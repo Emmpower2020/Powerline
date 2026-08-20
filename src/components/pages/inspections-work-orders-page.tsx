@@ -1,0 +1,84 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { apiClient } from "@/lib/api-client";
+import { API_ENDPOINTS } from "@/lib/api-config";
+import type { Inspection, WorkOrder, PaginatedResponse } from "@/lib/types";
+import { DataTable, type DataTableColumn } from "@/components/data-table";
+import { CreateInspectionDialog, CreateWorkOrderDialog } from "@/components/create-dialogs";
+import { Badge } from "@/components/ui/badge";
+
+export function InspectionsPage() {
+  const [data, setData] = useState<Inspection[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [showCreate, setShowCreate] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  useEffect(() => {
+    const load = async () => {
+      setLoading(true);
+      try { const result = await apiClient.get<PaginatedResponse<Inspection>>(API_ENDPOINTS.inspections, { page: 1, page_size: 500 }); setData(result?.data || []); }
+      catch (err) { console.error("خطا:", err); } finally { setLoading(false); }
+    };
+    load();
+  }, [refreshKey]);
+
+  const statusLabels: Record<string, string> = { draft: "پیش‌نویس", in_progress: "در حال انجام", submitted: "ارسال شده", approved: "تأیید شده", rejected: "رد شده", cancelled: "لغو شده" };
+  const priorityLabels: Record<string, string> = { routine: "معمول", emergency: "اضطراری", follow_up: "پیگیری", commissioning: "راه‌اندازی" };
+
+  const columns: DataTableColumn<Inspection>[] = [
+    { key: "inspection_code", header: "کد", sortable: true, filterable: true, align: "left" },
+    { key: "line_code", header: "خط", sortable: true, filterable: true },
+    { key: "tower_code", header: "دکل" },
+    { key: "inspector_name", header: "بازرس", sortable: true, filterable: true },
+    { key: "inspection_date", header: "تاریخ", sortable: true, type: "date" },
+    { key: "priority", header: "نوع", type: "badge", badgeLabels: priorityLabels, badgeColors: { routine: "bg-slate-100 text-slate-700", emergency: "bg-red-100 text-red-700", follow_up: "bg-amber-100 text-amber-700", commissioning: "bg-blue-100 text-blue-700" } },
+    { key: "status", header: "وضعیت", type: "badge", badgeLabels: statusLabels, badgeColors: { draft: "bg-slate-100 text-slate-700", submitted: "bg-amber-100 text-amber-700", approved: "bg-green-100 text-green-700", rejected: "bg-red-100 text-red-700", cancelled: "bg-slate-100 text-slate-500" } },
+  ];
+
+  return (
+    <div className="space-y-4">
+      <DataTable data={data} columns={columns} loading={loading}
+        searchKeys={["inspection_code", "line_code", "inspector_name"]}
+        title="بازدیدها" onAdd={() => setShowCreate(true)} onRefresh={() => setRefreshKey(k => k + 1)} />
+      <CreateInspectionDialog open={showCreate} onClose={() => setShowCreate(false)} onCreated={() => { setShowCreate(false); setRefreshKey(k => k + 1); }} />
+    </div>
+  );
+}
+
+export function WorkOrdersPage() {
+  const [data, setData] = useState<WorkOrder[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [showCreate, setShowCreate] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  useEffect(() => {
+    const load = async () => {
+      setLoading(true);
+      try { const result = await apiClient.get<PaginatedResponse<WorkOrder>>(API_ENDPOINTS.workOrders, { page: 1, page_size: 500 }); setData(result?.data || []); }
+      catch (err) { console.error("خطا:", err); } finally { setLoading(false); }
+    };
+    load();
+  }, [refreshKey]);
+
+  const statusLabels: Record<string, string> = { draft: "پیش‌نویس", assigned: "اختصاص داده شده", in_progress: "در حال انجام", on_hold: "متوقف", completed: "تکمیل شده", cancelled: "لغو شده", verified: "تأیید نهایی" };
+  const priorityLabels: Record<string, string> = { critical: "بحرانی", high: "بالا", medium: "متوسط", low: "پایین" };
+
+  const columns: DataTableColumn<WorkOrder>[] = [
+    { key: "wo_code", header: "کد", sortable: true, filterable: true, align: "left" },
+    { key: "title", header: "عنوان", sortable: true, filterable: true },
+    { key: "priority", header: "اولویت", type: "badge", badgeLabels: priorityLabels, badgeColors: { critical: "bg-red-100 text-red-700", high: "bg-orange-100 text-orange-700", medium: "bg-amber-100 text-amber-700", low: "bg-slate-100 text-slate-700" } },
+    { key: "crew_name", header: "اکیپ", sortable: true, filterable: true },
+    { key: "planned_start", header: "شروع پلن", type: "date" },
+    { key: "status", header: "وضعیت", type: "badge", badgeLabels: statusLabels, badgeColors: { draft: "bg-slate-100 text-slate-700", assigned: "bg-blue-100 text-blue-700", in_progress: "bg-amber-100 text-amber-700", completed: "bg-green-100 text-green-700", cancelled: "bg-red-100 text-red-700", verified: "bg-indigo-100 text-indigo-700" } },
+  ];
+
+  return (
+    <div className="space-y-4">
+      <DataTable data={data} columns={columns} loading={loading}
+        searchKeys={["wo_code", "title", "crew_name"]}
+        title="دستورکارها" onAdd={() => setShowCreate(true)} onRefresh={() => setRefreshKey(k => k + 1)} />
+      <CreateWorkOrderDialog open={showCreate} onClose={() => setShowCreate(false)} onCreated={() => { setShowCreate(false); setRefreshKey(k => k + 1); }} />
+    </div>
+  );
+}
