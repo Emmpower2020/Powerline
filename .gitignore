@@ -40,7 +40,8 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
-local-*
+# فقط فایل‌های محلی ریشه (نه src/lib/local-cache.ts)
+/local-*
 .claude
 .z-ai-config
 *.log
