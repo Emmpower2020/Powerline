@@ -101,10 +101,12 @@ export interface BasemapDef {
 }
 
 // مختصات کاشی ثابت برای منطقه کرمانشاه — z=12 (نمای منطقه)
-const KERMANSHAH_TILE = { x: 2618, y: 1517, z: 12 };
+// v4.2.1: اصلاح مختصات — قبلاً 2618/1517 به ناحیه خزر اشاره می‌کرد که خالی بود.
+// مختصات صحیح برای lat=34.3, lng=47.0: x=2582, y=1632
+const KERMANSHAH_TILE = { x: 2582, y: 1632, z: 12 };
 
 // مختصات کاشی ماهواره‌ای Esri برای همان ناحیه
-const ESRI_SAT_TILE = { x: 2618, y: 1517, z: 12 };
+const ESRI_SAT_TILE = { x: 2582, y: 1632, z: 12 };
 
 export const BASEMAPS: BasemapDef[] = [
   {
@@ -212,20 +214,50 @@ const FALLBACK_THUMB_SVG = "data:image/svg+xml;utf8," + encodeURIComponent(
   `<svg xmlns="http://www.w3.org/2000/svg" width="220" height="130"><rect width="220" height="130" fill="#f1f5f9"/><text x="50%" y="50%" font-size="10" fill="#94a3b8" text-anchor="middle" dominant-baseline="middle">پیش‌نمایش</text></svg>`
 );
 
+// v4.2.2: پارامتر cache-busting برای اطمینان از بارگذاری نسخه جدید بعد از تغییر مختصات
+const THUMB_CACHE_BUSTER = "v4.2.2";
+
+// v4.2.2: مسیر پروکسی محلی برای دور زدن CORS/مسدودسازی روی مرورگر کاربر
+// مسیر: /api/tile/<provider>/<z>/<x>/<y>
+// این تابع provider مناسب را بر اساس BasemapId برمی‌گرداند
+function basemapProvider(id: BasemapId): string | null {
+  switch (id) {
+    case "osm": return "osm";
+    case "osm-hot": return "osm-hot";
+    case "carto-light": return "carto-light";
+    case "carto-dark": return "carto-dark";
+    case "esri-satellite": return "esri-satellite";
+    case "esri-street": return "esri-street";
+    case "esri-topo": return "esri-topo";
+    case "opentopo": return "opentopo";
+    default: return null;
+  }
+}
+
 export function basemapThumbUrl(b: BasemapDef): string | null {
   if (b.id === "blank") return null;
-  if (!b.url || !b.thumb) return FALLBACK_THUMB_SVG;
-  // مختصات واقعی کاشی از همان منبع
-  const sub = b.subdomains ? b.subdomains[0] : "a";
-  return b.url
-    .replace("{s}", sub)
-    .replace("{z}", String(b.thumb.z))
-    .replace("{x}", String(b.thumb.x))
-    .replace("{y}", String(b.thumb.y))
-    .replace("{r}", "");
+  if (!b.thumb) return FALLBACK_THUMB_SVG;
+  // v4.2.2: استفاده از پروکسی محلی برای بارگذاری کاشی از طریق سرور خودمان
+  // این کار از مشکلات CORS، مسدودسازی شبکه، و عدم بارگذاری در برخی مرورگرها جلوگیری می‌کند
+  const provider = basemapProvider(b.id);
+  if (!provider) return FALLBACK_THUMB_SVG;
+  const { z, x, y } = b.thumb;
+  return `/api/tile/${provider}/${z}/${x}/${y}?cb=${THUMB_CACHE_BUSTER}`;
 }
 
 /** رنگ پیش‌فرض برچسب‌های خطوط روی نقشه (وارونه نسبت به پس‌زمینه) */
 export function basemapLabelColor(b: BasemapDef): string {
   return b.labelColor ?? (b.dark ? "#f1f5f9" : "#0f172a");
+}
+
+/**
+ * v4.2.2: URL کاشی برای TileLayer — از طریق پروکسی محلی
+ * این کار از مشکلات CORS، مسدودسازی شبکه، و عدم بارگذاری برخی کاشی‌ها جلوگیری می‌کند.
+ * الگوی {z}/{x}/{y} که Leaflet آن‌ها را با مختصات واقعی جایگزین می‌کند.
+ */
+export function basemapTileUrl(b: BasemapDef): string | null {
+  if (b.id === "blank") return null;
+  const provider = basemapProvider(b.id);
+  if (!provider) return null;
+  return `/api/tile/${provider}/{z}/{x}/{y}`;
 }

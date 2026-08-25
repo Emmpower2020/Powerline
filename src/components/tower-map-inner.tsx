@@ -8,6 +8,7 @@ import "leaflet-textpath";
 import {
   basemapById,
   basemapLabelColor,
+  basemapTileUrl,
   voltageStyle,
   towerTypeStyle,
   towerTypeLabel,
@@ -271,8 +272,16 @@ function RoutesOverlay({
       for (const part of g.parts) {
         const line = linesById.get(part.lineId);
         const vs = voltageStyle(line?.voltage_kv);
-        const latlngs = part.points.map((p) => [p.lat, p.lng] as [number, number]);
+        let latlngs = part.points.map((p) => [p.lat, p.lng] as [number, number]);
         if (latlngs.length === 0) continue;
+
+        // v4.2.1: معکوس‌سازی جهت مسیر برای خوانایی متن نام خط
+        // leaflet-textpath متن را در جهت مسیر می‌چیند. اگر مسیر راست‌به‌چپ باشد،
+        // متن ۱۸۰° چرخیده (سر و ته) نمایش داده می‌شود. با معکوس کردن نقاط،
+        // جهت کلی مسیر چپ‌به‌راست می‌شود و متن همیشه بالای خط و قابل خواندن است.
+        if (latlngs.length >= 2 && latlngs[latlngs.length - 1][1] < latlngs[0][1]) {
+          latlngs = [...latlngs].reverse();
+        }
 
         // مسیر با دورخط سفید برای خوانایی روی هر نقشه
         casings.push(
@@ -294,21 +303,26 @@ function RoutesOverlay({
         const lineName = line ? `${line.name}` : `خط ${part.lineId}`;
         const lineCode = line?.line_code || "";
 
-        // v4.2.0: نام خط موازی با مسیر — بدون پس‌زمینه، با رنگ وارونه نقشه
-        // leaflet-textpath با SVG renderer کار می‌کند و متن در طول مسیر قرار می‌گیرد
+        // v4.2.4: نام خط موازی با مسیر — وزن فونت سبک (500) طبق درخواست کاربر
+        // فونت: Vazirmatn (با CSS var که next/font ثبت کرده) + fallback کلاسیک
+        // font-size 16px، stroke-width 5 → هاله سفید پهن برای کنتراست روی هر پس‌زمینه
+        // paint-order: stroke fill → هاله اول کشیده می‌شود تا کاراکترها روی آن بیفتند
         (main as any).setText(lineName, {
           repeat: false,
           center: true,
-          offset: -8,
+          offset: -10,
           attributes: {
-            "font-size": "13",
-            "font-weight": "700",
-            "font-family": "Vazirmatn, Tahoma, sans-serif",
+            "font-size": "16",
+            "font-weight": "500",
+            "font-family": "var(--font-vazirmatn), Tahoma, sans-serif",
             fill: labelColor,
-            stroke: labelColor === "#ffffff" ? "#000000" : "#ffffff",
-            "stroke-width": "3",
-            "paint-order": "stroke",
+            stroke: labelColor === "#ffffff" ? "rgba(15, 23, 42, 0.9)" : "#ffffff",
+            "stroke-width": "5",
+            "stroke-linejoin": "round",
+            "stroke-linecap": "round",
+            "paint-order": "stroke fill",
             "text-anchor": "middle",
+            "letter-spacing": "0",
           },
         });
 
@@ -812,13 +826,12 @@ export function TowerMapInner({
         doubleClickZoom={false}
       >
         {!isBlank && <ScaleControl position="bottomright" metric imperial={false} />}
-        {!isBlank && bm.url && (
+        {!isBlank && (
           <TileLayer
             key={bm.id}
-            url={bm.url}
+            url={basemapTileUrl(bm) ?? bm.url ?? ""}
             attribution={bm.attribution}
             maxZoom={bm.maxZoom ?? 19}
-            crossOrigin
             {...(bm.subdomains ? { subdomains: bm.subdomains } : {})}
           />
         )}

@@ -470,8 +470,6 @@ export function MapPage() {
                               alt={b.title}
                               className="w-full h-full object-cover"
                               loading="lazy"
-                              referrerPolicy="no-referrer"
-                              crossOrigin="anonymous"
                               onError={(e) => {
                                 (e.target as HTMLImageElement).style.opacity = "0";
                               }}
@@ -563,213 +561,210 @@ export function MapPage() {
         </div>
       )}
 
-      {/* ─── پنل انتخاب خطوط (سمت چپ) — v4.2.0: عرض ۳۴۰، ارتفاع کوتاه‌تر، فاصله بالا/پایین بیشتر ─── */}
+      {/* ─── پنل انتخاب خطوط (سمت چپ) — v4.2.2: top هم‌سطح جعبه ابزار، مینیمال = جمع شدن ارتفاعی ─── */}
       {!loading && !error && (
         <div
-          className="absolute z-[600] transition-transform duration-300"
+          className="absolute z-[600] transition-all duration-300"
           style={{
-            top: "4.5rem",
-            bottom: "2.5rem",
-            left: sidebarOpen ? "0.75rem" : "-380px",
+            top: "0.5rem",
+            bottom: sidebarOpen ? "2.5rem" : "auto",
+            left: "0.75rem",
             width: "340px",
+            height: sidebarOpen ? undefined : "auto",
           }}
         >
-          <div className="h-full flex flex-col rounded-2xl bg-white/97 dark:bg-slate-900/97 backdrop-blur border border-slate-200 dark:border-slate-700 shadow-2xl overflow-hidden">
-            {/* هدر پنل */}
-            <div className="px-3 py-2.5 border-b border-slate-100 dark:border-slate-800 bg-gradient-to-l from-slate-50 to-white dark:from-slate-900 dark:to-slate-900 shrink-0">
+          <div className={`flex flex-col rounded-2xl bg-white/97 dark:bg-slate-900/97 backdrop-blur border border-slate-200 dark:border-slate-700 shadow-2xl overflow-hidden ${sidebarOpen ? "h-full" : ""}`}>
+            {/* هدر پنل — قابل کلیک برای جمع/باز کردن */}
+            <div
+              className="px-3 py-2.5 border-b border-slate-100 dark:border-slate-800 bg-gradient-to-l from-slate-50 to-white dark:from-slate-900 dark:to-slate-900 shrink-0 cursor-pointer select-none"
+              onClick={() => setSidebarOpen((v) => !v)}
+            >
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <ListFilter className="w-4 h-4 text-violet-600 dark:text-violet-400" />
-                  <h3 className="text-sm font-bold text-slate-800 dark:text-slate-100">انتخاب خطوط</h3>
+                  <h3 className="text-base font-bold text-slate-800 dark:text-slate-100">انتخاب خطوط</h3>
                 </div>
-                <div className="flex items-center gap-1">
-                  {selectedCount > 0 && (
+                <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                  {sidebarOpen && selectedCount > 0 && (
                     <button
                       onClick={clearSelection}
-                      className="text-[11px] text-red-600 hover:text-red-700 dark:text-red-400 cursor-pointer px-2 py-1 rounded-lg hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors"
+                      className="text-[13px] text-red-600 hover:text-red-700 dark:text-red-400 cursor-pointer px-2 py-1 rounded-lg hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors"
                     >
                       پاک کردن
                     </button>
                   )}
                   <button
-                    onClick={() => setSidebarOpen(false)}
-                    title="جمع کردن پنل"
+                    onClick={() => setSidebarOpen((v) => !v)}
+                    title={sidebarOpen ? "جمع کردن پنل" : "باز کردن پنل"}
                     className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
                   >
-                    <ChevronRight className="w-4 h-4" />
+                    {sidebarOpen
+                      ? <ChevronRight className="w-4 h-4" />
+                      : <ChevronDown className="w-4 h-4" />
+                    }
                   </button>
                 </div>
               </div>
-              {/* جستجو */}
-              <div className="relative mt-2">
-                <Search className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
-                <Input
-                  placeholder="جستجوی نام یا کد خط..."
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  className="h-8 pr-8 text-xs bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700"
-                />
-                {s && (
-                  <button
-                    onClick={() => setSearch("")}
-                    className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
-                  >
-                    <X className="w-3.5 h-3.5" />
-                  </button>
-                )}
-              </div>
-            </div>
-
-            {/* فهرست گروه‌های ولتاژ */}
-            <div className="flex-1 overflow-y-auto overscroll-contain">
-              {filteredGroups.length === 0 && (
-                <div className="p-6 text-center text-xs text-slate-400">
-                  خطی با این جستجو پیدا نشد
+              {sidebarOpen && (
+                <div className="relative mt-2">
+                  <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                  <Input
+                    placeholder="جستجوی نام یا کد خط..."
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    className="h-9 pr-9 text-sm bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700"
+                  />
+                  {s && (
+                    <button
+                      onClick={() => setSearch("")}
+                      className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  )}
                 </div>
               )}
-              {filteredGroups.map((g) => {
-                const allSelected = g.lines.every((l) => selectedLineIds.has(l.id));
-                const someSelected = g.lines.some((l) => selectedLineIds.has(l.id));
-                const collapsed = collapsedGroups.has(g.kv ?? 0);
-                return (
-                  <div key={String(g.kv)} className="border-b border-slate-100 dark:border-slate-800/60 last:border-b-0">
-                    {/* سرگروه ولتاژ */}
-                    <div
-                      className="flex items-center gap-2 px-3 py-2 select-none sticky top-0 z-10"
-                      style={{ background: g.bg }}
-                    >
-                      <Checkbox
-                        checked={allSelected ? true : someSelected ? "indeterminate" : false}
-                        onCheckedChange={() => toggleGroup(g.lines)}
-                        className="data-[state=checked]:border-white"
-                        style={{ borderColor: g.color }}
-                      />
-                      <button
-                        onClick={() =>
-                          setCollapsedGroups((prev) => {
-                            const next = new Set(prev);
-                            const k = g.kv ?? 0;
-                            if (next.has(k)) next.delete(k);
-                            else next.add(k);
-                            return next;
-                          })
-                        }
-                        className="flex flex-1 items-center gap-2 cursor-pointer min-w-0 text-right"
-                      >
-                        <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: g.color }} />
-                        <span className="text-xs font-bold truncate" style={{ color: g.text }}>
-                          خطوط {g.label}
-                        </span>
-                        <span
-                          className="text-[10px] rounded-full px-1.5 py-0.5 shrink-0 nums-fa"
-                          style={{ background: "rgba(255,255,255,0.7)", color: g.text }}
-                        >
-                          {fa(g.lines.length)}
-                        </span>
-                        <ChevronDown
-                          className={`w-3.5 h-3.5 shrink-0 transition-transform ${collapsed ? "-rotate-90" : ""}`}
-                          style={{ color: g.text }}
-                        />
-                      </button>
-                    </div>
-                    {/* خطوط گروه */}
-                    {!collapsed && (
-                      <div className="py-1">
-                        {g.lines.map((l) => {
-                          const checked = selectedLineIds.has(l.id);
-                          return (
-                            <label
-                              key={l.id}
-                              className={`flex items-start gap-2 px-3 py-1.5 mx-1.5 rounded-lg cursor-pointer transition-colors ${
-                                checked
-                                  ? "bg-slate-100 dark:bg-slate-800"
-                                  : "hover:bg-slate-50 dark:hover:bg-slate-800/60"
-                              }`}
-                              onMouseEnter={() => setHoveredLineId(l.id)}
-                              onMouseLeave={() => setHoveredLineId(null)}
-                            >
-                              <Checkbox
-                                checked={checked}
-                                onCheckedChange={() => toggleLine(l.id)}
-                                className="mt-0.5"
-                              />
-                              <span className="w-1.5 h-1.5 rounded-full mt-2 shrink-0" style={{ background: g.color }} />
-                              <span className="min-w-0 flex-1">
-                                <span
-                                  className={`block text-[11.5px] leading-snug truncate ${
-                                    checked
-                                      ? "font-semibold text-slate-800 dark:text-slate-100"
-                                      : "text-slate-600 dark:text-slate-300"
-                                  }`}
-                                  title={l.name}
-                                >
-                                  {l.name}
-                                </span>
-                                <span className="flex items-center gap-1.5 mt-0.5">
-                                  <span
-                                    className="text-[9.5px] font-mono rounded px-1 py-px bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400"
-                                    dir="ltr"
-                                  >
-                                    {l.line_code}
-                                  </span>
-                                  <span className="text-[9.5px] text-slate-400 nums-fa">
-                                    {l.towerCount > 0 ? `${fa(l.towerCount)} دکل` : "بدون دکل"}
-                                  </span>
-                                </span>
-                              </span>
-                            </label>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
+              {!sidebarOpen && selectedCount > 0 && (
+                <div className="mt-1 flex items-center gap-2">
+                  <span className="text-[13px] text-slate-500 dark:text-slate-400">
+                    <b className="text-slate-700 dark:text-slate-200 nums-fa">{fa(selectedCount)}</b> خط انتخاب شده
+                  </span>
+                </div>
+              )}
             </div>
 
-            {/* فوتر پنل — وضعیت انتخاب */}
-            <div className="shrink-0 px-3 py-2 border-t border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-900">
-              <div className="flex items-center justify-between text-[11px]">
-                <span className="text-slate-500 dark:text-slate-400">
-                  <b className="text-slate-800 dark:text-slate-100 nums-fa">{fa(selectedCount)}</b> خط انتخاب
-                </span>
-                <span className="text-slate-400 nums-fa">{fa(drawnTowerCount)} دکل</span>
-              </div>
-            </div>
+            {/* فهرست گروه‌های ولتاژ — فقط وقتی پنل باز است */}
+            {sidebarOpen && (
+              <>
+                <div className="flex-1 overflow-y-auto overscroll-contain">
+                  {filteredGroups.length === 0 && (
+                    <div className="p-6 text-center text-sm text-slate-400">
+                      خطی با این جستجو پیدا نشد
+                    </div>
+                  )}
+                  {filteredGroups.map((g) => {
+                    const allSelected = g.lines.every((l) => selectedLineIds.has(l.id));
+                    const someSelected = g.lines.some((l) => selectedLineIds.has(l.id));
+                    const collapsed = collapsedGroups.has(g.kv ?? 0);
+                    return (
+                      <div key={String(g.kv)} className="border-b border-slate-100 dark:border-slate-800/60 last:border-b-0">
+                        {/* سرگروه ولتاژ */}
+                        <div
+                          className="flex items-center gap-2 px-3 py-2 select-none sticky top-0 z-10"
+                          style={{ background: g.bg }}
+                        >
+                          <Checkbox
+                            checked={allSelected ? true : someSelected ? "indeterminate" : false}
+                            onCheckedChange={() => toggleGroup(g.lines)}
+                            className="data-[state=checked]:border-white"
+                            style={{ borderColor: g.color }}
+                          />
+                          <button
+                            onClick={() =>
+                              setCollapsedGroups((prev) => {
+                                const next = new Set(prev);
+                                const k = g.kv ?? 0;
+                                if (next.has(k)) next.delete(k);
+                                else next.add(k);
+                                return next;
+                              })
+                            }
+                            className="flex flex-1 items-center gap-2 cursor-pointer min-w-0 text-right"
+                          >
+                            <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: g.color }} />
+                            <span className="text-sm font-bold truncate" style={{ color: g.text }}>
+                              خطوط {g.label}
+                            </span>
+                            <span
+                              className="text-[12px] rounded-full px-1.5 py-0.5 shrink-0 nums-fa"
+                              style={{ background: "rgba(255,255,255,0.7)", color: g.text }}
+                            >
+                              {fa(g.lines.length)}
+                            </span>
+                            <ChevronDown
+                              className={`w-3.5 h-3.5 shrink-0 transition-transform ${collapsed ? "-rotate-90" : ""}`}
+                              style={{ color: g.text }}
+                            />
+                          </button>
+                        </div>
+                        {/* خطوط گروه */}
+                        {!collapsed && (
+                          <div className="py-1">
+                            {g.lines.map((l) => {
+                              const checked = selectedLineIds.has(l.id);
+                              return (
+                                <label
+                                  key={l.id}
+                                  className="flex items-start gap-2 px-3 py-1.5 mx-1.5 rounded-lg cursor-pointer transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/60"
+                                  onMouseEnter={() => setHoveredLineId(l.id)}
+                                  onMouseLeave={() => setHoveredLineId(null)}
+                                >
+                                  <Checkbox
+                                    checked={checked}
+                                    onCheckedChange={() => toggleLine(l.id)}
+                                    className="mt-0.5"
+                                  />
+                                  <span className="w-1.5 h-1.5 rounded-full mt-2 shrink-0" style={{ background: g.color }} />
+                                  <span className="min-w-0 flex-1">
+                                    <span
+                                      className="block text-[13.5px] leading-snug truncate text-slate-600 dark:text-slate-300"
+                                      title={l.name}
+                                    >
+                                      {l.name}
+                                    </span>
+                                    <span className="flex items-center gap-1.5 mt-0.5">
+                                      <span
+                                        className="text-[11.5px] font-mono rounded px-1 py-px bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400"
+                                        dir="ltr"
+                                      >
+                                        {l.line_code}
+                                      </span>
+                                      <span className="text-[11.5px] text-slate-400 nums-fa">
+                                        {l.towerCount > 0 ? `${fa(l.towerCount)} دکل` : "بدون دکل"}
+                                      </span>
+                                    </span>
+                                  </span>
+                                </label>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* فوتر پنل — وضعیت انتخاب */}
+                <div className="shrink-0 px-3 py-2 border-t border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-900">
+                  <div className="flex items-center justify-between text-[13px]">
+                    <span className="text-slate-500 dark:text-slate-400">
+                      <b className="text-slate-800 dark:text-slate-100 nums-fa">{fa(selectedCount)}</b> خط انتخاب
+                    </span>
+                    <span className="text-slate-400 nums-fa">{fa(drawnTowerCount)} دکل</span>
+                  </div>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}
 
-      {/* دکمه باز کردن پنل بسته شده (سمت چپ) */}
-      {!loading && !error && !sidebarOpen && (
-        <button
-          onClick={() => setSidebarOpen(true)}
-          className="absolute z-[600] top-20 left-3 flex items-center gap-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 shadow-lg px-3 py-2 text-xs font-medium text-slate-700 dark:text-slate-200 hover:shadow-xl transition-all cursor-pointer"
-        >
-          <ListFilter className="w-4 h-4 text-violet-600" />
-          انتخاب خطوط
-          {selectedCount > 0 && (
-            <span className="bg-violet-100 dark:bg-violet-950 text-violet-700 dark:text-violet-300 rounded-full px-1.5 py-0.5 text-[10px] font-bold nums-fa">
-              {fa(selectedCount)}
-            </span>
-          )}
-        </button>
-      )}
+      {/* دکمه باز کردن پنل حذف شد — در حالت مینیمال، هدر پنل همچنان قابل مشاهده است و کاربر می‌تواند با کلیک روی هدر یا دکمه chevron پنل را باز کند */}
 
-      {/* ─── نوار وضعیت پایین ─── */}
+      {/* ─── نوار وضعیت پایین — v4.2.3: به وسط پایین منتقل شد تا با سایدبار خطوط تداخل نداشته باشد ─── */}
       {!loading && !error && (
-        <div className="absolute z-[500] bottom-3 left-3 flex items-center gap-1.5 pointer-events-none" dir="rtl">
+        <div className="absolute z-[500] bottom-3 left-1/2 -translate-x-1/2 flex items-center gap-1.5 pointer-events-none" dir="rtl">
           {selectedCount > 0 && (
             <>
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-white/95 dark:bg-slate-900/95 backdrop-blur border border-slate-200 dark:border-slate-700 px-3 py-1.5 text-[11px] text-slate-600 dark:text-slate-300 shadow-lg">
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-white/95 dark:bg-slate-900/95 backdrop-blur border border-slate-200 dark:border-slate-700 px-3 py-1.5 text-[12px] text-slate-600 dark:text-slate-300 shadow-lg">
                 <Layers className="w-3.5 h-3.5 text-violet-500" />
                 <b className="nums-fa">{fa(selectedCount)}</b> خط
               </span>
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-white/95 dark:bg-slate-900/95 backdrop-blur border border-slate-200 dark:border-slate-700 px-3 py-1.5 text-[11px] text-slate-600 dark:text-slate-300 shadow-lg">
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-white/95 dark:bg-slate-900/95 backdrop-blur border border-slate-200 dark:border-slate-700 px-3 py-1.5 text-[12px] text-slate-600 dark:text-slate-300 shadow-lg">
                 <b className="nums-fa">{fa(drawnTowerCount)}</b> دکل
               </span>
               {totalKm > 0 && (
-                <span className="inline-flex items-center gap-1.5 rounded-full bg-white/95 dark:bg-slate-900/95 backdrop-blur border border-slate-200 dark:border-slate-700 px-3 py-1.5 text-[11px] text-slate-600 dark:text-slate-300 shadow-lg">
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-white/95 dark:bg-slate-900/95 backdrop-blur border border-slate-200 dark:border-slate-700 px-3 py-1.5 text-[12px] text-slate-600 dark:text-slate-300 shadow-lg">
                   <b className="nums-fa">{fa(Math.round(totalKm))}</b> کیلومتر
                 </span>
               )}

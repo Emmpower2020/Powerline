@@ -22,6 +22,7 @@ import {
 import { cn } from "@/lib/utils";
 import { useBootstrap } from "@/hooks/use-bootstrap";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { APP_VERSION } from "@/lib/version";
 
 type Page =
   | "dashboard" | "maps"
@@ -190,6 +191,11 @@ export function DashboardLayout({ children, currentPage, onNavigate, title, subt
               </div>
             ))}
           </nav>
+          {/* v4.2.4: نشان نسخه برنامه در پایین سایدبار — کاربر می‌بیند کدام نسخه در حال اجراست */}
+          <div className="px-4 py-2.5 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
+            <span className="text-[10px] text-slate-400 dark:text-slate-500" dir="ltr">{APP_VERSION}</span>
+            <span className="text-[10px] text-slate-400 dark:text-slate-500">نسخه برنامه</span>
+          </div>
         </div>
       </aside>
       {sidebarOpen && <div className="fixed inset-0 bg-black/20 z-30 lg:hidden" onClick={() => setSidebarOpen(false)} />}
