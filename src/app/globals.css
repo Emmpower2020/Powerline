@@ -369,26 +369,13 @@
   color: #e2e8f0;
 }
 
-/* برچسب دائمی نام خط روی مسیر — همیشه در مرکز توجه */
+/* v4.2.0: نام خط موازی با مسیر — بدون پس‌زمینه (تول‌تیپ دائمی حذف شد) */
+/* استایل قدیمی پاک شد. نام خط روی نقشه حالا با leaflet-textpath نوشته می‌شود */
+/* رنگ و قلم متن در attributes درون کد مشخص می‌شود (auto-contrast) */
+
+/* تولتیپ تعاملی هنگام hover (با جزئیات) — با پس‌زمینه */
 .leaflet-tooltip.route-name-permanent {
-  background: rgba(255, 255, 255, 0.96);
-  color: #1e293b;
-  border: 1px solid rgba(15, 23, 42, 0.18);
-  border-radius: 8px;
-  padding: 2px 8px;
-  font-size: 11px;
-  font-weight: 700;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18);
-  white-space: nowrap;
-  pointer-events: none;
-}
-.leaflet-tooltip.route-name-permanent::before {
   display: none !important;
-}
-.dark .leaflet-tooltip.route-name-permanent {
-  background: rgba(15, 23, 42, 0.94);
-  color: #f1f5f9;
-  border-color: rgba(255, 255, 255, 0.2);
 }
 
 /* برچسب ابزار اندازه‌گیری */

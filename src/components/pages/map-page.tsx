@@ -357,7 +357,6 @@ export function MapPage() {
       {!loading && !error && (
         <div
           className="absolute z-[700] top-2 left-1/2 -translate-x-1/2 flex items-center gap-0.5 rounded-2xl bg-white/95 dark:bg-slate-900/95 backdrop-blur border border-slate-200 dark:border-slate-700 shadow-xl px-1.5 py-1.5"
-          style={{ left: sidebarOpen ? "calc(50% + 144px)" : "50%" }}
           onClick={(e) => e.stopPropagation()}
         >
           {/* اندازه‌گیری طول */}
@@ -471,8 +470,10 @@ export function MapPage() {
                               alt={b.title}
                               className="w-full h-full object-cover"
                               loading="lazy"
+                              referrerPolicy="no-referrer"
+                              crossOrigin="anonymous"
                               onError={(e) => {
-                                (e.target as HTMLImageElement).style.display = "none";
+                                (e.target as HTMLImageElement).style.opacity = "0";
                               }}
                             />
                           ) : (
@@ -562,15 +563,15 @@ export function MapPage() {
         </div>
       )}
 
-      {/* ─── پنل انتخاب خطوط (سمت چپ) ─── */}
+      {/* ─── پنل انتخاب خطوط (سمت چپ) — v4.2.0: عرض ۳۴۰، ارتفاع کوتاه‌تر، فاصله بالا/پایین بیشتر ─── */}
       {!loading && !error && (
         <div
           className="absolute z-[600] transition-transform duration-300"
           style={{
-            top: "4rem",
-            bottom: "1.5rem",
-            left: sidebarOpen ? "0.75rem" : "-302px",
-            width: "288px",
+            top: "4.5rem",
+            bottom: "2.5rem",
+            left: sidebarOpen ? "0.75rem" : "-380px",
+            width: "340px",
           }}
         >
           <div className="h-full flex flex-col rounded-2xl bg-white/97 dark:bg-slate-900/97 backdrop-blur border border-slate-200 dark:border-slate-700 shadow-2xl overflow-hidden">

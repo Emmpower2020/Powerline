@@ -3,8 +3,11 @@
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import { MapContainer, TileLayer, useMap, ScaleControl } from "react-leaflet";
 import L from "leaflet";
+// v4.2.0: leaflet-textpath برای نوشتن نام خط موازی با مسیر
+import "leaflet-textpath";
 import {
   basemapById,
+  basemapLabelColor,
   voltageStyle,
   towerTypeStyle,
   towerTypeLabel,
@@ -198,6 +201,7 @@ function RoutesOverlay({
   hoveredLineId,
   onTowerClick,
   fitTrigger,
+  labelColor,
 }: {
   routes: BuiltRoutes;
   towersById: Map<number, Tower>;
@@ -205,9 +209,13 @@ function RoutesOverlay({
   hoveredLineId: number | null;
   onTowerClick?: (tower: Tower) => void;
   fitTrigger: number;
+  labelColor: string;
 }) {
   const map = useMap();
-  const rendererRef = useRef<any>(null);
+  // رندرکننده SVG جداگانه برای مسیرها — leaflet-textpath فقط با SVG کار می‌کند
+  const svgRendererRef = useRef<L.SVG | null>(null);
+  // رندرکننده Canvas برای دکل‌ها (سفارشی با اشکال)
+  const canvasRendererRef = useRef<any>(null);
   const groupRef = useRef<L.LayerGroup | null>(null);
   const polylineIndexRef = useRef<Map<number, L.Polyline[]>>(new Map());
   const towerClickRef = useRef(onTowerClick);
@@ -226,23 +234,31 @@ function RoutesOverlay({
   }, [map]);
 
   useEffect(() => {
-    const renderer = new (ShapeCanvasRenderer as any)({ padding: 0.3 });
-    renderer.addTo(map);
+    // رندرکننده SVG برای مسیرها — leaflet-textpath فقط با SVG کار می‌کند
+    const svgRenderer = L.svg({ padding: 0.3 });
+    svgRenderer.addTo(map);
+    // رندرکننده Canvas سفارشی برای دکل‌ها
+    const canvasRenderer = new (ShapeCanvasRenderer as any)({ padding: 0.3 });
+    canvasRenderer.addTo(map);
     const group = L.layerGroup().addTo(map);
-    rendererRef.current = renderer;
+    svgRendererRef.current = svgRenderer as unknown as L.SVG;
+    canvasRendererRef.current = canvasRenderer;
     groupRef.current = group;
     return () => {
       group.remove();
-      (renderer as L.Layer).remove();
-      rendererRef.current = null;
+      (svgRenderer as L.Layer).remove();
+      (canvasRenderer as L.Layer).remove();
+      svgRendererRef.current = null;
+      canvasRendererRef.current = null;
       groupRef.current = null;
     };
   }, [map]);
 
   useEffect(() => {
     const group = groupRef.current;
-    const renderer = rendererRef.current;
-    if (!group || !renderer) return;
+    const svgRenderer = svgRendererRef.current;
+    const canvasRenderer = canvasRendererRef.current;
+    if (!group || !svgRenderer || !canvasRenderer) return;
     group.clearLayers();
     polylineIndexRef.current = new Map();
 
@@ -261,7 +277,7 @@ function RoutesOverlay({
         // مسیر با دورخط سفید برای خوانایی روی هر نقشه
         casings.push(
           L.polyline(latlngs, {
-            renderer,
+            renderer: svgRenderer,
             color: "#ffffff",
             weight: 6,
             opacity: 0.7,
@@ -269,7 +285,7 @@ function RoutesOverlay({
           })
         );
         const main = L.polyline(latlngs, {
-          renderer,
+          renderer: svgRenderer,
           color: vs.color,
           weight: 3,
           opacity: 0.95,
@@ -277,14 +293,25 @@ function RoutesOverlay({
         });
         const lineName = line ? `${line.name}` : `خط ${part.lineId}`;
         const lineCode = line?.line_code || "";
-        // برچسب دائمی نام خط روی مسیر — در مرکز خط، همیشه قابل دیدن
-        main.bindTooltip(lineName, {
-          permanent: true,
-          direction: "center",
-          className: "route-name-permanent",
-          opacity: 1,
-          sticky: false,
+
+        // v4.2.0: نام خط موازی با مسیر — بدون پس‌زمینه، با رنگ وارونه نقشه
+        // leaflet-textpath با SVG renderer کار می‌کند و متن در طول مسیر قرار می‌گیرد
+        (main as any).setText(lineName, {
+          repeat: false,
+          center: true,
+          offset: -8,
+          attributes: {
+            "font-size": "13",
+            "font-weight": "700",
+            "font-family": "Vazirmatn, Tahoma, sans-serif",
+            fill: labelColor,
+            stroke: labelColor === "#ffffff" ? "#000000" : "#ffffff",
+            "stroke-width": "3",
+            "paint-order": "stroke",
+            "text-anchor": "middle",
+          },
         });
+
         // تولتیپ تعاملی هنگام hover — با جزئیات بیشتر
         main.bindTooltip(
           `<div dir="rtl" style="font-family:Vazirmatn,Tahoma,sans-serif"><b>${lineName}</b>${lineCode ? ` <span style="color:#64748b;font-size:11px">(${lineCode})</span>` : ""}<div style="color:${vs.color};font-size:11px">${vs.label} — ${part.points.length.toLocaleString("fa-IR")} دکل</div></div>`,
@@ -306,7 +333,7 @@ function RoutesOverlay({
               shape: ts.shape,
               color: vs.color,
               radius: 5,
-              renderer,
+              renderer: canvasRenderer,
               towerLabel: formatTowerLabel(tower),
               popupHtml: towerPopupHtml(tower, line),
               towerId: tower.id,
@@ -329,7 +356,7 @@ function RoutesOverlay({
               [c.from.lat, c.from.lng],
               [c.to.lat, c.to.lng],
             ],
-            { renderer, color: vs.color, weight: 2.5, opacity: 0.85, dashArray: "6 8", interactive: false }
+            { renderer: svgRenderer, color: vs.color, weight: 2.5, opacity: 0.85, dashArray: "6 8", interactive: false }
           )
         );
       }
@@ -339,7 +366,7 @@ function RoutesOverlay({
     for (const m of mains) m.addTo(group);
     for (const cn of connectors) cn.addTo(group);
     for (const mk of markers) mk.addTo(group);
-  }, [routes, towersById, linesById]);
+  }, [routes, towersById, linesById, labelColor]);
 
   // هایلایت خطِ hover شده از فهرست کناری
   useEffect(() => {
@@ -761,13 +788,15 @@ export function TowerMapInner({
 }: TowerMapInnerProps) {
   const bm = basemapById(basemapId);
   const isBlank = bm.id === "blank";
+  // v4.2.0: رنگ متن نام خطوط — وارونه نسبت به پس‌زمینه نقشه (مشکی روی روشن، سفید روی تیره/ماهواره)
+  const labelColor = useMemo(() => basemapLabelColor(bm), [bm]);
 
   // مرکز پیش‌فرض: منطقه کرمانشاه (محل خطوط واقعی داده)
   const center = useMemo<[number, number]>(() => [34.3, 47.0], []);
 
   return (
     <div
-      className="relative h-full w-full overflow-hidden"
+      className={`relative h-full w-full overflow-hidden ${bm.dark ? "dark-basemap" : "light-basemap"}`}
       style={{ background: isBlank ? "#ffffff" : bm.dark ? "#0f172a" : "#e8eaed" }}
     >
       <MapContainer
@@ -789,6 +818,7 @@ export function TowerMapInner({
             url={bm.url}
             attribution={bm.attribution}
             maxZoom={bm.maxZoom ?? 19}
+            crossOrigin
             {...(bm.subdomains ? { subdomains: bm.subdomains } : {})}
           />
         )}
@@ -800,6 +830,7 @@ export function TowerMapInner({
           hoveredLineId={hoveredLineId}
           onTowerClick={onTowerClick}
           fitTrigger={fitTrigger}
+          labelColor={labelColor}
         />
         <MapTools
           activeTool={activeTool}
