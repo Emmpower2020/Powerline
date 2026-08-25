@@ -1,0 +1,463 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "leaflet/dist/leaflet.css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-vazirmatn);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+:root {
+  --radius: 0.625rem;
+
+  /* پس‌زمینه روشن */
+  --background: oklch(0.99 0.005 264);
+  --foreground: oklch(0.20 0.04 264);
+
+  /* کارت‌های سفید */
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.20 0.04 264);
+
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.20 0.04 264);
+
+  /* رنگ اصلی: بنفش Indigo */
+  --primary: oklch(0.55 0.22 264);
+  --primary-foreground: oklch(0.99 0 0);
+
+  --secondary: oklch(0.96 0.01 264);
+  --secondary-foreground: oklch(0.25 0.04 264);
+
+  --muted: oklch(0.97 0.005 264);
+  --muted-foreground: oklch(0.50 0.03 264);
+
+  /* رنگ accent */
+  --accent: oklch(0.94 0.04 264);
+  --accent-foreground: oklch(0.40 0.18 264);
+
+  /* رنگ‌های وضعیت */
+  --destructive: oklch(0.60 0.22 25);
+  --success: oklch(0.65 0.18 150);
+  --warning: oklch(0.75 0.17 85);
+  --info: oklch(0.60 0.18 240);
+
+  --border: oklch(0.92 0.005 264);
+  --input: oklch(0.94 0.005 264);
+  --ring: oklch(0.55 0.22 264);
+
+  /* رنگ‌های چارت */
+  --chart-1: oklch(0.55 0.22 264);
+  --chart-2: oklch(0.65 0.18 150);
+  --chart-3: oklch(0.75 0.17 85);
+  --chart-4: oklch(0.60 0.22 25);
+  --chart-5: oklch(0.60 0.18 240);
+
+  /* سایدبار */
+  --sidebar: oklch(1 0 0);
+  --sidebar-foreground: oklch(0.20 0.04 264);
+  --sidebar-primary: oklch(0.55 0.22 264);
+  --sidebar-primary-foreground: oklch(0.99 0 0);
+  --sidebar-accent: oklch(0.96 0.01 264);
+  --sidebar-accent-foreground: oklch(0.40 0.18 264);
+  --sidebar-border: oklch(0.92 0.005 264);
+  --sidebar-ring: oklch(0.55 0.22 264);
+}
+
+.dark {
+  --background: oklch(0.15 0.02 264);
+  --foreground: oklch(0.98 0.005 264);
+
+  --card: oklch(0.20 0.02 264);
+  --card-foreground: oklch(0.98 0.005 264);
+
+  --popover: oklch(0.20 0.02 264);
+  --popover-foreground: oklch(0.98 0.005 264);
+
+  --primary: oklch(0.65 0.22 264);
+  --primary-foreground: oklch(0.15 0.02 264);
+
+  --secondary: oklch(0.25 0.02 264);
+  --secondary-foreground: oklch(0.98 0.005 264);
+
+  --muted: oklch(0.25 0.02 264);
+  --muted-foreground: oklch(0.70 0.02 264);
+
+  --accent: oklch(0.30 0.04 264);
+  --accent-foreground: oklch(0.90 0.05 264);
+
+  --destructive: oklch(0.65 0.22 25);
+  --success: oklch(0.70 0.18 150);
+  --warning: oklch(0.80 0.17 85);
+  --info: oklch(0.65 0.18 240);
+
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: oklch(0.65 0.22 264);
+
+  --chart-1: oklch(0.65 0.22 264);
+  --chart-2: oklch(0.70 0.18 150);
+  --chart-3: oklch(0.80 0.17 85);
+  --chart-4: oklch(0.65 0.22 25);
+  --chart-5: oklch(0.65 0.18 240);
+
+  --sidebar: oklch(0.20 0.02 264);
+  --sidebar-foreground: oklch(0.98 0.005 264);
+  --sidebar-primary: oklch(0.65 0.22 264);
+  --sidebar-primary-foreground: oklch(0.15 0.02 264);
+  --sidebar-accent: oklch(0.30 0.04 264);
+  --sidebar-accent-foreground: oklch(0.90 0.05 264);
+  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-ring: oklch(0.65 0.22 264);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings: "ss01", "ss02", "cv01", "cv02";
+  }
+
+  /* نشانگر دست برای همه دکمه‌ها، لینک‌ها و عناصر قابل کلیک */
+  button:not(:disabled),
+  a,
+  [role="button"],
+  label,
+  .cursor-hand,
+  input[type="checkbox"]:not(:disabled),
+  input[type="radio"]:not(:disabled),
+  input[type="submit"]:not(:disabled),
+  input[type="button"]:not(:disabled),
+  input[type="reset"]:not(:disabled),
+  select:not(:disabled),
+  summary,
+  [data-slot="dropdown-menu-trigger"],
+  [data-slot="dropdown-menu-item"]:not([data-disabled]),
+  [data-slot="dialog-close"],
+  [data-slot="accordion-trigger"],
+  [data-slot="select-trigger"],
+  [data-slot="tabs-trigger"],
+  [data-slot="collapsible-trigger"],
+  tr[class*="cursor-pointer"],
+  .clickable {
+    cursor: pointer !important;
+  }
+
+  /* اطمینان از اینکه دکمه‌های disabled نشانگر not-allowed بگیرند */
+  button:disabled,
+  [role="button"][aria-disabled="true"],
+  input[type="checkbox"]:disabled,
+  input[type="radio"]:disabled,
+  input[type="submit"]:disabled,
+  input[type="button"]:disabled,
+  input[type="reset"]:disabled,
+  select:disabled {
+    cursor: not-allowed !important;
+  }
+
+  /* در dark mode، slate-50 و slate-900 به‌طور خودکار از CSS variables استفاده می‌کنن */
+  /* اما برای اطمینان، استایل‌های زیر رو هم اضافه می‌کنیم */
+  .dark {
+    color-scheme: dark;
+  }
+  .dark body {
+    background-color: oklch(0.15 0.02 264);
+    color: oklch(0.98 0.005 264);
+  }
+
+  /* اسکرول‌بار سفارشی */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: oklch(0.85 0.01 264);
+    border-radius: 4px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: oklch(0.75 0.01 264);
+  }
+  .dark ::-webkit-scrollbar-thumb {
+    background: oklch(0.35 0.02 264);
+  }
+}
+
+/* اعداد فارسی */
+.nums-fa {
+  font-feature-settings: "ss01";
+}
+
+/* v2.7.2: اسکرول‌بار نامرئی — فقط هنگام hover ظاهر می‌شود */
+.scrollbar-hidden {
+  /* Firefox */
+  scrollbar-width: none;
+  /* IE / Edge */
+  -ms-overflow-style: none;
+}
+.scrollbar-hidden::-webkit-scrollbar {
+  /* Chrome, Safari, Opera */
+  width: 0;
+  height: 0;
+  display: none;
+}
+/* هنگام hover روی نوار، اسکرول‌بار ظاهر می‌شود */
+.scrollbar-hover {
+  /* Firefox */
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+  transition: scrollbar-color 0.2s ease;
+}
+.scrollbar-hover::-webkit-scrollbar {
+  height: 6px;
+  width: 6px;
+}
+.scrollbar-hover::-webkit-scrollbar-track {
+  background: transparent;
+}
+.scrollbar-hover::-webkit-scrollbar-thumb {
+  background: transparent;
+  border-radius: 3px;
+  transition: background 0.2s ease;
+}
+.scrollbar-hover:hover {
+  scrollbar-color: oklch(0.85 0.01 264) transparent;
+}
+.scrollbar-hover:hover::-webkit-scrollbar-thumb {
+  background: oklch(0.85 0.01 264);
+}
+.scrollbar-hover:hover::-webkit-scrollbar-thumb:hover {
+  background: oklch(0.75 0.01 264);
+}
+.dark .scrollbar-hover:hover {
+  scrollbar-color: oklch(0.35 0.02 264) transparent;
+}
+.dark .scrollbar-hover:hover::-webkit-scrollbar-thumb {
+  background: oklch(0.35 0.02 264);
+}
+
+/* انیمیشن fade-in */
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.animate-fade-in {
+  animation: fade-in 0.3s ease-out;
+}
+
+/* انیمیشن slide-in از راست (RTL) */
+@keyframes slide-in-right {
+  from { opacity: 0; transform: translateX(20px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+.animate-slide-in-right {
+  animation: slide-in-right 0.3s ease-out;
+}
+
+/* ─────────────────────────────────────────
+ * v4.0.0: استایل‌های ماژول نقشه (Leaflet)
+ * ───────────────────────────────────────── */
+
+/* ظرف نقشه — فونت فارسی و بدون پس‌زمینه اضافه */
+.leaflet-container {
+  font-family: var(--font-vazirmatn), Tahoma, sans-serif;
+  outline: none;
+}
+
+/* پاپ‌آپ دکل‌ها */
+.leaflet-popup.tower-popup .leaflet-popup-content-wrapper {
+  border-radius: 14px;
+  box-shadow: 0 10px 40px rgba(15, 23, 42, 0.18);
+  border: 1px solid #e2e8f0;
+  padding: 4px;
+}
+.leaflet-popup.tower-popup .leaflet-popup-content {
+  margin: 10px 12px;
+  line-height: 1.6;
+}
+.leaflet-popup.tower-popup .leaflet-popup-tip {
+  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.12);
+}
+.dark .leaflet-popup.tower-popup .leaflet-popup-content-wrapper {
+  background: #0f172a;
+  border-color: #334155;
+}
+
+/* تولتیپ مسیر خطوط */
+.leaflet-tooltip.route-tooltip {
+  border-radius: 10px;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 6px 24px rgba(15, 23, 42, 0.14);
+  padding: 6px 10px;
+  font-size: 12px;
+}
+.leaflet-tooltip.route-tooltip::before {
+  display: none;
+}
+.dark .leaflet-tooltip.route-tooltip {
+  background: #0f172a;
+  border-color: #334155;
+  color: #e2e8f0;
+}
+
+/* دکمه‌های زوم و مقیاس هماهنگ با تم */
+.leaflet-bar a,
+.leaflet-control-attribution {
+  font-family: var(--font-vazirmatn), Tahoma, sans-serif !important;
+}
+.leaflet-control-attribution {
+  font-size: 9px !important;
+  background: rgba(255, 255, 255, 0.75) !important;
+}
+.dark .leaflet-control-attribution {
+  background: rgba(15, 23, 42, 0.75) !important;
+  color: #94a3b8 !important;
+}
+.dark .leaflet-control-attribution a {
+  color: #94a3b8 !important;
+}
+.dark .leaflet-bar a {
+  background: #0f172a;
+  color: #e2e8f0;
+  border-color: #334155;
+}
+.dark .leaflet-bar a:hover {
+  background: #1e293b;
+}
+.dark .leaflet-control-scale-line {
+  background: rgba(15, 23, 42, 0.7);
+  border-color: #94a3b8;
+  color: #e2e8f0;
+}
+
+/* برچسب دائمی نام خط روی مسیر — همیشه در مرکز توجه */
+.leaflet-tooltip.route-name-permanent {
+  background: rgba(255, 255, 255, 0.96);
+  color: #1e293b;
+  border: 1px solid rgba(15, 23, 42, 0.18);
+  border-radius: 8px;
+  padding: 2px 8px;
+  font-size: 11px;
+  font-weight: 700;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18);
+  white-space: nowrap;
+  pointer-events: none;
+}
+.leaflet-tooltip.route-name-permanent::before {
+  display: none !important;
+}
+.dark .leaflet-tooltip.route-name-permanent {
+  background: rgba(15, 23, 42, 0.94);
+  color: #f1f5f9;
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+/* برچسب ابزار اندازه‌گیری */
+.measure-label {
+  background: transparent !important;
+  border: none !important;
+}
+.measure-label > div {
+  background: rgba(99, 102, 241, 0.95);
+  color: #fff;
+  border-radius: 8px;
+  padding: 2px 8px;
+  font-size: 11px;
+  font-weight: 700;
+  font-family: Vazirmatn, Tahoma, sans-serif;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.22);
+  white-space: nowrap;
+  text-align: center;
+}
+
+/* نشانگر موقعیت جغرافیایی */
+.map-coord-display {
+  font-family: Vazirmatn, Tahoma, sans-serif;
+}
+
+/* نشانگر مستطیل زوم به ناحیه */
+.zoom-area-rect {
+  cursor: crosshair !important;
+}
+
+/* نوار ابزار نقشه */
+.map-tool-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: transparent;
+  color: #475569;
+  border: none;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.map-tool-btn:hover {
+  background: #f1f5f9;
+  color: #0f172a;
+}
+.map-tool-btn.active {
+  background: #ede9fe;
+  color: #6d28d9;
+}
+.dark .map-tool-btn {
+  color: #94a3b8;
+}
+.dark .map-tool-btn:hover {
+  background: #1e293b;
+  color: #f1f5f9;
+}
+.dark .map-tool-btn.active {
+  background: #4c1d95;
+  color: #ddd6fe;
+}
+.map-tool-divider {
+  width: 1px;
+  height: 26px;
+  background: #e2e8f0;
+  margin: 0 4px;
+}
+.dark .map-tool-divider {
+  background: #334155;
+}
