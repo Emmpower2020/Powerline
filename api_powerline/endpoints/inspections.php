@@ -1,0 +1,189 @@
+<?php
+/**
+ * endpoints/inspections.php — مدیریت بازدیدها
+ */
+
+function registerInspectionRoutes(Router $router): void
+{
+    // لیست بازدیدها
+    $router->get('inspections', function () {
+        Auth::authenticate();
+        Auth::requirePermission('inspections.view');
+
+        $db = Database::getInstance();
+        $page = Helpers::getPage();
+        $pageSize = Helpers::getPageSize();
+        $offset = Helpers::getOffset();
+        $search = Helpers::getSearch();
+        $status = Helpers::query('status');
+        $lineId = Helpers::queryInt('line_id');
+        $towerId = Helpers::queryInt('tower_id');
+
+        $where = '1=1';
+        $params = [];
+
+        if (!empty($search)) {
+            $where .= ' AND (i.inspection_code LIKE ? OR i.notes LIKE ?)';
+            $searchParam = "%$search%";
+            $params[] = $searchParam;
+            $params[] = $searchParam;
+        }
+
+        if ($status) {
+            $where .= ' AND i.status = ?';
+            $params[] = $status;
+        }
+
+        if ($lineId) {
+            $where .= ' AND i.line_id = ?';
+            $params[] = $lineId;
+        }
+
+        if ($towerId) {
+            $where .= ' AND i.tower_id = ?';
+            $params[] = $towerId;
+        }
+
+        $countSql = "SELECT COUNT(*) FROM inspections i WHERE $where";
+        $stmt = $db->getConnection()->prepare($countSql);
+        $stmt->execute($params);
+        $total = (int) $stmt->fetchColumn();
+
+        $sql = "SELECT i.*, l.line_code, l.name AS line_name, t.tower_code,
+                       p.first_name AS inspector_first, p.last_name AS inspector_last
+                FROM inspections i
+                LEFT JOIN `lines` l ON l.id = i.line_id
+                LEFT JOIN towers t ON t.id = i.tower_id
+                LEFT JOIN personnel p ON p.id = i.inspector_id
+                WHERE $where
+                ORDER BY i.id DESC
+                LIMIT $pageSize OFFSET $offset";
+
+        $rows = $db->fetchAll($sql, $params);
+        $data = array_map('formatInspectionRow', $rows);
+
+        Response::paginated($data, $page, $pageSize, $total);
+    });
+
+    // جزئیات یک بازدید
+    $router->get('inspections/{id}', function ($id) {
+        Auth::authenticate();
+        Auth::requirePermission('inspections.view');
+
+        $db = Database::getInstance();
+        $row = $db->fetchOne(
+            "SELECT i.*, l.line_code, l.name AS line_name, t.tower_code,
+                    p.first_name AS inspector_first, p.last_name AS inspector_last
+             FROM inspections i
+             LEFT JOIN `lines` l ON l.id = i.line_id
+             LEFT JOIN towers t ON t.id = i.tower_id
+             LEFT JOIN personnel p ON p.id = i.inspector_id
+             WHERE i.id = ?",
+            [(int) $id]
+        );
+
+        if (!$row) {
+            Response::error(404, 'بازدید پیدا نشد');
+        }
+
+        Response::success(formatInspectionRow($row));
+    });
+
+    // ثبت بازدید جدید
+    $router->post('inspections', function () {
+        $user = Auth::authenticate();
+        Auth::requirePermission('inspections.create');
+
+        $body = Helpers::getJsonBody();
+        $db = Database::getInstance();
+
+        if (empty($body['inspection_date'])) {
+            Response::error(400, 'تاریخ بازدید الزامی است');
+        }
+
+        $inspectionCode = Helpers::generateCode('INS', 6);
+
+        $sql = "INSERT INTO inspections
+                (inspection_code, line_id, tower_id, template_id, inspector_id, crew_id,
+                 inspection_date, start_time, end_time, gps_lat, gps_lng,
+                 status, priority, weather, notes, created_at)
+                VALUES
+                (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'draft', ?, ?, ?, NOW())";
+
+        $db->execute($sql, [
+            $inspectionCode,
+            $body['line_id'] ?? null,
+            $body['tower_id'] ?? null,
+            $body['template_id'] ?? null,
+            $body['inspector_id'] ?? 1,
+            $body['crew_id'] ?? null,
+            $body['inspection_date'],
+            $body['start_time'] ?? null,
+            $body['end_time'] ?? null,
+            $body['gps_lat'] ?? null,
+            $body['gps_lng'] ?? null,
+            $body['priority'] ?? 'routine',
+            $body['weather'] ?? null,
+            $body['notes'] ?? null,
+        ]);
+
+        $newId = (int) $db->lastInsertId();
+
+        Logger::info('Inspection created', ['inspection_id' => $newId, 'user_id' => $user['id']]);
+        Response::success(['id' => $newId, 'inspection_code' => $inspectionCode], 'بازدید ثبت شد', 201);
+    });
+
+    // تأیید بازدید
+    $router->post('inspections/{id}/approve', function ($id) {
+        $user = Auth::authenticate();
+        Auth::requirePermission('inspections.approve');
+
+        $body = Helpers::getJsonBody();
+        $db = Database::getInstance();
+
+        $existing = $db->fetchOne("SELECT id, status FROM inspections WHERE id = ?", [(int) $id]);
+        if (!$existing) {
+            Response::error(404, 'بازدید پیدا نشد');
+        }
+
+        if ($existing['status'] !== 'submitted') {
+            Response::error(400, 'فقط بازدیدهای ارسالی قابل تأیید هستند');
+        }
+
+        $db->update('inspections',
+            ['status' => 'approved', 'approved_by' => $user['id'], 'approved_at' => date('Y-m-d H:i:s')],
+            'id = ?',
+            [(int) $id]
+        );
+
+        Logger::info('Inspection approved', ['inspection_id' => $id, 'user_id' => $user['id']]);
+        Response::success(null, 'بازدید تأیید شد');
+    });
+}
+
+/**
+ * فرمت‌بندی ردیف بازدید
+ */
+function formatInspectionRow(array $row): array
+{
+    return [
+        'id'                => (int) $row['id'],
+        'inspection_code'   => $row['inspection_code'],
+        'line_id'           => $row['line_id'] ? (int) $row['line_id'] : null,
+        'line_code'         => $row['line_code'] ?? null,
+        'line_name'         => $row['line_name'] ?? null,
+        'tower_id'          => $row['tower_id'] ? (int) $row['tower_id'] : null,
+        'tower_code'        => $row['tower_code'] ?? null,
+        'inspector_name'    => trim(($row['inspector_first'] ?? '') . ' ' . ($row['inspector_last'] ?? '')),
+        'inspection_date'   => $row['inspection_date'],
+        'start_time'        => $row['start_time'],
+        'end_time'          => $row['end_time'],
+        'gps_lat'           => $row['gps_lat'] !== null ? (float) $row['gps_lat'] : null,
+        'gps_lng'           => $row['gps_lng'] !== null ? (float) $row['gps_lng'] : null,
+        'status'            => $row['status'],
+        'priority'          => $row['priority'],
+        'weather'           => $row['weather'],
+        'notes'             => $row['notes'],
+        'created_at'        => $row['created_at'],
+    ];
+}
