@@ -33,21 +33,21 @@ export function normalizeConductorName(name: unknown): string {
  * نمایش به شکل «لینکس (Lynx)» — نام‌های ناشناخته بدون تغییر برمی‌گردند
  */
 const CONDUCTOR_NAME_FA: Record<string, string> = {
-  fox: "فاکس",
-  mink: "مینک",
-  dog: "داگ",
-  hyena: "هاینا",
-  partridge: "پارتریج",
-  oriole: "اوریول",
-  lynx: "لینکس",
+  fox: "روباه",
+  mink: "راسو",
+  dog: "سگ",
+  hyena: "کفتار",
+  partridge: "کبک",
+  oriole: "زردپره",
+  lynx: "سیاه‌گوش",
   hawk: "شاهین",
   peacock: "طاووس",
-  squab: "اسکواب",
-  drake: "دریک",
-  canary: "کاناری",
+  squab: "جوجه‌کبوتر",
+  drake: "اردک نر",
+  canary: "قناری",
   cardinal: "کاردینال",
-  curlew: "کرلو",
-  martin: "مارتین",
+  curlew: "آبچلیک",
+  martin: "چلچله",
 };
 
 /** نمایش نام سیم: «لینکس (Lynx)» — نام ناشناخته همان خام برمی‌گردد */

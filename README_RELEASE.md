@@ -1,3 +1,5 @@
+4.3.23 updates: database-schema hardening for lines, voltage_kv-only, conductor Persian+English names.
+
 # سیستم مدیریت خطوط ایلیا — Powerline EAM/CMMS Web v4.2.7
 
 **تاریخ انتشار:** 2026-08-25

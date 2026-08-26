@@ -96,6 +96,10 @@ function registerLineRoutes(Router $router): void
 
         $body = Helpers::getJsonBody();
 
+        // محافظ قطعی سازگاری با schema واقعی جدول lines:
+        // ستون voltage در lines وجود ندارد و هرگز نباید وارد Query شود.
+        unset($body['voltage']);
+
         // اعتبارسنجی فیلدهای اجباری
         $required = ['line_code', 'name'];
         foreach ($required as $field) {
@@ -340,11 +344,16 @@ function registerLineRoutes(Router $router): void
                         throw new Exception("کد خط {$r['line_code']} تکراری است");
                     }
 
+                    $schemaRows = $db->fetchAll("SHOW COLUMNS FROM `lines`");
+                    $actual = [];
+                    foreach ($schemaRows as $schemaRow) {
+                        if (isset($schemaRow['Field'])) $actual[(string)$schemaRow['Field']] = true;
+                    }
                     $cols = ['line_code', 'created_at'];
                     $marks = ['?', 'NOW()'];
                     $params = [$r['line_code']];
                     foreach ($allowed as $f) {
-                        if (array_key_exists($f, $r)) {
+                        if (array_key_exists($f, $r) && isset($actual[$f])) {
                             $cols[] = "`$f`";
                             $marks[] = '?';
                             $params[] = ($f === 'is_active') ? (($r[$f] === false || $r[$f] === 0 || $r[$f] === '0') ? 0 : 1) : $r[$f];

@@ -146,8 +146,8 @@ export function BulkLinesActions({ getSelection, onApplied }: BulkLinesActionsPr
       case "contractor":           patch = { contractor_id: Number(value) }; break;
       case "voltage": {
         const v = Number(value);
-        // هر دو فیلد ولتاژ پر می‌شوند تا با جستجو و نمایش هماهنگ باشند
-        patch = { voltage: v, voltage_kv: v };
+        // فقط ستون واقعی دیتابیس lines استفاده می‌شود: voltage_kv
+        patch = { voltage_kv: v };
         break;
       }
       default: return;
