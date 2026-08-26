@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import {
   ChevronUp, ChevronDown, ChevronsUpDown, ChevronRight, ChevronLeft, Search, RefreshCw,
   Plus, Eye, EyeOff, Filter, X, Check, Copy, CopyPlus, Trash2, ArrowUp, ArrowDown, Pencil,
-  Settings as SettingsIcon, Upload, Download, Printer, RotateCcw,
+  Settings as SettingsIcon, Upload, Download, Printer, RotateCcw, CheckCheck,
 } from "lucide-react";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
@@ -247,10 +247,12 @@ function DataTableInner<T extends { id: number }>({
   const somePageSelected = pageIds.some(id => selectedRows.has(id));
   const toggleSelectAll = () => {
     const next = new Set(selectedRows);
-    if (allPageSelected) {
-      pageIds.forEach(id => next.delete(id));
+    const filteredIds = filtered.map(r => r.id);
+    const allFilteredSelected = filteredIds.length > 0 && filteredIds.every(id => selectedRows.has(id));
+    if (allFilteredSelected) {
+      filteredIds.forEach(id => next.delete(id));
     } else {
-      pageIds.forEach(id => next.add(id));
+      filteredIds.forEach(id => next.add(id));
     }
     setSelectedRows(next);
   };
@@ -550,6 +552,18 @@ function DataTableInner<T extends { id: number }>({
             )}
           </div>
 
+          {/* انتخاب همه — روی تمام ردیف‌های فیلترشده، نه فقط صفحه فعلی */}
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={toggleSelectAll}
+            disabled={filtered.length === 0}
+            title={filtered.length > 0 && filtered.every(r => selectedRows.has(r.id)) ? "لغو انتخاب همه" : "انتخاب همه"}
+            className="h-9 w-9 text-indigo-600 hover:bg-indigo-50 border-indigo-200"
+          >
+            <CheckCheck className="w-4 h-4" />
+          </Button>
+
           {/* بازنشانی کامل فیلترها و مرتب‌سازی */}
           <Button
             variant="outline"
@@ -562,23 +576,11 @@ function DataTableInner<T extends { id: number }>({
             <RotateCcw className="w-4 h-4" />
           </Button>
 
-          {/* شمارنده انتخاب — عمداً بعد از دکمه Settings قرار گرفته است */}
+          {/* فقط شمارنده انتخاب — هیچ عملیات انتخابی داخل این متن نیست */}
           {selCount > 0 && (
             <span className="text-xs px-2.5 py-1 bg-indigo-50 text-indigo-700 rounded-md nums-fa border border-indigo-200 inline-flex items-center gap-1 ml-1">
               <span className="w-1.5 h-1.5 rounded-full bg-indigo-500"></span>
               {selCount.toLocaleString("fa-IR")} ردیف انتخاب شده
-              {selCount < filtered.length && (
-                <button
-                  onClick={() => setSelectedRows(new Set(filtered.map(r => r.id)))}
-                  className="text-indigo-500 hover:text-indigo-800 underline decoration-dotted cursor-pointer mr-1 whitespace-nowrap"
-                  title="همه ردیف‌ها در همه صفحات طبق فیلترهای فعلی انتخاب می‌شوند"
-                >
-                  انتخاب همه ({filtered.length.toLocaleString("fa-IR")})
-                </button>
-              )}
-              <button onClick={clearSelection} className="text-indigo-400 hover:text-indigo-700 cursor-pointer mr-1" title="لغو انتخاب‌ها">
-                <X className="w-3 h-3" />
-              </button>
             </span>
           )}
 
