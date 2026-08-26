@@ -21,9 +21,9 @@ import type { Line, Tower } from "@/lib/types";
  * (همه با اندازه ثابت پیکسلی + برچسب شماره دکل بدون صفر پیشینی)
  * ──────────────────────────────────────────────────────────────── */
 
-const LABEL_MIN_ZOOM = 14;
+const LABEL_MIN_ZOOM = 11;
 /** زیر این زوم، دکل‌ها رسم نمی‌شوند و فقط مسیر خط دیده می‌شود */
-const MARKER_MIN_ZOOM = 13;
+const MARKER_MIN_ZOOM = 11;
 
 type CanvasRenderer = L.Canvas & {
   _drawing: boolean;
@@ -79,7 +79,7 @@ const ShapeCanvasRenderer = (L.Canvas as any).extend({
     }
     (self as any)._fillStroke(ctx, layer);
 
-    // برچسب شماره دکل (بدون کد دکل و بدون صفر پیشینی) — فقط در زوم بالا
+    // برچسب شماره دکل همزمان با نمایش دکل، از همان زوم قابل مشاهده است
     const label: string | undefined = layer.options.towerLabel;
     if (label && zoom >= (layer.options.labelMinZoom ?? LABEL_MIN_ZOOM)) {
       ctx.save();

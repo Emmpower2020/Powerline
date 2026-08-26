@@ -578,22 +578,6 @@ export function MapPage() {
                   <ListFilter className="w-4 h-4 text-violet-600 dark:text-violet-400 shrink-0" />
                   <h3 className="text-base font-bold text-slate-800 dark:text-slate-100 truncate">انتخاب خطوط</h3>
                 </div>
-                <label
-                  className="flex items-center gap-1.5 shrink-0 text-[11px] font-medium text-slate-600 dark:text-slate-300 cursor-pointer select-none"
-                  title="انتخاب یا لغو انتخاب همه خطوط"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <Checkbox
-                    checked={lineInfos.length > 0 && lineInfos.every((l) => selectedLineIds.has(l.id))
-                      ? true
-                      : selectedLineIds.size > 0
-                        ? "indeterminate"
-                        : false}
-                    onCheckedChange={toggleAllLines}
-                    disabled={lineInfos.length === 0}
-                  />
-                  <span>همه</span>
-                </label>
                 <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
                   {sidebarOpen && selectedCount > 0 && (
                     <button

@@ -528,6 +528,8 @@
   max-width: calc(100% - 16px);
   min-height: 50px;
   justify-content: center;
+  /* دقیقاً همان سایه پنل انتخاب خطوط */
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.18), 0 2px 8px rgba(15, 23, 42, 0.08);
   overflow-x: auto;
   overflow-y: visible;
   scrollbar-width: none;
@@ -597,7 +599,7 @@
   }
 
   .map-line-sidebar {
-    top: 58px !important;
+    top: 68px !important;
     left: 8px !important;
     right: 8px !important;
     bottom: auto !important;
@@ -631,7 +633,7 @@
   }
 
   .leaflet-top {
-    top: 58px;
+    top: 68px;
   }
 
   .leaflet-control-zoom {
