@@ -588,7 +588,8 @@
 @media (max-width: 767px) {
   .map-toolbar {
     top: auto !important;
-    bottom: 92px !important;
+    /* v4.3.7: نوار ابزار کمی پایین‌تر قرار گرفت تا فاصله متعادل‌تری از پایین صفحه داشته باشد. */
+    bottom: 68px !important;
     left: 8px !important;
     right: 8px !important;
     transform: none !important;
@@ -599,12 +600,12 @@
     padding: 4px;
     gap: 1px;
     border-radius: 16px;
-    overflow-x: auto !important;
-    overflow-y: visible !important;
+    /* v4.3.7: در موبایل اسکرول افقی حذف شد؛ همه ابزارها داخل صفحه جا می‌گیرند. */
+    overflow: visible !important;
     flex-wrap: nowrap;
     scrollbar-width: none;
-    -webkit-overflow-scrolling: touch;
-    touch-action: pan-x;
+    -webkit-overflow-scrolling: auto;
+    touch-action: manipulation;
   }
 
   .map-toolbar.map-toolbar-panel-open {
@@ -612,9 +613,9 @@
   }
 
   .map-toolbar .map-tool-btn {
-    flex: 0 0 36px;
-    width: 36px;
-    height: 36px;
+    flex: 0 0 32px;
+    width: 32px;
+    height: 32px;
   }
   .map-toolbar {
     margin: 0;
@@ -710,9 +711,9 @@
   }
 
   .map-toolbar .map-tool-btn {
-    flex-basis: 34px;
-    width: 34px;
-    height: 34px;
+    flex-basis: 30px;
+    width: 30px;
+    height: 30px;
   }
 
   .powerline-route-label-box {

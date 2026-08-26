@@ -45,8 +45,6 @@ import {
   Minus,
   Home,
   Scan,
-  Eye,
-  EyeOff,
 } from "lucide-react";
 
 /**
@@ -399,15 +397,6 @@ export function MapPage() {
             onClick={() => setHomeTrigger((t) => t + 1)}
           >
             <Home className="w-4 h-4" />
-          </ToolBtn>
-
-          {/* نمایش / عدم نمایش نام خطوط */}
-          <ToolBtn
-            active={showLineLabels}
-            title={showLineLabels ? "مخفی کردن نام خطوط" : "نمایش نام خطوط"}
-            onClick={() => setShowLineLabels((v) => !v)}
-          >
-            {showLineLabels ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
           </ToolBtn>
 
           <span className="map-tool-divider" />
