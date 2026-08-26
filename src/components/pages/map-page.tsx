@@ -369,7 +369,7 @@ export function MapPage() {
       {/* ─── نوار ابزار بالای نقشه ─── */}
       {!loading && !error && (
         <div
-          className="map-toolbar absolute z-[1000] top-2 left-1/2 -translate-x-1/2 flex items-center gap-0.5 rounded-2xl bg-white/95 dark:bg-slate-900/95 backdrop-blur border border-slate-200 dark:border-slate-700 shadow-xl px-1.5 py-1.5"
+          className="map-toolbar map-floating-panel absolute z-[1000] top-2 left-1/2 -translate-x-1/2 flex items-center gap-0.5 bg-white/95 dark:bg-slate-900/95 backdrop-blur px-1.5 py-1.5"
           onClick={(e) => e.stopPropagation()}
         >
           {/* اندازه‌گیری طول */}
@@ -595,7 +595,7 @@ export function MapPage() {
             height: sidebarOpen ? undefined : "auto",
           }}
         >
-          <div className={`flex flex-col rounded-2xl bg-white/97 dark:bg-slate-900/97 backdrop-blur border border-slate-200 dark:border-slate-700 shadow-2xl overflow-hidden ${sidebarOpen ? "h-full" : ""}`}>
+          <div className={`map-floating-panel flex flex-col bg-white/97 dark:bg-slate-900/97 backdrop-blur overflow-hidden ${sidebarOpen ? "h-full" : ""}`}>
             {/* هدر پنل — قابل کلیک برای جمع/باز کردن */}
             <div
               className="px-3 py-2.5 border-b border-slate-100 dark:border-slate-800 bg-gradient-to-l from-slate-50 to-white dark:from-slate-900 dark:to-slate-900 shrink-0 cursor-pointer select-none"

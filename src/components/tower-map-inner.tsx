@@ -239,11 +239,18 @@ function RoutesOverlay({
   }, [map]);
 
   useEffect(() => {
-    // رندرکننده SVG برای مسیرها — leaflet-textpath فقط با SVG کار می‌کند
-    const svgRenderer = L.svg({ padding: 0.3 });
+    // لایه‌های مجزا برای تضمین ترتیب نمایش: خطوط پایین‌تر، دکل‌ها بالاتر
+    // تا نماد دکل‌ها هیچ‌وقت زیر مسیر خط قرار نگیرد.
+    const linePane = map.getPane("powerline-line-pane") ?? map.createPane("powerline-line-pane");
+    linePane.style.zIndex = "400";
+    const towerPane = map.getPane("powerline-tower-pane") ?? map.createPane("powerline-tower-pane");
+    towerPane.style.zIndex = "450";
+
+    // رندرکننده SVG برای مسیرها
+    const svgRenderer = L.svg({ padding: 0.3, pane: "powerline-line-pane" });
     svgRenderer.addTo(map);
-    // رندرکننده Canvas سفارشی برای دکل‌ها
-    const canvasRenderer = new (ShapeCanvasRenderer as any)({ padding: 0.3 });
+    // رندرکننده Canvas سفارشی برای دکل‌ها — همیشه روی مسیرها
+    const canvasRenderer = new (ShapeCanvasRenderer as any)({ padding: 0.3, pane: "powerline-tower-pane" });
     canvasRenderer.addTo(map);
     const group = L.layerGroup().addTo(map);
     svgRendererRef.current = svgRenderer as unknown as L.SVG;

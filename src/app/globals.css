@@ -506,10 +506,23 @@
 
 
 /* ─────────────────────────────────────────
- * v4.2.8: ریسپانسیو کامل نقشه برای موبایل و تبلت
+ * v4.2.9: هماهنگی نوار ابزار و پنل خطوط + ترتیب لایه‌ها
  * ───────────────────────────────────────── */
+.map-floating-panel {
+  border-radius: 16px;
+  border: 1px solid rgba(226, 232, 240, 0.95);
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.18), 0 2px 8px rgba(15, 23, 42, 0.08);
+}
+.dark .map-floating-panel {
+  border-color: rgba(51, 65, 85, 0.95);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.42), 0 2px 8px rgba(0, 0, 0, 0.24);
+}
+
 .map-toolbar {
+  width: 340px;
   max-width: calc(100% - 16px);
+  min-height: 50px;
+  justify-content: center;
   overflow-x: auto;
   overflow-y: visible;
   scrollbar-width: none;
@@ -523,6 +536,10 @@
 
 .map-line-sidebar {
   min-width: 0;
+  width: 340px !important;
+}
+.map-line-sidebar > .map-floating-panel {
+  width: 100%;
 }
 
 .powerline-route-label-box {
@@ -545,15 +562,15 @@
 @media (max-width: 767px) {
   .map-toolbar {
     top: 8px !important;
-    left: 8px !important;
-    right: 8px !important;
-    transform: none !important;
-    width: auto !important;
+    left: 50% !important;
+    right: auto !important;
+    transform: translateX(-50%) !important;
+    width: calc(100% - 16px) !important;
+    max-width: none;
+    min-height: 48px;
     justify-content: flex-start;
-    border-radius: 14px;
     padding: 4px;
     gap: 1px;
-    box-shadow: 0 8px 28px rgba(15, 23, 42, 0.20);
   }
 
   .map-toolbar .map-tool-btn {
@@ -572,11 +589,11 @@
     left: 8px !important;
     right: 8px !important;
     bottom: auto !important;
-    width: auto !important;
+    width: calc(100% - 16px) !important;
     max-height: 46vh;
   }
 
-  .map-line-sidebar > div {
+  .map-line-sidebar > .map-floating-panel {
     max-height: 46vh;
     border-radius: 16px;
   }
@@ -601,7 +618,6 @@
     border-radius: 7px;
   }
 
-  /* کنترل‌های داخلی Leaflet در موبایل با نوار ابزار تداخل نکنند */
   .leaflet-top {
     top: 58px;
   }
@@ -632,7 +648,7 @@
     max-height: 42vh;
   }
 
-  .map-line-sidebar > div {
+  .map-line-sidebar > .map-floating-panel {
     max-height: 42vh;
   }
 
@@ -647,3 +663,4 @@
     font-size: 10.5px;
   }
 }
+
