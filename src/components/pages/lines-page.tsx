@@ -151,7 +151,7 @@ export function LinesPage() {
     // حذف فیلدهای غیرمجاز
     const allowedFields = [
       "line_code", "dispatch_code", "name", "group_name",
-      "voltage_kv", "voltage", "circuit_count", "bundle_count",
+      "voltage_kv", "circuit_count", "bundle_count",
       "conductor_type", "tower_structure_type", "length_km", "circuit_length_km",
       "total_towers", "tension_towers", "suspension_towers",
       "plain_terrain", "semi_mountainous", "mountainous",
@@ -166,7 +166,7 @@ export function LinesPage() {
           payload[key] = null;
         } else if (["circuit_count", "bundle_count", "total_towers", "tension_towers", "suspension_towers",
                     "plain_terrain", "semi_mountainous", "mountainous", "commission_year",
-                    "voltage", "owner_org_id", "contractor_id"].includes(key)) {
+                    "owner_org_id", "contractor_id"].includes(key)) {
           // تبدیل به عدد
           const n = Number(v);
           payload[key] = isNaN(n) ? null : n;

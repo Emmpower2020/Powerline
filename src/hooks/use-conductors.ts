@@ -23,27 +23,6 @@ export interface Conductor {
   [k: string]: unknown;
 }
 
-/**
- * فهرست ثابت قبلی حذف شد: فرم خط باید مستقیماً از جدول انواع سیم‌ها تغذیه شود.
- * اگر جدول خالی باشد، فهرست هم خالی می‌ماند تا کاربر متوجه کمبود داده مرجع شود.
- */
-export const FALLBACK_CONDUCTOR_OPTIONS: SearchableOption[] = [
-  { value: "لینکس (Lynx)", label: "لینکس (Lynx)" },
-  { value: "کاناری (Canary)", label: "کاناری (Canary)" },
-  { value: "کرلو (Curlew)", label: "کرلو (Curlew)" },
-  { value: "فینچ (Finch)", label: "فینچ (Finch)" },
-  { value: "پارتریج (Partridge)", label: "پارتریج (Partridge)" },
-  { value: "رابین (Robin)", label: "رابین (Robin)" },
-  { value: "کلاغ (Raven)", label: "کلاغ (Raven)" },
-  { value: "قرقاول (Pheasant)", label: "قرقاول (Pheasant)" },
-  { value: "شاهین (Hawk)", label: "شاهین (Hawk)" },
-  { value: "ماهی‌خورک (Osprey)", label: "ماهی‌خورک (Osprey)" },
-  { value: "کورمورنت (Cormorant)", label: "کورمورنت (Cormorant)" },
-  { value: "پلیکان (Pelican)", label: "پلیکان (Pelican)" },
-  { value: "فلامینگو (Flamingo)", label: "فلامینگو (Flamingo)" },
-  { value: "سایر", label: "سایر" },
-];
-
 /** v3.5.1: حذف کوتیشن/فاصله اضافه دور نام — دیتای قدیمی با 'Fox' (کوتیشن) درج شده بود */
 export function normalizeConductorName(name: unknown): string {
   return String(name ?? "").trim().replace(/^'+|'+$/g, "").trim();
@@ -96,8 +75,8 @@ export function useConductors() {
       .map(c => {
         const rawName = normalizeConductorName(c.name);
         return {
-          value: rawName,
-          label: rawName,
+          value: conductorDisplayName(rawName),
+          label: conductorDisplayName(rawName),
         };
       })
       .filter(o => o.value)

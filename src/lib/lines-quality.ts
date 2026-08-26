@@ -50,7 +50,7 @@ export function getLineIssues(row: any, ctx?: LineIssueContext): string[] {
   if (row?.length_km == null || Number(row.length_km) === 0) {
     issues.push("طول خط ثبت نشده است");
   }
-  if (row?.voltage_kv == null && row?.voltage == null) {
+  if (row?.voltage_kv == null) {
     issues.push("ولتاژ ثبت نشده است");
   }
   if (row?.total_towers == null) {

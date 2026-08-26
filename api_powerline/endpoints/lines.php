@@ -129,44 +129,45 @@ function registerLineRoutes(Router $router): void
             }
         }
 
-        // درج در دیتابیس (بدون construction_date و commission_date — حذف شدند)
-        $sql = "INSERT INTO `lines`
-                (line_code, dispatch_code, name, group_name, voltage_kv,
-                 circuit_count, bundle_count, conductor_type, tower_structure_type,
-                 length_km, circuit_length_km, total_towers, tension_towers, suspension_towers,
-                 plain_terrain, semi_mountainous, mountainous,
-                 commission_year, line_supervisor, line_expert,
-                 owner_org_id, contractor_id, geom, is_active, created_at)
-                VALUES
-                (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-                 ST_GeomFromText(?), 1, NOW())";
-
-        $params = [
-            $body['line_code'],
-            $body['dispatch_code'] ?? null,
-            $body['name'],
-            $body['group_name'] ?? null,
-            $body['voltage_kv'] ?? null,
-            $body['circuit_count'] ?? 1,
-            $body['bundle_count'] ?? null,
-            $body['conductor_type'] ?? null,
-            $body['tower_structure_type'] ?? null,
-            $body['length_km'] ?? null,
-            $body['circuit_length_km'] ?? null,
-            $body['total_towers'] ?? null,
-            $body['tension_towers'] ?? null,
-            $body['suspension_towers'] ?? null,
-            $body['plain_terrain'] ?? null,
-            $body['semi_mountainous'] ?? null,
-            $body['mountainous'] ?? null,
-            $body['commission_year'] ?? null,
-            $body['line_supervisor'] ?? null,
-            $body['line_expert'] ?? null,
-            $body['owner_org_id'] ?? null,
-            $body['contractor_id'] ?? null,
+        // درج در دیتابیس — فقط ستون‌های واقعی جدول `lines` استفاده می‌شوند.
+        // این لیست عمداً شامل `voltage` نیست؛ نام صحیح ستون ولتاژ `voltage_kv` است.
+        $lineColumns = [
+            'line_code','dispatch_code','name','group_name','voltage_kv',
+            'circuit_count','bundle_count','conductor_type','tower_structure_type',
+            'length_km','circuit_length_km','total_towers','tension_towers','suspension_towers',
+            'plain_terrain','semi_mountainous','mountainous',
+            'commission_year','line_supervisor','line_expert','owner_org_id','contractor_id',
+            'geom','is_active'
         ];
-        // geom همیشه باید ارسال شود چون ستون در دیتابیس NOT NULL است.
-        $params[] = $geomWkt;
+
+        // در برابر نسخه‌های قدیمی دیتابیس/کد هم مقاوم باشد: فقط ستون‌هایی که واقعاً در جدول وجود دارند وارد INSERT شوند.
+        $schemaRows = $db->fetchAll("SHOW COLUMNS FROM `lines`");
+        $actualColumns = [];
+        foreach ($schemaRows as $schemaRow) {
+            if (isset($schemaRow['Field'])) $actualColumns[(string)$schemaRow['Field']] = true;
+        }
+        $insertColumns = array_values(array_filter($lineColumns, fn($c) => isset($actualColumns[$c])));
+
+        if (!in_array('line_code', $insertColumns, true) || !in_array('name', $insertColumns, true)) {
+            Response::error(500, 'ساختار جدول lines با نسخه برنامه سازگار نیست.');
+        }
+
+        $insertValues = [];
+        $params = [];
+        foreach ($insertColumns as $column) {
+            if ($column === 'geom') {
+                $insertValues[] = 'ST_GeomFromText(?)';
+                $params[] = $geomWkt;
+            } elseif ($column === 'is_active') {
+                $insertValues[] = '1';
+            } else {
+                $insertValues[] = '?';
+                $params[] = $body[$column] ?? null;
+            }
+        }
+
+        $insertColumnsSql = implode(', ', array_map(fn($c) => "`$c`", $insertColumns));
+        $sql = "INSERT INTO `lines` (" . $insertColumnsSql . ") VALUES (" . implode(', ', $insertValues) . ")";
 
         try {
             $db->execute($sql, $params);
@@ -457,7 +458,6 @@ function formatLineRow(array $row): array
         'name'               => $row['name'],
         'group_name'         => $row['group_name'] ?? null,
         'voltage_kv'         => $row['voltage_kv'] !== null ? (float) $row['voltage_kv'] : null,
-        'voltage'            => $row['voltage_kv'] !== null ? (float) $row['voltage_kv'] : null,
         'circuit_count'      => (int) ($row['circuit_count'] ?? 1),
         'bundle_count'       => $row['bundle_count'] !== null ? (int) $row['bundle_count'] : null,
         'conductor_type'     => $row['conductor_type'] ?? null,

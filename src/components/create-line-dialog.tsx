@@ -16,7 +16,7 @@ import { Loader2 } from "lucide-react";
 
 interface FormData {
   line_code: string; dispatch_code: string; name: string; group_name: string;
-  voltage: string; circuit_count: string; bundle_count: string;
+  voltage_kv: string; circuit_count: string; bundle_count: string;
   conductor_type: string; tower_structure_type: string; length_km: string; circuit_length_km: string;
   total_towers: string; tension_towers: string; suspension_towers: string;
   plain_terrain: string; semi_mountainous: string; mountainous: string;
@@ -26,7 +26,7 @@ interface FormData {
 
 const empty: FormData = {
   line_code: "", dispatch_code: "", name: "", group_name: "",
-  voltage: "", circuit_count: "1", bundle_count: "1",
+  voltage_kv: "", circuit_count: "1", bundle_count: "1",
   conductor_type: "", tower_structure_type: "", length_km: "", circuit_length_km: "",
   total_towers: "", tension_towers: "", suspension_towers: "",
   plain_terrain: "", semi_mountainous: "", mountainous: "",
@@ -37,25 +37,8 @@ const empty: FormData = {
 /**
  * v3.4.1: مقادیر رایج هادی (ACSR) در شبکه انتقال ایران — نام‌گذاری پرندگان
  * فرمت «فارسی (انگلیسی)» هماهنگ با داده موجود دیتابیس (لینکس (Lynx))
- * اگر مقدار رکورد موجود در فهرست نباشد، خودکار به گزینه‌ها اضافه می‌شود
  */
-export const CONDUCTOR_OPTIONS = [
-  { value: "لینکس (Lynx)", label: "لینکس (Lynx)" },
-  { value: "کاناری (Canary)", label: "کاناری (Canary)" },
-  { value: "کرلو (Curlew)", label: "کرلو (Curlew)" },
-  { value: "فینچ (Finch)", label: "فینچ (Finch)" },
-  { value: "پارتریج (Partridge)", label: "پارتریج (Partridge)" },
-  { value: "رابین (Robin)", label: "رابین (Robin)" },
-  { value: "کلاغ (Raven)", label: "کلاغ (Raven)" },
-  { value: "بلدرچین (Quail)", label: "بلدرچین (Quail)" },
-  { value: "قرقاول (Pheasant)", label: "قرقاول (Pheasant)" },
-  { value: "شاهین (Hawk)", label: "شاهین (Hawk)" },
-  { value: "ماهی‌خورک (Osprey)", label: "ماهی‌خورک (Osprey)" },
-  { value: "کورمورنت (Cormorant)", label: "کورمورنت (Cormorant)" },
-  { value: "پلیکان (Pelican)", label: "پلیکان (Pelican)" },
-  { value: "فلامینگو (Flamingo)", label: "فلامینگو (Flamingo)" },
-  { value: "سایر", label: "سایر" },
-];
+
 
 /**
  * v3.4.1: انواع سازه دکل — دقیقاً مطابق مقادیر معتبر دیتابیس
@@ -101,7 +84,7 @@ export function CreateLineDialog({ open, onClose, onCreated, editRow, duplicateF
 
   // گزینه‌های کد دیسپاچینگ فیلترشده بر اساس ولتاژ انتخاب‌شده — طبق درخواست کاربر:
   // «خطی که ۲۳۰ انتخاب میشه فقط کدهای ۲۳۰ رو نشون بده»
-  const dispatchOptions = useMemo(() => optionsForVoltage(form.voltage), [optionsForVoltage, form.voltage]);
+  const dispatchOptions = useMemo(() => optionsForVoltage(form.voltage_kv), [optionsForVoltage, form.voltage_kv]);
 
   // Reset error + form whenever the dialog opens (whether add, edit or duplicate mode)
   useEffect(() => {
@@ -121,7 +104,7 @@ export function CreateLineDialog({ open, onClose, onCreated, editRow, duplicateF
           dispatch_code: sourceRow.dispatch_code || "",
           name: sourceRow.name || "",
           group_name: sourceRow.group_name || "",
-          voltage: sourceRow.voltage_kv ? String(sourceRow.voltage_kv) : (sourceRow.voltage ? String(sourceRow.voltage) : ""),
+          voltage_kv: sourceRow.voltage_kv != null ? String(sourceRow.voltage_kv) : "",
           circuit_count: sourceRow.circuit_count != null ? String(sourceRow.circuit_count) : "1",
           bundle_count: sourceRow.bundle_count != null ? String(sourceRow.bundle_count) : "",
           conductor_type: (() => {
@@ -154,11 +137,11 @@ export function CreateLineDialog({ open, onClose, onCreated, editRow, duplicateF
 
   // v3.0.0: با تغییر ولتاژ، کدهای دیسپاچینگ نامرتبط با ولتاژ جدید حذف می‌شوند
   useEffect(() => {
-    if (!form.voltage || circuits.length === 0) return;
-    const validCodes = new Set(circuits.filter(c => String(c.voltage) === form.voltage).map(c => c.dispatch_code));
+    if (!form.voltage_kv || circuits.length === 0) return;
+    const validCodes = new Set(circuits.filter(c => String(c.voltage) === form.voltage_kv).map(c => c.dispatch_code));
     setDispatchCodes(prev => prev.filter(c => validCodes.has(c)));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [form.voltage, circuits]);
+  }, [form.voltage_kv, circuits]);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -173,7 +156,7 @@ export function CreateLineDialog({ open, onClose, onCreated, editRow, duplicateF
         name: form.name,
         group_name: form.group_name || null,
         // فقط ستون واقعی دیتابیس ارسال شود؛ جدول lines ستونی به نام voltage ندارد.
-        voltage_kv: form.voltage ? Number(form.voltage) : null,
+        voltage_kv: form.voltage_kv ? Number(form.voltage_kv) : null,
         circuit_count: Number(form.circuit_count) || 1,
         bundle_count: form.bundle_count ? Number(form.bundle_count) : null,
         conductor_type: form.conductor_type || null,
@@ -235,8 +218,8 @@ export function CreateLineDialog({ open, onClose, onCreated, editRow, duplicateF
               </Field>
               <Field label="ولتاژ (kV) — ابتدا انتخاب کنید">
                 <SearchableSelect
-                  value={form.voltage}
-                  onChange={v => set("voltage", v)}
+                  value={form.voltage_kv}
+                  onChange={v => set("voltage_kv", v)}
                   options={[
                     { value: "63", label: "۶۳ کیلوولت" },
                     { value: "132", label: "۱۳۲ کیلوولت" },
@@ -248,7 +231,7 @@ export function CreateLineDialog({ open, onClose, onCreated, editRow, duplicateF
               </Field>
             </div>
             <Field label="کد دیسپاچینگ">
-              {form.voltage ? (
+              {form.voltage_kv ? (
                 <SearchableMultiSelect
                   values={dispatchCodes}
                   onChange={setDispatchCodes}
