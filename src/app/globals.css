@@ -542,6 +542,15 @@
   display: none;
 }
 
+/* v4.3.5: وقتی پنل نقشه پایه/راهنما باز است، نوار ابزار نباید popup را به‌خاطر overflow افقی قطع کند. */
+.map-toolbar.map-toolbar-panel-open {
+  overflow: visible !important;
+}
+.map-toolbar.map-toolbar-panel-open .map-basemap-popup,
+.map-toolbar.map-toolbar-panel-open .map-legend-popup {
+  z-index: 2100 !important;
+}
+
 .map-line-sidebar {
   min-width: 0;
   width: 340px !important;
@@ -579,7 +588,7 @@
 @media (max-width: 767px) {
   .map-toolbar {
     top: auto !important;
-    bottom: 8px !important;
+    bottom: 14px !important;
     left: 8px !important;
     right: 8px !important;
     transform: none !important;
@@ -598,6 +607,10 @@
     touch-action: pan-x;
   }
 
+  .map-toolbar.map-toolbar-panel-open {
+    overflow: visible !important;
+  }
+
   .map-toolbar .map-tool-btn {
     flex: 0 0 36px;
     width: 36px;
@@ -613,13 +626,13 @@
   .map-legend-popup {
     position: fixed !important;
     top: auto !important;
-    bottom: 66px !important;
+    bottom: 76px !important;
     left: 50% !important;
     right: auto !important;
     transform: translateX(-50%) !important;
     width: min(312px, calc(100vw - 24px)) !important;
     max-width: calc(100vw - 24px) !important;
-    max-height: calc(100vh - 82px) !important;
+    max-height: min(70vh, 560px) !important;
     overflow: hidden !important;
   }
 

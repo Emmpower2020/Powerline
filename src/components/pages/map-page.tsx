@@ -341,7 +341,7 @@ export function MapPage() {
       {/* ─── نوار ابزار بالای نقشه ─── */}
       {!loading && !error && (
         <div
-          className="map-toolbar map-floating-panel absolute z-[1000] top-2 flex items-center gap-0.5 bg-white/95 dark:bg-slate-900/95 backdrop-blur px-1.5 py-1.5"
+          className={`map-toolbar map-floating-panel absolute z-[2000] top-2 flex items-center gap-0.5 bg-white/95 dark:bg-slate-900/95 backdrop-blur px-1.5 py-1.5 ${basemapPanel || legendPanel ? "map-toolbar-panel-open" : ""}`}
           onClick={(e) => e.stopPropagation()}
         >
           {/* اندازه‌گیری طول */}
@@ -427,7 +427,7 @@ export function MapPage() {
 
             {/* پنل انتخاب نقشه — شبکه نقشه‌ها */}
             {basemapPanel && (
-              <div className="absolute top-full mt-2 right-0 w-[312px] rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 shadow-none overflow-hidden z-[800] map-basemap-popup">
+              <div className="absolute top-full mt-2 right-0 w-[312px] rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 shadow-none overflow-hidden z-[2100] map-basemap-popup">
                 <div className="px-3 py-2 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
                   <span className="text-xs font-bold text-slate-700 dark:text-slate-200">انتخاب نقشه پایه</span>
                   <button
@@ -512,7 +512,7 @@ export function MapPage() {
             </ToolBtn>
 
             {legendPanel && (
-              <div className="absolute top-full mt-2 right-0 w-[230px] rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 shadow-none overflow-hidden p-3 space-y-3 z-[800] map-legend-popup">
+              <div className="absolute top-full mt-2 right-0 w-[230px] rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 shadow-none overflow-hidden p-3 space-y-3 z-[2100] map-legend-popup">
                 <div>
                   <p className="text-[11px] font-bold text-slate-500 dark:text-slate-400 mb-1.5">سطح ولتاژ (رنگ مسیر)</p>
                   <div className="space-y-1">
