@@ -303,19 +303,59 @@
   outline: none;
 }
 
-/* v4.2.5: تایپوگرافی لایه‌های برداری نقشه — مخصوصاً نام خطوط */
+/* v4.2.6: برچسب نام خطوط با HTML — شکل‌دهی صحیح فارسی/عربی و خوانایی بالا */
 .leaflet-overlay-pane svg text,
-.leaflet-overlay-pane svg textPath,
-.leaflet-overlay-pane svg .powerline-route-label {
+.leaflet-overlay-pane svg textPath {
   font-family: var(--font-vazirmatn), Vazirmatn, Tahoma, sans-serif !important;
   font-synthesis: none;
-  text-rendering: geometricPrecision;
 }
 
-.leaflet-overlay-pane svg .powerline-route-label {
-  font-size: 14px;
-  font-weight: 600;
-  letter-spacing: 0.05px;
+.powerline-route-label-icon {
+  background: transparent !important;
+  border: 0 !important;
+  width: max-content !important;
+  height: auto !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+.powerline-route-label-box {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  direction: rtl;
+  unicode-bidi: plaintext;
+  white-space: nowrap;
+  padding: 4px 9px 4px;
+  border-radius: 8px;
+  border: 1px solid var(--route-color);
+  font-family: var(--font-vazirmatn), Vazirmatn, Tahoma, sans-serif !important;
+  font-size: 13px;
+  line-height: 1.45;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  text-shadow: none !important;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
+.powerline-route-label-box.is-light {
+  color: #0f172a;
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 2px 9px rgba(15, 23, 42, 0.24);
+}
+
+.powerline-route-label-box.is-dark {
+  color: #ffffff;
+  background: rgba(15, 23, 42, 0.94);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.55);
+}
+
+/* برچسب‌های شماره دکل در Canvas */
+.leaflet-container canvas {
+  text-rendering: optimizeLegibility;
 }
 
 /* پاپ‌آپ دکل‌ها */

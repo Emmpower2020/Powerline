@@ -3,8 +3,6 @@
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import { MapContainer, TileLayer, useMap, ScaleControl } from "react-leaflet";
 import L from "leaflet";
-// v4.2.0: leaflet-textpath برای نوشتن نام خط موازی با مسیر
-import "leaflet-textpath";
 import {
   basemapById,
   basemapLabelColor,
@@ -203,6 +201,7 @@ function RoutesOverlay({
   onTowerClick,
   fitTrigger,
   labelColor,
+  bmIsDark,
 }: {
   routes: BuiltRoutes;
   towersById: Map<number, Tower>;
@@ -211,9 +210,10 @@ function RoutesOverlay({
   onTowerClick?: (tower: Tower) => void;
   fitTrigger: number;
   labelColor: string;
+  bmIsDark: boolean;
 }) {
   const map = useMap();
-  // رندرکننده SVG جداگانه برای مسیرها — leaflet-textpath فقط با SVG کار می‌کند
+  // رندرکننده SVG جداگانه برای مسیرها
   const svgRendererRef = useRef<L.SVG | null>(null);
   // رندرکننده Canvas برای دکل‌ها (سفارشی با اشکال)
   const canvasRendererRef = useRef<any>(null);
@@ -267,6 +267,7 @@ function RoutesOverlay({
     const mains: L.Polyline[] = [];
     const connectors: L.Polyline[] = [];
     const markers: L.CircleMarker[] = [];
+    const routeLabels: L.Marker[] = [];
 
     for (const g of routes.groups) {
       for (const part of g.parts) {
@@ -303,27 +304,12 @@ function RoutesOverlay({
         const lineName = line ? `${line.name}` : `خط ${part.lineId}`;
         const lineCode = line?.line_code || "";
 
-        // v4.2.5: بهبود خوانایی نام خطوط روی نقشه
-        // فونت Vazirmatn، وزن متوسط، اندازه متعادل و هاله باریک برای جلوگیری از ظاهر درشت/تاری
-        (main as any).setText(lineName, {
-          repeat: false,
-          center: true,
-          offset: -10,
-          attributes: {
-            "class": "powerline-route-label",
-            "font-size": "14",
-            "font-weight": "600",
-            "font-family": "Vazirmatn, Tahoma, sans-serif",
-            fill: labelColor,
-            stroke: labelColor === "#ffffff" ? "rgba(15, 23, 42, 0.9)" : "#ffffff",
-            "stroke-width": "3.2",
-            "stroke-linejoin": "round",
-            "stroke-linecap": "round",
-            "paint-order": "stroke fill",
-            "text-anchor": "middle",
-            "letter-spacing": "0.05px",
-          },
-        });
+        // v4.2.6: برچسب HTML به‌جای SVG textPath.
+        // این کار شکل‌دهی صحیح حروف فارسی/عربی را به موتور متن مرورگر می‌سپارد
+        // و مشکل «شکسته شدن» یا جدا افتادن حروف روی مسیر را از بین می‌برد.
+        routeLabels.push(
+          createRouteLabel(routeMidpoint(latlngs), lineName, labelColor, bmIsDark)
+        );
 
         // تولتیپ تعاملی هنگام hover — با جزئیات بیشتر
         main.bindTooltip(
@@ -379,6 +365,7 @@ function RoutesOverlay({
     for (const m of mains) m.addTo(group);
     for (const cn of connectors) cn.addTo(group);
     for (const mk of markers) mk.addTo(group);
+    for (const label of routeLabels) label.addTo(group);
   }, [routes, towersById, linesById, labelColor]);
 
   // هایلایت خطِ hover شده از فهرست کناری
@@ -760,6 +747,61 @@ function AutoResize() {
   return null;
 }
 
+/**
+ * نقطه‌ی میانی واقعی مسیر برای قرار دادن برچسب HTML.
+ * از متن SVG/textPath استفاده نمی‌کنیم چون شکل‌دهی حروف فارسی/عربی
+ * در textPath مرورگرها می‌تواند شکسته و ناخوانا شود.
+ */
+function routeMidpoint(latlngs: [number, number][]): [number, number] {
+  if (latlngs.length === 1) return latlngs[0];
+  const points = latlngs.map(([lat, lng]) => L.latLng(lat, lng));
+  let total = 0;
+  for (let i = 1; i < points.length; i++) total += points[i - 1].distanceTo(points[i]);
+  if (!total) return latlngs[Math.floor(latlngs.length / 2)];
+
+  const target = total / 2;
+  let walked = 0;
+  for (let i = 1; i < points.length; i++) {
+    const seg = points[i - 1].distanceTo(points[i]);
+    if (walked + seg >= target) {
+      const t = (target - walked) / seg;
+      return [
+        points[i - 1].lat + (points[i].lat - points[i - 1].lat) * t,
+        points[i - 1].lng + (points[i].lng - points[i - 1].lng) * t,
+      ];
+    }
+    walked += seg;
+  }
+  return latlngs[latlngs.length - 1];
+}
+
+function createRouteLabel(
+  position: [number, number],
+  text: string,
+  color: string,
+  dark: boolean
+): L.Marker {
+  const safeText = String(text ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+
+  const icon = L.divIcon({
+    className: "powerline-route-label-icon",
+    html: `<div class="powerline-route-label-box ${dark ? "is-dark" : "is-light"}" style="--route-color:${color}"><span dir="rtl" lang="fa">${safeText}</span></div>`,
+    iconSize: undefined,
+    iconAnchor: [0, 0],
+  });
+
+  return L.marker(position, {
+    icon,
+    interactive: false,
+    keyboard: false,
+    zIndexOffset: 500,
+  });
+}
+
 /* ────────────────────────────────────────────────────────────────
  * کامپوننت اصلی نقشه
  * ──────────────────────────────────────────────────────────────── */
@@ -843,6 +885,7 @@ export function TowerMapInner({
           onTowerClick={onTowerClick}
           fitTrigger={fitTrigger}
           labelColor={labelColor}
+          bmIsDark={!!bm.dark}
         />
         <MapTools
           activeTool={activeTool}
