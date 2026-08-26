@@ -538,13 +538,24 @@ function DataTableInner<T extends { id: number }>({
           <Button
             variant="outline" size="icon" onClick={toggleSelectAll} disabled={filtered.length === 0}
             title={filtered.length > 0 && filtered.every(r => selectedRows.has(r.id)) ? "لغو انتخاب همه" : "انتخاب همه"}
-            className="h-9 w-9 text-indigo-600 hover:bg-indigo-50 border-indigo-200"
+            className={cn(
+              "h-9 w-9 border-indigo-200 transition-colors",
+              filtered.length > 0 && filtered.every(r => selectedRows.has(r.id))
+                ? "bg-indigo-100 text-indigo-700 hover:bg-indigo-200"
+                : "text-indigo-600 hover:bg-indigo-50"
+            )}
           ><CheckCheck className="w-4 h-4" /></Button>
 
-          {/* بازنشانی کامل فیلترها و مرتب‌سازی */}
+          {/* بازنشانی کامل فیلترها و مرتب‌سازی — در حالت عادی قرمز نیست؛ فقط هنگام فعال بودن فیلتر/مرتب‌سازی قرمز می‌شود */}
           <Button
             variant="outline" size="icon" onClick={resetFilters} disabled={!hasAnyFilters}
-            title="ریست فیلترها و مرتب‌سازی" className="h-9 w-9 text-red-600 hover:bg-slate-50 border-slate-200"
+            title={hasAnyFilters ? "حذف فیلترها و مرتب‌سازی فعال" : "فیلتر فعالی وجود ندارد"}
+            className={cn(
+              "h-9 w-9 border-slate-200 transition-colors",
+              hasAnyFilters
+                ? "bg-red-50 text-red-600 hover:bg-red-100 border-red-200"
+                : "text-slate-600 hover:bg-slate-50"
+            )}
           ><RotateCcw className="w-4 h-4" /></Button>
 
           {/* فقط شمارنده انتخاب */}
