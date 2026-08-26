@@ -524,13 +524,13 @@
   right: auto;
   transform: translateX(-50%);
   box-sizing: border-box;
-  width: 340px;
+  width: 440px;
   max-width: calc(100% - 16px);
   min-height: 50px;
   justify-content: center;
   /* دقیقاً همان سایه پنل انتخاب خطوط */
   box-shadow: 0 4px 14px rgba(15, 23, 42, 0.12), 0 1px 3px rgba(15, 23, 42, 0.05);
-  overflow-x: visible;
+  overflow-x: auto;
   overflow-y: visible;
   scrollbar-width: none;
   -ms-overflow-style: none;
@@ -578,7 +578,8 @@
 
 @media (max-width: 767px) {
   .map-toolbar {
-    top: 8px !important;
+    top: auto !important;
+    bottom: 8px !important;
     left: 8px !important;
     right: 8px !important;
     transform: none !important;
@@ -589,6 +590,12 @@
     padding: 4px;
     gap: 1px;
     border-radius: 16px;
+    overflow-x: auto !important;
+    overflow-y: visible !important;
+    flex-wrap: nowrap;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+    touch-action: pan-x;
   }
 
   .map-toolbar .map-tool-btn {
@@ -604,8 +611,9 @@
 
   .map-basemap-popup,
   .map-legend-popup {
-    position: absolute !important;
-    top: calc(100% + 10px) !important;
+    position: fixed !important;
+    top: auto !important;
+    bottom: 66px !important;
     left: 50% !important;
     right: auto !important;
     transform: translateX(-50%) !important;
@@ -621,7 +629,7 @@
   }
 
   .map-line-sidebar {
-    top: 68px !important;
+    top: 8px !important;
     left: 8px !important;
     right: 8px !important;
     bottom: auto !important;
@@ -655,7 +663,7 @@
   }
 
   .leaflet-top {
-    top: 68px;
+    top: 8px;
   }
 
   .leaflet-control-zoom {
