@@ -485,6 +485,7 @@ function MapTools({
   const boxRef = useRef<L.Rectangle | null>(null);
   const startRef = useRef<L.LatLng | null>(null);
   const coordDivRef = useRef<HTMLDivElement | null>(null);
+  const locationMarkerRef = useRef<L.CircleMarker | null>(null);
   const activeToolRef = useRef<MapTool>(activeTool);
   useEffect(() => {
     activeToolRef.current = activeTool;
@@ -568,15 +569,21 @@ function MapTools({
     };
   }, [activeTool, map, drawMeasure]);
 
-  // ابزار موقعیت جغرافیایی
+  // ابزار موقعیت جغرافیایی — استفاده از موقعیت واقعی دستگاه/مرورگر
   useEffect(() => {
     if (activeTool !== "coordinates") {
       if (coordDivRef.current) {
         coordDivRef.current.remove();
         coordDivRef.current = null;
       }
+      if (locationMarkerRef.current) {
+        locationMarkerRef.current.remove();
+        locationMarkerRef.current = null;
+      }
+      map.stopLocate();
       return;
     }
+
     const div = L.DomUtil.create("div", "map-coord-display");
     div.style.cssText = `
       position: absolute; bottom: 12px; right: 12px; z-index: 1000;
@@ -584,25 +591,43 @@ function MapTools({
       border-radius: 10px; padding: 6px 10px; font-size: 11px;
       color: #1e293b; pointer-events: none;
       box-shadow: 0 4px 14px rgba(0,0,0,0.15); font-weight: 600;
-      min-width: 130px; text-align: center;
+      min-width: 170px; text-align: center;
     `;
-    div.innerHTML = "مختصات: —";
+    div.innerHTML = "در حال دریافت موقعیت…";
     map.getContainer().appendChild(div);
     coordDivRef.current = div;
 
-    const onMove = (e: L.LeafletMouseEvent) => {
+    const onFound = (e: L.LocationEvent) => {
       const lat = e.latlng.lat.toFixed(5);
       const lng = e.latlng.lng.toFixed(5);
-      div.innerHTML = `<span dir="ltr">${lat}°, ${lng}°</span>`;
+      div.innerHTML = `<span dir="rtl">موقعیت شما:</span> <span dir="ltr">${lat}°, ${lng}°</span>`;
+      if (locationMarkerRef.current) locationMarkerRef.current.remove();
+      locationMarkerRef.current = L.circleMarker(e.latlng, {
+        radius: 8,
+        color: "#2563eb",
+        weight: 3,
+        fillColor: "#60a5fa",
+        fillOpacity: 0.35,
+        interactive: false,
+      }).addTo(map);
     };
-    const onMoveOut = () => {
-      div.innerHTML = "مختصات: —";
+
+    const onError = (e: L.ErrorEvent) => {
+      div.innerHTML = e.message || "دریافت موقعیت جغرافیایی ممکن نیست";
     };
-    map.on("mousemove", onMove);
-    map.on("mouseout", onMoveOut);
+
+    map.on("locationfound", onFound);
+    map.on("locationerror", onError);
+    map.locate({ setView: true, maxZoom: Math.max(map.getZoom(), 15), enableHighAccuracy: true });
+
     return () => {
-      map.off("mousemove", onMove);
-      map.off("mouseout", onMoveOut);
+      map.off("locationfound", onFound);
+      map.off("locationerror", onError);
+      map.stopLocate();
+      if (locationMarkerRef.current) {
+        locationMarkerRef.current.remove();
+        locationMarkerRef.current = null;
+      }
       div.remove();
       coordDivRef.current = null;
     };

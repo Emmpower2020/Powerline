@@ -1,1 +1,1 @@
-Powerline Web v4.3.11 - Map mobile toolbar refinement
+Powerline Web v4.3.12 - Map mobile UI, labels and geolocation fixes

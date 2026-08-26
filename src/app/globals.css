@@ -604,9 +604,9 @@
   }
 
   .map-toolbar .map-tool-btn {
-    flex: 0 0 32px;
-    width: 32px;
-    height: 32px;
+    flex: 0 0 33px;
+    width: 33px;
+    height: 33px;
     border-radius: 9px;
   }
   .map-toolbar {
@@ -716,3 +716,25 @@
   }
 }
 
+
+
+/* v4.3.12: تثبیت لایه‌های رابط نقشه در موبایل و حذف محدودیت اسکرول پنل‌ها */
+@media (max-width: 767px) {
+  .map-line-sidebar {
+    z-index: 50000 !important;
+    isolation: isolate;
+    pointer-events: auto !important;
+  }
+  .map-line-sidebar > .map-floating-panel {
+    z-index: 50001 !important;
+    pointer-events: auto !important;
+  }
+  .map-basemap-popup,
+  .map-legend-popup {
+    z-index: 60000 !important;
+    pointer-events: auto !important;
+  }
+  .map-toolbar {
+    z-index: 55000 !important;
+  }
+}

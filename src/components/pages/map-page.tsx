@@ -45,8 +45,6 @@ import {
   Minus,
   Home,
   Scan,
-  Eye,
-  EyeOff,
 } from "lucide-react";
 
 /**
@@ -122,7 +120,6 @@ export function MapPage() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [basemapPanel, setBasemapPanel] = useState(false);
   const [legendPanel, setLegendPanel] = useState(false);
-  const [showLineLabels, setShowLineLabels] = useState(true);
   const [fitTrigger, setFitTrigger] = useState(0);
 
   // نوار ابزار — ابزار فعال + ترایگرهای زوم
@@ -323,8 +320,8 @@ export function MapPage() {
             zoomInTrigger={zoomInTrigger}
             zoomOutTrigger={zoomOutTrigger}
             homeTrigger={homeTrigger}
-            showLineLabels={showLineLabels}
-            labelSafeLeft={sidebarOpen ? 320 : 12}
+            showLineLabels={true}
+            labelSafeLeft={12}
             onToolDone={() => setActiveTool(null)}
           />
         )}
@@ -392,19 +389,6 @@ export function MapPage() {
           >
             <MapPin className="w-4 h-4" />
           </ToolBtn>
-
-          <span className="map-tool-divider" />
-
-          {/* نمایش/مخفی کردن نام خطوط */}
-          <ToolBtn
-            active={showLineLabels}
-            title={showLineLabels ? "مخفی کردن نام خطوط" : "نمایش نام خطوط"}
-            onClick={() => setShowLineLabels((v) => !v)}
-          >
-            {showLineLabels ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
-          </ToolBtn>
-
-          <span className="map-tool-divider" />
 
           {/* انتخاب نقشه پایه */}
           <div className="relative">
@@ -552,7 +536,7 @@ export function MapPage() {
       {/* ─── پنل انتخاب خطوط (سمت چپ) — v4.2.2: top هم‌سطح جعبه ابزار، مینیمال = جمع شدن ارتفاعی ─── */}
       {!loading && !error && (
         <div
-          className="map-line-sidebar absolute z-[700] transition-all duration-300"
+          className="map-line-sidebar absolute z-[50000] transition-all duration-300"
           style={{
             top: "0.5rem",
             bottom: sidebarOpen ? "2.5rem" : "auto",
