@@ -530,18 +530,10 @@
   justify-content: center;
   /* دقیقاً همان سایه پنل انتخاب خطوط */
   box-shadow: 0 4px 14px rgba(15, 23, 42, 0.12), 0 1px 3px rgba(15, 23, 42, 0.05);
-  overflow-x: auto;
-  overflow-y: visible;
-  scrollbar-width: none;
-  -ms-overflow-style: none;
+  overflow: visible;
   white-space: nowrap;
   touch-action: auto;
-  overscroll-behavior-x: contain;
 }
-.map-toolbar::-webkit-scrollbar {
-  display: none;
-}
-
 /* v4.3.5: وقتی پنل نقشه پایه/راهنما باز است، نوار ابزار نباید popup را به‌خاطر overflow افقی قطع کند. */
 .map-toolbar.map-toolbar-panel-open {
   overflow: visible !important;
@@ -587,9 +579,10 @@
 
 @media (max-width: 767px) {
   .map-toolbar {
+    z-index: 9000 !important;
     top: auto !important;
     /* v4.3.7: نوار ابزار کمی پایین‌تر قرار گرفت تا فاصله متعادل‌تری از پایین صفحه داشته باشد. */
-    bottom: 48px !important;
+    bottom: 68px !important;
     left: 8px !important;
     right: 8px !important;
     transform: none !important;
@@ -600,11 +593,9 @@
     padding: 4px;
     gap: 1px;
     border-radius: 16px;
-    /* v4.3.7: در موبایل اسکرول افقی حذف شد؛ همه ابزارها داخل صفحه جا می‌گیرند. */
+    /* در موبایل اسکرول افقی نوار ابزار کاملاً حذف است. */
     overflow: visible !important;
     flex-wrap: nowrap;
-    scrollbar-width: none;
-    -webkit-overflow-scrolling: auto;
     touch-action: manipulation;
   }
 
@@ -625,15 +616,15 @@
 
   .map-basemap-popup,
   .map-legend-popup {
-    position: fixed !important;
-    top: 64px !important;
-    bottom: auto !important;
+    position: absolute !important;
+    top: auto !important;
+    bottom: calc(100% + 10px) !important;
     left: 50% !important;
     right: auto !important;
     transform: translateX(-50%) !important;
     width: min(312px, calc(100vw - 24px)) !important;
     max-width: calc(100vw - 24px) !important;
-    max-height: min(70vh, 560px) !important;
+    max-height: none !important;
     overflow: hidden !important;
     z-index: 10000 !important;
     pointer-events: auto !important;
@@ -645,6 +636,9 @@
   }
 
   .map-line-sidebar {
+    /* v4.3.9: منوی خطوط باید روی لایه نقشه، ابزارها و سایر کنترل‌های Leaflet قرار بگیرد. */
+    z-index: 12000 !important;
+    pointer-events: auto !important;
     top: 8px !important;
     left: 8px !important;
     right: 8px !important;
@@ -654,6 +648,8 @@
   }
 
   .map-line-sidebar > .map-floating-panel {
+    position: relative;
+    z-index: 12001 !important;
     max-height: 46vh;
     border-radius: 16px;
   }
@@ -710,12 +706,6 @@
 
   .map-line-sidebar > .map-floating-panel {
     max-height: 42vh;
-  }
-
-  .map-toolbar .map-tool-btn {
-    flex-basis: 30px;
-    width: 30px;
-    height: 30px;
   }
 
   .powerline-route-label-box {

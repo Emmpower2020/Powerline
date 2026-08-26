@@ -21,9 +21,9 @@ import type { Line, Tower } from "@/lib/types";
  * (همه با اندازه ثابت پیکسلی + برچسب شماره دکل بدون صفر پیشینی)
  * ──────────────────────────────────────────────────────────────── */
 
-const LABEL_MIN_ZOOM = 13;
+const LABEL_MIN_ZOOM = 14;
 /** زیر این زوم، دکل‌ها رسم نمی‌شوند و فقط مسیر خط دیده می‌شود */
-const MARKER_MIN_ZOOM = 13;
+const MARKER_MIN_ZOOM = 14;
 
 type CanvasRenderer = L.Canvas & {
   _drawing: boolean;

@@ -45,6 +45,8 @@ import {
   Minus,
   Home,
   Scan,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 
 /**
@@ -120,6 +122,7 @@ export function MapPage() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [basemapPanel, setBasemapPanel] = useState(false);
   const [legendPanel, setLegendPanel] = useState(false);
+  const [showLineLabels, setShowLineLabels] = useState(true);
   const [fitTrigger, setFitTrigger] = useState(0);
 
   // نوار ابزار — ابزار فعال + ترایگرهای زوم
@@ -320,7 +323,7 @@ export function MapPage() {
             zoomInTrigger={zoomInTrigger}
             zoomOutTrigger={zoomOutTrigger}
             homeTrigger={homeTrigger}
-            showLineLabels={true}
+            showLineLabels={showLineLabels}
             labelSafeLeft={sidebarOpen ? 320 : 12}
             onToolDone={() => setActiveTool(null)}
           />
@@ -392,6 +395,17 @@ export function MapPage() {
 
           <span className="map-tool-divider" />
 
+          {/* نمایش/مخفی کردن نام خطوط */}
+          <ToolBtn
+            active={showLineLabels}
+            title={showLineLabels ? "مخفی کردن نام خطوط" : "نمایش نام خطوط"}
+            onClick={() => setShowLineLabels((v) => !v)}
+          >
+            {showLineLabels ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
+          </ToolBtn>
+
+          <span className="map-tool-divider" />
+
           {/* انتخاب نقشه پایه */}
           <div className="relative">
             <ToolBtn
@@ -417,7 +431,7 @@ export function MapPage() {
                     <X className="w-3.5 h-3.5" />
                   </button>
                 </div>
-                <div className="p-2.5 grid grid-cols-3 gap-2 max-h-[380px] overflow-y-auto">
+                <div className="p-2.5 grid grid-cols-3 gap-2">
                   {BASEMAPS.map((b) => {
                     const thumb = basemapThumbUrl(b);
                     const active = b.id === basemapId;
