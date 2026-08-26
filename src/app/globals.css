@@ -588,7 +588,7 @@
 @media (max-width: 767px) {
   .map-toolbar {
     top: auto !important;
-    bottom: 14px !important;
+    bottom: 92px !important;
     left: 8px !important;
     right: 8px !important;
     transform: none !important;
@@ -625,8 +625,8 @@
   .map-basemap-popup,
   .map-legend-popup {
     position: fixed !important;
-    top: auto !important;
-    bottom: 76px !important;
+    top: 72px !important;
+    bottom: auto !important;
     left: 50% !important;
     right: auto !important;
     transform: translateX(-50%) !important;

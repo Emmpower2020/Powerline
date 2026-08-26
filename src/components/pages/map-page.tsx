@@ -338,7 +338,7 @@ export function MapPage() {
         )}
       </div>
 
-      {/* ─── نوار ابزار بالای نقشه ─── */}
+      {/* ─── نوار ابزار نقشه ─── */}
       {!loading && !error && (
         <div
           className={`map-toolbar map-floating-panel absolute z-[2000] top-2 flex items-center gap-0.5 bg-white/95 dark:bg-slate-900/95 backdrop-blur px-1.5 py-1.5 ${basemapPanel || legendPanel ? "map-toolbar-panel-open" : ""}`}

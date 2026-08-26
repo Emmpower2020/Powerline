@@ -76,9 +76,6 @@ export function towerTypeLabel(towerType?: string | null): string {
 export type BasemapId =
   | "blank"
   | "osm"
-  | "osm-hot"
-  | "carto-light"
-  | "carto-dark"
   | "esri-satellite"
   | "esri-street"
   | "esri-topo"
@@ -126,40 +123,6 @@ export const BASEMAPS: BasemapDef[] = [
     maxZoom: 19,
     thumb: KERMANSHAH_TILE,
     labelColor: "#0f172a",
-  },
-  {
-    id: "osm-hot",
-    title: "نقشه انسانی",
-    desc: "OSM Humanitarian",
-    url: "https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png",
-    attribution: '&copy; OpenStreetMap contributors, Tiles style by Humanitarian OSM Team',
-    subdomains: "ab",
-    maxZoom: 19,
-    thumb: KERMANSHAH_TILE,
-    labelColor: "#0f172a",
-  },
-  {
-    id: "carto-light",
-    title: "روشن مینیمال",
-    desc: "Carto Light",
-    url: "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",
-    attribution: '&copy; OpenStreetMap contributors &copy; CARTO',
-    subdomains: "abcd",
-    maxZoom: 20,
-    thumb: KERMANSHAH_TILE,
-    labelColor: "#0f172a",
-  },
-  {
-    id: "carto-dark",
-    title: "تیره",
-    desc: "Carto Dark",
-    url: "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
-    attribution: '&copy; OpenStreetMap contributors &copy; CARTO',
-    subdomains: "abcd",
-    maxZoom: 20,
-    dark: true,
-    thumb: KERMANSHAH_TILE,
-    labelColor: "#f1f5f9", // سفید روی تیره
   },
   {
     id: "esri-satellite",
@@ -223,9 +186,6 @@ const THUMB_CACHE_BUSTER = "v4.2.2";
 function basemapProvider(id: BasemapId): string | null {
   switch (id) {
     case "osm": return "osm";
-    case "osm-hot": return "osm-hot";
-    case "carto-light": return "carto-light";
-    case "carto-dark": return "carto-dark";
     case "esri-satellite": return "esri-satellite";
     case "esri-street": return "esri-street";
     case "esri-topo": return "esri-topo";
