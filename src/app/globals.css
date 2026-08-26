@@ -511,11 +511,11 @@
 .map-floating-panel {
   border-radius: 16px;
   border: 1px solid rgba(226, 232, 240, 0.95);
-  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.18), 0 2px 8px rgba(15, 23, 42, 0.08);
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.12), 0 1px 3px rgba(15, 23, 42, 0.05);
 }
 .dark .map-floating-panel {
   border-color: rgba(51, 65, 85, 0.95);
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.42), 0 2px 8px rgba(0, 0, 0, 0.24);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.20), 0 1px 3px rgba(0, 0, 0, 0.10);
 }
 
 .map-toolbar {
@@ -529,7 +529,7 @@
   min-height: 50px;
   justify-content: center;
   /* دقیقاً همان سایه پنل انتخاب خطوط */
-  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.18), 0 2px 8px rgba(15, 23, 42, 0.08);
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.12), 0 1px 3px rgba(15, 23, 42, 0.05);
   overflow-x: visible;
   overflow-y: visible;
   scrollbar-width: none;
@@ -567,6 +567,15 @@
   user-select: none;
 }
 
+.map-basemap-popup,
+.map-legend-popup {
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.12), 0 1px 3px rgba(15, 23, 42, 0.05) !important;
+}
+.dark .map-basemap-popup,
+.dark .map-legend-popup {
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.20), 0 1px 3px rgba(0, 0, 0, 0.10) !important;
+}
+
 @media (max-width: 767px) {
   .map-toolbar {
     top: 8px !important;
@@ -592,6 +601,19 @@
     max-width: none !important;
   }
 
+
+  .map-basemap-popup,
+  .map-legend-popup {
+    position: absolute !important;
+    top: calc(100% + 10px) !important;
+    left: 50% !important;
+    right: auto !important;
+    transform: translateX(-50%) !important;
+    width: min(312px, calc(100vw - 24px)) !important;
+    max-width: calc(100vw - 24px) !important;
+    max-height: calc(100vh - 82px) !important;
+    overflow: hidden !important;
+  }
 
   .map-toolbar .map-tool-divider {
     flex: 0 0 1px;
