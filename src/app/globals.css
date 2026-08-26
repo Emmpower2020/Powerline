@@ -530,12 +530,12 @@
   justify-content: center;
   /* دقیقاً همان سایه پنل انتخاب خطوط */
   box-shadow: 0 10px 30px rgba(15, 23, 42, 0.18), 0 2px 8px rgba(15, 23, 42, 0.08);
-  overflow-x: auto;
+  overflow-x: visible;
   overflow-y: visible;
   scrollbar-width: none;
   -ms-overflow-style: none;
   white-space: nowrap;
-  touch-action: pan-x;
+  touch-action: auto;
   overscroll-behavior-x: contain;
 }
 .map-toolbar::-webkit-scrollbar {
