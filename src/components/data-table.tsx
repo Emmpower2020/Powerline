@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import {
   ChevronUp, ChevronDown, ChevronsUpDown, ChevronRight, ChevronLeft, Search, RefreshCw,
   Plus, Eye, EyeOff, Filter, X, Check, Copy, CopyPlus, Trash2, ArrowUp, ArrowDown, Pencil,
-  Settings as SettingsIcon, Upload, Download, Printer,
+  Settings as SettingsIcon, Upload, Download, Printer, RotateCcw,
 } from "lucide-react";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
@@ -345,6 +345,17 @@ function DataTableInner<T extends { id: number }>({
     });
   }, [paginated, filtered, columns, onLoadAllRows]);
 
+  const hasAnyFilters = search.trim() !== "" || Object.values(appliedFilters).some((f: { search: string; selectedValues: Set<string> }) => f.search !== "" || f.selectedValues.size > 0) || (sortKey !== null && sortDir !== "none");
+  const resetFilters = () => {
+    setSearch("");
+    setAppliedFilters({});
+    setPendingFilters({});
+    setOpenFilterCol(null);
+    setSortKey(null);
+    setSortDir("none");
+    setPage(1);
+  };
+
   // Copy selected rows to clipboard as TSV (tab-separated) — paste-able in Excel
   // If no row selected, copy all filtered rows
   const handleCopy = () => {
@@ -413,7 +424,8 @@ function DataTableInner<T extends { id: number }>({
     return String(value);
   };
 
-  const hasSelection = !!(onCopy || onDelete || onEdit);
+  // همه جدول‌ها قابلیت انتخاب ردیف دارند؛ عملیات وابسته به callbackهای صفحه فعال می‌شوند.
+  const hasSelection = true;
   const selCount = selectedRows.size;
 
   // Edit handler — if 0 selected: do nothing; if 1 selected: call onEdit; if >1: alert
@@ -490,31 +502,6 @@ function DataTableInner<T extends { id: number }>({
             </Button>
           )}
 
-          {/* Inline selection counter — placed between action buttons */}
-          {selCount > 0 && (
-            <span className="text-xs px-2.5 py-1 bg-indigo-50 text-indigo-700 rounded-md nums-fa border border-indigo-200 inline-flex items-center gap-1 ml-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-indigo-500"></span>
-              {selCount.toLocaleString("fa-IR")} ردیف انتخاب شده
-              {/* v2.2.0: انتخاب همه ردیف‌های فیلترشده (همه صفحات) */}
-              {selCount < filtered.length && (
-                <button
-                  onClick={() => setSelectedRows(new Set(filtered.map(r => r.id)))}
-                  className="text-indigo-500 hover:text-indigo-800 underline decoration-dotted cursor-pointer mr-1 whitespace-nowrap"
-                  title="همه ردیف‌ها در همه صفحات (طبق فیلترهای فعلی) انتخاب می‌شوند"
-                >
-                  انتخاب همه ({filtered.length.toLocaleString("fa-IR")})
-                </button>
-              )}
-              <button
-                onClick={() => setSelectedRows(new Set())}
-                className="text-indigo-400 hover:text-indigo-700 cursor-pointer mr-1"
-                title="لغو انتخاب‌ها"
-              >
-                <X className="w-3 h-3" />
-              </button>
-            </span>
-          )}
-
           {/* عنصر اضافه ماژول (مثل دکمه عملیات گروهی) — همان ردیف دکمه‌های اصلی */}
           {toolbarExtra}
 
@@ -562,9 +549,43 @@ function DataTableInner<T extends { id: number }>({
               </div>
             )}
           </div>
+
+          {/* بازنشانی کامل فیلترها و مرتب‌سازی */}
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={resetFilters}
+            disabled={!hasAnyFilters}
+            title="ریست فیلترها و مرتب‌سازی"
+            className="h-9 w-9 text-slate-600 hover:bg-slate-50 border-slate-200"
+          >
+            <RotateCcw className="w-4 h-4" />
+          </Button>
+
+          {/* شمارنده انتخاب — عمداً بعد از دکمه Settings قرار گرفته است */}
+          {selCount > 0 && (
+            <span className="text-xs px-2.5 py-1 bg-indigo-50 text-indigo-700 rounded-md nums-fa border border-indigo-200 inline-flex items-center gap-1 ml-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-indigo-500"></span>
+              {selCount.toLocaleString("fa-IR")} ردیف انتخاب شده
+              {selCount < filtered.length && (
+                <button
+                  onClick={() => setSelectedRows(new Set(filtered.map(r => r.id)))}
+                  className="text-indigo-500 hover:text-indigo-800 underline decoration-dotted cursor-pointer mr-1 whitespace-nowrap"
+                  title="همه ردیف‌ها در همه صفحات طبق فیلترهای فعلی انتخاب می‌شوند"
+                >
+                  انتخاب همه ({filtered.length.toLocaleString("fa-IR")})
+                </button>
+              )}
+              <button onClick={clearSelection} className="text-indigo-400 hover:text-indigo-700 cursor-pointer mr-1" title="لغو انتخاب‌ها">
+                <X className="w-3 h-3" />
+              </button>
+            </span>
+          )}
+
         </div>
 
         {searchable && (
+
           <div className="relative min-w-[140px]" style={{ maxWidth: "280px", flex: "0 1 280px" }}>
             <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
             <Input placeholder="جستجو..." value={search} onChange={e => { setSearch(e.target.value); setPage(1); }} className="pr-9 bg-white dark:bg-slate-800" />
@@ -624,21 +645,17 @@ function DataTableInner<T extends { id: number }>({
                     key={col.key}
                     className={cn(
                       "p-2 font-medium text-slate-700 dark:text-slate-200 whitespace-nowrap bg-white dark:bg-slate-800",
-                      col.align === "center" ? "text-center"
-                      : col.align === "left" ? "text-left"
-                      : "text-right"
+                      "text-right"
                     )}
                     style={{ width: getColumnWidth(col) }}
                   >
                     <div className={cn(
                       "flex items-center gap-1",
-                      col.align === "center" ? "justify-center"
-                      : col.align === "left" ? "justify-start"
-                      : "justify-start"
+                      "justify-start"
                     )}>
-                      <span className={col.align === "center" ? "text-center" : "text-right"}>{col.header}</span>
-                      {/* v3.5.4: ستون‌های عددی همیشه فیلتر دارند (درخواست کاربر) — ستون‌های متنی فقط با filterable */}
-                      {(col.filterable || col.type === "number") && (
+                      <span className="text-right">{col.header}</span>
+                      {/* همه ستون‌ها فیلترپذیر هستند مگر صراحتاً غیرفعال شده باشند */}
+                      {col.filterable !== false && (
                         <DropdownMenu open={openFilterCol === col.key} onOpenChange={(o) => { if (o) { setOpenFilterCol(col.key); if (!pendingFilters[col.key]) setPendingFilters(prev => ({ ...prev, [col.key]: { search: "", selectedValues: new Set() } })); } else setOpenFilterCol(null); }}>
                           <DropdownMenuTrigger asChild>
                             <button
@@ -657,8 +674,8 @@ function DataTableInner<T extends { id: number }>({
                                 )}
                               </div>
 
-                              {/* بخش سورت — فقط ستون‌های sortable */}
-                              {col.sortable && (
+                              {/* بخش سورت — همه ستون‌ها sortable هستند مگر صراحتاً غیرفعال شده باشند */}
+                              {col.sortable !== false && (
                                 <div className="space-y-1 border border-slate-100 dark:border-slate-700 rounded p-2 bg-slate-50 dark:bg-slate-800/50">
                                   <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">مرتب‌سازی</p>
                                   <div className="grid grid-cols-3 gap-1">
@@ -770,9 +787,7 @@ function DataTableInner<T extends { id: number }>({
                         className={cn(
                           "p-2",
                           col.wrap ? "whitespace-normal break-words align-top" : "whitespace-nowrap",
-                          col.align === "center" ? "text-center"
-                          : col.align === "left" ? "text-left"
-                          : "text-right"
+                          "text-right"
                         )}
                       >
                         {renderCell(row, col)}
