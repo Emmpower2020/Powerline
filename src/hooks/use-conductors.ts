@@ -8,7 +8,7 @@ import type { SearchableOption } from "@/components/searchable-select";
  * Hook گزینه‌های سیم از جدول conductors — v3.5.0
  *
  * فرم خطوط و عملیات گروهی از این جدول می‌خوانند (به‌جای فهرست ثابت).
- * ساختار گزینه: «نام (سطح مقطع mm²)» — ساخت‌یافته و قابل جستجو.
+ * گزینه‌ها فقط بر اساس «نام سیم» نمایش داده می‌شوند؛ بدون سطح مقطع و دسته‌بندی.
  * سازگار با داده قدیمی: اگر جدول خالی بود (هنوز SQL اجرا نشده)،
  * فهرست ثابت قبلی برگردانده می‌شود تا فرم‌ها بی‌گزینه نمانند.
  *
@@ -89,21 +89,19 @@ export function useConductors() {
 
   /**
    * گزینه‌های کمبوباکس مستقیماً از جدول conductors.
-   * value = نام خام رکورد دیتابیس تا مقدار ذخیره‌شده با مرجع جدول دقیقاً یکسان بماند.
-   * label = نام فارسی/استاندارد + سطح مقطع برای نمایش کاربر.
+   * فقط نام سیم نمایش داده می‌شود و هیچ عدد/سطح مقطع یا group ندارد.
    */
   const options = useMemo<SearchableOption[]>(() => {
-    return conductors.map(c => {
-      const rawName = normalizeConductorName(c.name);
-      const display = conductorDisplayName(rawName);
-      return {
-        value: rawName,
-        label: c.sectional_area_all != null
-          ? `${display} (${Number(c.sectional_area_all).toLocaleString("fa-IR")} mm²)`
-          : display,
-        group: c.standard || undefined,
-      };
-    });
+    return conductors
+      .map(c => {
+        const rawName = normalizeConductorName(c.name);
+        return {
+          value: rawName,
+          label: rawName,
+        };
+      })
+      .filter(o => o.value)
+      .sort((a, b) => a.label.localeCompare(b.label, 'fa'));
   }, [conductors]);
 
   return { conductors, options, fromDb: conductors.length > 0, loading: false, reload: refresh };

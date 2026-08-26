@@ -172,7 +172,7 @@ export function CreateLineDialog({ open, onClose, onCreated, editRow, duplicateF
         dispatch_code: dispatchCode || null,
         name: form.name,
         group_name: form.group_name || null,
-        voltage: form.voltage ? Number(form.voltage) : null,
+        // فقط ستون واقعی دیتابیس ارسال شود؛ جدول lines ستونی به نام voltage ندارد.
         voltage_kv: form.voltage ? Number(form.voltage) : null,
         circuit_count: Number(form.circuit_count) || 1,
         bundle_count: form.bundle_count ? Number(form.bundle_count) : null,
