@@ -643,13 +643,51 @@ function MapTools({
       onToolDone?.();
     };
 
+    // دسکتاپ
     map.on("mousedown", onMouseDown);
     map.on("mousemove", onMouseMove);
     map.on("mouseup", onMouseUp);
+
+    // موبایل: رویدادهای لمسی برای کشیدن مستطیل زوم
+    const container = map.getContainer();
+    let touchActive = false;
+    const onTouchStart = (ev: TouchEvent) => {
+      if (ev.touches.length !== 1) return;
+      ev.preventDefault();
+      touchActive = true;
+      const p = map.mouseEventToLatLng(ev.touches[0] as unknown as MouseEvent);
+      onMouseDown({ latlng: p } as L.LeafletMouseEvent);
+      map.dragging.disable();
+    };
+    const onTouchMove = (ev: TouchEvent) => {
+      if (!touchActive || ev.touches.length !== 1) return;
+      ev.preventDefault();
+      const p = map.mouseEventToLatLng(ev.touches[0] as unknown as MouseEvent);
+      onMouseMove({ latlng: p } as L.LeafletMouseEvent);
+    };
+    const onTouchEnd = (ev: TouchEvent) => {
+      if (!touchActive) return;
+      ev.preventDefault();
+      touchActive = false;
+      const touch = ev.changedTouches[0];
+      if (touch) {
+        const p = map.mouseEventToLatLng(touch as unknown as MouseEvent);
+        onMouseUp({ latlng: p } as L.LeafletMouseEvent);
+      }
+      map.dragging.enable();
+    };
+    container.addEventListener("touchstart", onTouchStart, { passive: false });
+    container.addEventListener("touchmove", onTouchMove, { passive: false });
+    container.addEventListener("touchend", onTouchEnd, { passive: false });
+
     return () => {
       map.off("mousedown", onMouseDown);
       map.off("mousemove", onMouseMove);
       map.off("mouseup", onMouseUp);
+      container.removeEventListener("touchstart", onTouchStart);
+      container.removeEventListener("touchmove", onTouchMove);
+      container.removeEventListener("touchend", onTouchEnd);
+      map.dragging.enable();
     };
   }, [activeTool, map, onToolDone]);
 
@@ -675,7 +713,8 @@ function MapTools({
       }
     }
     if (allPoints.length === 0) {
-      // اگر هیچ خطی انتخاب نشده، روی مرکز پیش‌فرض بمان
+      // وقتی هیچ خطی فعال نیست، Home باید دقیقاً نمای اولیه نقشه را برگرداند.
+      map.setView([34.3, 47.0], 10, { animate: true });
       return;
     }
     if (allPoints.length === 1) {

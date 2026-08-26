@@ -336,6 +336,38 @@ export function MapPage() {
           className={`map-toolbar map-floating-panel absolute z-[2000] top-2 flex items-center gap-0.5 bg-white/95 dark:bg-slate-900/95 backdrop-blur px-1.5 py-1.5 ${basemapPanel || legendPanel ? "map-toolbar-panel-open" : ""}`}
           onClick={(e) => e.stopPropagation()}
         >
+          {/* خانه — بازگشت به نمای اولیه / محدوده خطوط */}
+          <ToolBtn
+            title="بازگشت به خانه — نمای اولیه"
+            onClick={() => setHomeTrigger((t) => t + 1)}
+          >
+            <Home className="w-4 h-4" />
+          </ToolBtn>
+          {/* زوم این + */}
+          <ToolBtn
+            title="زوم این"
+            onClick={() => setZoomInTrigger((t) => t + 1)}
+          >
+            <Plus className="w-4 h-4" />
+          </ToolBtn>
+          {/* زوم اوت - */}
+          <ToolBtn
+            title="زوم اوت"
+            onClick={() => setZoomOutTrigger((t) => t + 1)}
+          >
+            <Minus className="w-4 h-4" />
+          </ToolBtn>
+          {/* زوم به ناحیه — کنار کنترل‌های زوم */}
+          <ToolBtn
+            active={activeTool === "zoom-area"}
+            title="زوم به ناحیه (کشیدن مستطیل)"
+            onClick={() => toggleTool("zoom-area")}
+          >
+            <Scan className="w-4 h-4" />
+          </ToolBtn>
+
+          <span className="map-tool-divider" />
+
           {/* اندازه‌گیری طول */}
           <ToolBtn
             active={activeTool === "measure-distance"}
@@ -359,38 +391,6 @@ export function MapPage() {
             onClick={() => toggleTool("coordinates")}
           >
             <MapPin className="w-4 h-4" />
-          </ToolBtn>
-          {/* زوم به ناحیه */}
-          <ToolBtn
-            active={activeTool === "zoom-area"}
-            title="زوم به ناحیه (کشیدن مستطیل)"
-            onClick={() => toggleTool("zoom-area")}
-          >
-            <Scan className="w-4 h-4" />
-          </ToolBtn>
-
-          <span className="map-tool-divider" />
-
-          {/* زوم این + */}
-          <ToolBtn
-            title="زوم این"
-            onClick={() => setZoomInTrigger((t) => t + 1)}
-          >
-            <Plus className="w-4 h-4" />
-          </ToolBtn>
-          {/* زوم اوت - */}
-          <ToolBtn
-            title="زوم اوت"
-            onClick={() => setZoomOutTrigger((t) => t + 1)}
-          >
-            <Minus className="w-4 h-4" />
-          </ToolBtn>
-          {/* خانه — نمایش همه خطوط */}
-          <ToolBtn
-            title="بازگشت به خانه — نمایش همه خطوط"
-            onClick={() => setHomeTrigger((t) => t + 1)}
-          >
-            <Home className="w-4 h-4" />
           </ToolBtn>
 
           <span className="map-tool-divider" />
@@ -421,7 +421,7 @@ export function MapPage() {
 
             {/* پنل انتخاب نقشه — شبکه نقشه‌ها */}
             {basemapPanel && (
-              <div className="absolute top-full mt-2 right-0 w-[312px] rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 shadow-none overflow-hidden z-[2100] map-basemap-popup">
+              <div className="absolute top-full mt-2 right-0 w-[360px] rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 shadow-none overflow-hidden z-[2100] map-basemap-popup">
                 <div className="px-3 py-2 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
                   <span className="text-xs font-bold text-slate-700 dark:text-slate-200">انتخاب نقشه پایه</span>
                   <button
@@ -506,7 +506,7 @@ export function MapPage() {
             </ToolBtn>
 
             {legendPanel && (
-              <div className="absolute top-full mt-2 right-0 w-[230px] rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 shadow-none overflow-hidden p-3 space-y-3 z-[2100] map-legend-popup">
+              <div className="absolute top-full mt-2 right-0 w-[250px] rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 shadow-none overflow-hidden p-3 space-y-3 z-[2100] map-legend-popup">
                 <div>
                   <p className="text-[11px] font-bold text-slate-500 dark:text-slate-400 mb-1.5">سطح ولتاژ (رنگ مسیر)</p>
                   <div className="space-y-1">

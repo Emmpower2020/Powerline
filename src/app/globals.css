@@ -588,10 +588,10 @@
     transform: none !important;
     width: auto !important;
     max-width: none;
-    min-height: 48px;
-    justify-content: flex-start;
+    min-height: 46px;
+    justify-content: center;
     padding: 4px;
-    gap: 1px;
+    gap: 0;
     border-radius: 16px;
     /* در موبایل اسکرول افقی نوار ابزار کاملاً حذف است. */
     overflow: visible !important;
@@ -604,9 +604,10 @@
   }
 
   .map-toolbar .map-tool-btn {
-    flex: 0 0 36px;
-    width: 36px;
-    height: 36px;
+    flex: 0 0 32px;
+    width: 32px;
+    height: 32px;
+    border-radius: 9px;
   }
   .map-toolbar {
     margin: 0;
@@ -619,11 +620,11 @@
     position: absolute !important;
     top: auto !important;
     bottom: calc(100% + 10px) !important;
-    left: 50% !important;
+    left: 0 !important;
     right: auto !important;
-    transform: translateX(-50%) !important;
-    width: min(312px, calc(100vw - 24px)) !important;
-    max-width: calc(100vw - 24px) !important;
+    transform: none !important;
+    width: min(360px, calc(100vw - 12px)) !important;
+    max-width: calc(100vw - 12px) !important;
     max-height: none !important;
     overflow: hidden !important;
     z-index: 10000 !important;
@@ -632,7 +633,8 @@
 
   .map-toolbar .map-tool-divider {
     flex: 0 0 1px;
-    margin: 0 2px;
+    height: 23px;
+    margin: 0 1px;
   }
 
   .map-line-sidebar {
