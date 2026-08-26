@@ -937,6 +937,19 @@ function registerModuleRoutes(Router $router): void
         Response::success(['id' => (int)$pdo->lastInsertId(), 'code' => $code], 'قلم ایجاد شد', 201);
     });
 
+    $router->put('price-list-items/{id}', function ($id) {
+        Auth::authenticate();
+        Auth::requirePermissionSoft('price_lists.update');
+        $body = Helpers::getJsonBody(); $pdo = Database::getInstance()->getConnection();
+        $fields = ['code','title','unit','unit_price','category','is_active'];
+        $updates = []; $params = [];
+        foreach ($fields as $f) { if (array_key_exists($f, $body)) { $updates[] = "`$f` = ?"; $params[] = $body[$f]; } }
+        if (!$updates) Response::error(400, 'هیچ فیلدی ارسال نشده');
+        $params[] = (int)$id;
+        $pdo->prepare("UPDATE price_list_items SET " . implode(', ', $updates) . " WHERE id = ?")->execute($params);
+        Response::success(null, 'قلم فهرست بها ویرایش شد');
+    });
+
     $router->delete('price-list-items/{id}', function ($id) {
         Auth::authenticate();
         Auth::requirePermissionSoft('price_lists.delete');

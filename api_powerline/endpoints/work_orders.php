@@ -151,6 +151,28 @@ function registerWorkOrderRoutes(Router $router): void
         Response::success(['id' => $newId, 'wo_code' => $woCode], 'دستورکار ایجاد شد', 201);
     });
 
+    // ویرایش دستورکار — برای جدول یکپارچه
+    $router->put('work-orders/{id}', function ($id) {
+        Auth::authenticate();
+        Auth::requirePermissionSoft('maintenance.update');
+        $body = Helpers::getJsonBody();
+        $fields = ['title','description','priority','planned_start','planned_end','crew_id','contractor_id','outage_required','status'];
+        $updates = []; $params = [];
+        foreach ($fields as $f) { if (array_key_exists($f, $body)) { $updates[] = "`$f` = ?"; $params[] = $body[$f]; } }
+        if (!$updates) Response::error(400, 'هیچ فیلدی ارسال نشده');
+        $params[] = (int)$id;
+        Database::getInstance()->getConnection()->prepare("UPDATE work_orders SET " . implode(', ', $updates) . " WHERE id = ?")->execute($params);
+        Response::success(null, 'دستورکار ویرایش شد');
+    });
+
+    // حذف دستورکار — برای عملیات گروهی جدول
+    $router->delete('work-orders/{id}', function ($id) {
+        Auth::authenticate();
+        Auth::requirePermissionSoft('maintenance.delete');
+        Database::getInstance()->execute("DELETE FROM work_orders WHERE id = ?", [(int)$id]);
+        Response::success(null, 'دستورکار حذف شد');
+    });
+
     // اختصاص دستورکار به اکیپ
     $router->post('work-orders/{id}/assign', function ($id) {
         $user = Auth::authenticate();

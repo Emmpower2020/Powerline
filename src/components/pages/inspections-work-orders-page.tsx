@@ -25,6 +25,14 @@ export function InspectionsPage() {
 
   const statusLabels: Record<string, string> = { draft: "پیش‌نویس", in_progress: "در حال انجام", submitted: "ارسال شده", approved: "تأیید شده", rejected: "رد شده", cancelled: "لغو شده" };
   const priorityLabels: Record<string, string> = { routine: "معمول", emergency: "اضطراری", follow_up: "پیگیری", commissioning: "راه‌اندازی" };
+  const handleDelete = async (rows: Inspection[]) => {
+    if (!rows.length || !window.confirm(`آیا ${rows.length.toLocaleString("fa-IR")} بازدید حذف شود؟`)) return;
+    for (const row of rows) { try { await apiClient.delete(`${API_ENDPOINTS.inspections}/${row.id}`); } catch (e) { console.error(e); } }
+    setRefreshKey(k => k + 1);
+  };
+  const handleDuplicate = async (row: Inspection) => {
+    try { await apiClient.post(API_ENDPOINTS.inspections, { inspection_date: row.inspection_date, priority: row.priority, weather: row.weather || null, notes: row.notes || null, line_id: row.line_id || null, tower_id: row.tower_id || null }); setRefreshKey(k => k + 1); } catch (e) { console.error(e); }
+  };
 
   const columns: DataTableColumn<Inspection>[] = [
     { key: "inspection_code", header: "کد", sortable: true, filterable: true, align: "left" },
@@ -39,8 +47,9 @@ export function InspectionsPage() {
   return (
     <div className="space-y-4">
       <DataTable data={data} columns={columns} loading={loading}
-        searchKeys={["inspection_code", "line_code", "inspector_name"]}
-        title="بازدیدها" onAdd={() => setShowCreate(true)} onRefresh={() => setRefreshKey(k => k + 1)} />
+        searchKeys={columns.map(c => c.key)}
+        title="بازدیدها" onAdd={() => setShowCreate(true)} onRefresh={() => setRefreshKey(k => k + 1)}
+        onCopy={() => {}} onDelete={handleDelete} onDuplicate={handleDuplicate} onImport={() => alert("برای وارد کردن اطلاعات بازدید از قالب اکسل پروژه استفاده کنید.")} onLoadAllRows={async () => data} />
       <CreateInspectionDialog open={showCreate} onClose={() => setShowCreate(false)} onCreated={() => { setShowCreate(false); setRefreshKey(k => k + 1); }} />
     </div>
   );
@@ -63,6 +72,14 @@ export function WorkOrdersPage() {
 
   const statusLabels: Record<string, string> = { draft: "پیش‌نویس", assigned: "اختصاص داده شده", in_progress: "در حال انجام", on_hold: "متوقف", completed: "تکمیل شده", cancelled: "لغو شده", verified: "تأیید نهایی" };
   const priorityLabels: Record<string, string> = { critical: "بحرانی", high: "بالا", medium: "متوسط", low: "پایین" };
+  const handleDelete = async (rows: WorkOrder[]) => {
+    if (!rows.length || !window.confirm(`آیا ${rows.length.toLocaleString("fa-IR")} دستورکار حذف شود؟`)) return;
+    for (const row of rows) { try { await apiClient.delete(`${API_ENDPOINTS.workOrders}/${row.id}`); } catch (e) { console.error(e); } }
+    setRefreshKey(k => k + 1);
+  };
+  const handleDuplicate = async (row: WorkOrder) => {
+    try { await apiClient.post(API_ENDPOINTS.workOrders, { title: row.title, description: row.description || null, priority: row.priority, planned_start: row.planned_start || null, planned_end: row.planned_end || null, crew_id: row.crew_id || null, outage_required: !!row.outage_required }); setRefreshKey(k => k + 1); } catch (e) { console.error(e); }
+  };
 
   const columns: DataTableColumn<WorkOrder>[] = [
     { key: "wo_code", header: "کد", sortable: true, filterable: true, align: "left" },
@@ -76,8 +93,9 @@ export function WorkOrdersPage() {
   return (
     <div className="space-y-4">
       <DataTable data={data} columns={columns} loading={loading}
-        searchKeys={["wo_code", "title", "crew_name"]}
-        title="دستورکارها" onAdd={() => setShowCreate(true)} onRefresh={() => setRefreshKey(k => k + 1)} />
+        searchKeys={columns.map(c => c.key)}
+        title="دستورکارها" onAdd={() => setShowCreate(true)} onRefresh={() => setRefreshKey(k => k + 1)}
+        onCopy={() => {}} onDelete={handleDelete} onDuplicate={handleDuplicate} onImport={() => alert("برای وارد کردن اطلاعات دستورکار از قالب اکسل پروژه استفاده کنید.")} onLoadAllRows={async () => data} />
       <CreateWorkOrderDialog open={showCreate} onClose={() => setShowCreate(false)} onCreated={() => { setShowCreate(false); setRefreshKey(k => k + 1); }} />
     </div>
   );

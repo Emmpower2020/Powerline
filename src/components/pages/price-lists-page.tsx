@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { apiClient } from "@/lib/api-client";
 import { API_ENDPOINTS } from "@/lib/api-config";
 import { Card, CardContent } from "@/components/ui/card";
@@ -116,6 +116,45 @@ export function PriceListsPage() {
     { key: "is_active", header: "فعال", type: "boolean" },
   ];
 
+  const importInputRef = useRef<HTMLInputElement | null>(null);
+
+  const handleEdit = async (row: PriceListItem) => {
+    const title = window.prompt("شرح قلم", row.title);
+    if (title === null) return;
+    const unit = window.prompt("واحد", row.unit || "");
+    if (unit === null) return;
+    const price = window.prompt("بهای واحد (ریال)", String(row.unit_price));
+    if (price === null) return;
+    const category = window.prompt("دسته", row.category || "");
+    if (category === null) return;
+    try {
+      await apiClient.put(`${API_ENDPOINTS.priceListItems}/${row.id}`, { title, unit: unit || null, unit_price: Number(price) || 0, category: category || null });
+      setRefreshKey(k => k + 1);
+    } catch (e) { console.error(e); }
+  };
+
+  const handleDuplicate = async (row: PriceListItem) => {
+    try {
+      await apiClient.post(API_ENDPOINTS.priceListItems, { price_list_id: row.price_list_id, code: `${row.code}-COPY`, title: `${row.title} - کپی`, unit: row.unit, unit_price: row.unit_price, category: row.category });
+      setRefreshKey(k => k + 1);
+    } catch (e) { console.error(e); }
+  };
+
+  const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]; if (!file) return;
+    try {
+      const XLSX = await import("xlsx");
+      const wb = XLSX.read(await file.arrayBuffer(), { type: "array" });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws, { defval: "" });
+      for (const r of rows) {
+        await apiClient.post(API_ENDPOINTS.priceListItems, { price_list_id: Number(selectedListId), code: r.code || r["کد"], title: r.title || r["شرح"], unit: r.unit || r["واحد"] || "عدد", unit_price: Number(r.unit_price || r["بهای واحد (ریال)"] || 0), category: r.category || r["دسته"] || "عملیات" });
+      }
+      setRefreshKey(k => k + 1);
+    } catch (e) { console.error("خطا در import فهرست بها", e); }
+    finally { e.target.value = ""; }
+  };
+
   const handleDelete = async () => {
     if (!pendingDelete || pendingDelete.length === 0) return;
     setDeleting(true);
@@ -141,6 +180,7 @@ export function PriceListsPage() {
 
   return (
     <div className="space-y-4">
+      <input ref={importInputRef} type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={handleImport} />
       {/* انتخاب فهرست + دکمه‌ها */}
       <Card>
         <CardContent className="p-4">
@@ -220,6 +260,11 @@ export function PriceListsPage() {
           onAdd={() => setShowCreateItem(true)}
           onRefresh={() => setRefreshKey(k => k + 1)}
           onDelete={(rows) => setPendingDelete(rows)}
+          onEdit={handleEdit}
+          onDuplicate={handleDuplicate}
+          onCopy={() => {}}
+          onImport={() => importInputRef.current?.click()}
+          onLoadAllRows={async () => items}
         />
       )}
 

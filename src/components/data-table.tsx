@@ -557,7 +557,7 @@ function DataTableInner<T extends { id: number }>({
             onClick={resetFilters}
             disabled={!hasAnyFilters}
             title="ریست فیلترها و مرتب‌سازی"
-            className="h-9 w-9 text-slate-600 hover:bg-slate-50 border-slate-200"
+            className="h-9 w-9 text-red-600 hover:bg-slate-50 border-slate-200"
           >
             <RotateCcw className="w-4 h-4" />
           </Button>

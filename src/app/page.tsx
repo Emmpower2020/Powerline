@@ -79,7 +79,7 @@ export default function Home() {
       case "contracts": return <GenericModulePage moduleKey="contracts" endpoint="/contracts" />;
       case "invoices": return <GenericModulePage moduleKey="invoices" endpoint="/invoices" />;
       case "safety": return <GenericModulePage moduleKey="safety-incidents" endpoint="/safety-incidents" />;
-      case "line-incidents": return <GenericModulePage moduleKey="safety-incidents" endpoint="/safety-incidents" />;
+      case "line-incidents": return <GenericModulePage moduleKey="line-incidents" endpoint="/safety-incidents" />;
       case "personnel": return <PersonnelPage />;
       case "contractors": return <GenericModulePage moduleKey="contractors" endpoint="/contractors" />;
       case "equipment": return <GenericModulePage moduleKey="equipment" endpoint="/equipment" />;

@@ -133,6 +133,28 @@ function registerInspectionRoutes(Router $router): void
         Response::success(['id' => $newId, 'inspection_code' => $inspectionCode], 'بازدید ثبت شد', 201);
     });
 
+    // ویرایش بازدید — برای جدول یکپارچه
+    $router->put('inspections/{id}', function ($id) {
+        Auth::authenticate();
+        Auth::requirePermissionSoft('inspections.update');
+        $body = Helpers::getJsonBody();
+        $fields = ['inspection_date','priority','weather','notes','line_id','tower_id','inspector_id','crew_id','status'];
+        $updates = []; $params = [];
+        foreach ($fields as $f) { if (array_key_exists($f, $body)) { $updates[] = "`$f` = ?"; $params[] = $body[$f]; } }
+        if (!$updates) Response::error(400, 'هیچ فیلدی ارسال نشده');
+        $params[] = (int)$id;
+        Database::getInstance()->getConnection()->prepare("UPDATE inspections SET " . implode(', ', $updates) . " WHERE id = ?")->execute($params);
+        Response::success(null, 'بازدید ویرایش شد');
+    });
+
+    // حذف بازدید — برای عملیات گروهی جدول
+    $router->delete('inspections/{id}', function ($id) {
+        Auth::authenticate();
+        Auth::requirePermissionSoft('inspections.delete');
+        Database::getInstance()->execute("DELETE FROM inspections WHERE id = ?", [(int)$id]);
+        Response::success(null, 'بازدید حذف شد');
+    });
+
     // تأیید بازدید
     $router->post('inspections/{id}/approve', function ($id) {
         $user = Auth::authenticate();
