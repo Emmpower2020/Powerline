@@ -131,7 +131,7 @@ function registerLineRoutes(Router $router): void
 
         // درج در دیتابیس (بدون construction_date و commission_date — حذف شدند)
         $sql = "INSERT INTO `lines`
-                (line_code, dispatch_code, name, group_name, voltage_kv, voltage,
+                (line_code, dispatch_code, name, group_name, voltage_kv,
                  circuit_count, bundle_count, conductor_type, tower_structure_type,
                  length_km, circuit_length_km, total_towers, tension_towers, suspension_towers,
                  plain_terrain, semi_mountainous, mountainous,
@@ -147,7 +147,6 @@ function registerLineRoutes(Router $router): void
             $body['name'],
             $body['group_name'] ?? null,
             $body['voltage_kv'] ?? null,
-            $body['voltage'] ?? ($body['voltage_kv'] ?? null),
             $body['circuit_count'] ?? 1,
             $body['bundle_count'] ?? null,
             $body['conductor_type'] ?? null,
@@ -209,7 +208,7 @@ function registerLineRoutes(Router $router): void
         // فیلدهای قابل ویرایش (بدون construction_date و commission_date — حذف شدند)
         $allowedFields = [
             'dispatch_code', 'name', 'group_name',
-            'voltage_kv', 'voltage', 'circuit_count', 'bundle_count',
+            'voltage_kv', 'circuit_count', 'bundle_count',
             'conductor_type', 'tower_structure_type', 'length_km', 'circuit_length_km',
             'total_towers', 'tension_towers', 'suspension_towers',
             'plain_terrain', 'semi_mountainous', 'mountainous',
@@ -318,7 +317,7 @@ function registerLineRoutes(Router $router): void
         $pdo = $db->getConnection();
 
         $allowed = [
-            'dispatch_code', 'name', 'group_name', 'voltage_kv', 'voltage',
+            'dispatch_code', 'name', 'group_name', 'voltage_kv',
             'circuit_count', 'bundle_count', 'conductor_type', 'tower_structure_type',
             'length_km', 'circuit_length_km', 'total_towers', 'tension_towers', 'suspension_towers',
             'plain_terrain', 'semi_mountainous', 'mountainous', 'commission_year',
@@ -458,7 +457,7 @@ function formatLineRow(array $row): array
         'name'               => $row['name'],
         'group_name'         => $row['group_name'] ?? null,
         'voltage_kv'         => $row['voltage_kv'] !== null ? (float) $row['voltage_kv'] : null,
-        'voltage'            => $row['voltage'] !== null ? (int) $row['voltage'] : null,
+        'voltage'            => $row['voltage_kv'] !== null ? (float) $row['voltage_kv'] : null,
         'circuit_count'      => (int) ($row['circuit_count'] ?? 1),
         'bundle_count'       => $row['bundle_count'] !== null ? (int) $row['bundle_count'] : null,
         'conductor_type'     => $row['conductor_type'] ?? null,
