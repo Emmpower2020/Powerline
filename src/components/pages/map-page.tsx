@@ -132,6 +132,14 @@ export function MapPage() {
   const [homeTrigger, setHomeTrigger] = useState(0);
   const [showLineLabels, setShowLineLabels] = useState(true);
 
+  // در موبایل، نام خطوط به‌صورت پیش‌فرض خاموش است تا نقشه شلوغ نشود.
+  useEffect(() => {
+    const applyMobileDefaults = () => {
+      if (window.innerWidth < 768) setShowLineLabels(false);
+    };
+    applyMobileDefaults();
+  }, []);
+
   const containerRef = useRef<HTMLDivElement>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
 
@@ -361,7 +369,7 @@ export function MapPage() {
       {/* ─── نوار ابزار بالای نقشه ─── */}
       {!loading && !error && (
         <div
-          className="absolute z-[700] top-2 left-1/2 -translate-x-1/2 flex items-center gap-0.5 rounded-2xl bg-white/95 dark:bg-slate-900/95 backdrop-blur border border-slate-200 dark:border-slate-700 shadow-xl px-1.5 py-1.5"
+          className="map-toolbar absolute z-[1000] top-2 left-1/2 -translate-x-1/2 flex items-center gap-0.5 rounded-2xl bg-white/95 dark:bg-slate-900/95 backdrop-blur border border-slate-200 dark:border-slate-700 shadow-xl px-1.5 py-1.5"
           onClick={(e) => e.stopPropagation()}
         >
           {/* اندازه‌گیری طول */}
@@ -578,7 +586,7 @@ export function MapPage() {
       {/* ─── پنل انتخاب خطوط (سمت چپ) — v4.2.2: top هم‌سطح جعبه ابزار، مینیمال = جمع شدن ارتفاعی ─── */}
       {!loading && !error && (
         <div
-          className="absolute z-[600] transition-all duration-300"
+          className="map-line-sidebar absolute z-[700] transition-all duration-300"
           style={{
             top: "0.5rem",
             bottom: sidebarOpen ? "2.5rem" : "auto",
