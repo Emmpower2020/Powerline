@@ -127,15 +127,6 @@ export function MapPage() {
   const [zoomInTrigger, setZoomInTrigger] = useState(0);
   const [zoomOutTrigger, setZoomOutTrigger] = useState(0);
   const [homeTrigger, setHomeTrigger] = useState(0);
-  const [showLineLabels, setShowLineLabels] = useState(true);
-
-  // در موبایل، نام خطوط به‌صورت پیش‌فرض خاموش است تا نقشه شلوغ نشود.
-  useEffect(() => {
-    const applyMobileDefaults = () => {
-      if (window.innerWidth < 768) setShowLineLabels(false);
-    };
-    applyMobileDefaults();
-  }, []);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -329,7 +320,7 @@ export function MapPage() {
             zoomInTrigger={zoomInTrigger}
             zoomOutTrigger={zoomOutTrigger}
             homeTrigger={homeTrigger}
-            showLineLabels={showLineLabels}
+            showLineLabels={true}
             labelSafeLeft={sidebarOpen ? 320 : 12}
             onToolDone={() => setActiveTool(null)}
           />

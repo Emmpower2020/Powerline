@@ -589,7 +589,7 @@
   .map-toolbar {
     top: auto !important;
     /* v4.3.7: نوار ابزار کمی پایین‌تر قرار گرفت تا فاصله متعادل‌تری از پایین صفحه داشته باشد. */
-    bottom: 68px !important;
+    bottom: 48px !important;
     left: 8px !important;
     right: 8px !important;
     transform: none !important;
@@ -613,9 +613,9 @@
   }
 
   .map-toolbar .map-tool-btn {
-    flex: 0 0 32px;
-    width: 32px;
-    height: 32px;
+    flex: 0 0 36px;
+    width: 36px;
+    height: 36px;
   }
   .map-toolbar {
     margin: 0;
@@ -626,7 +626,7 @@
   .map-basemap-popup,
   .map-legend-popup {
     position: fixed !important;
-    top: 72px !important;
+    top: 64px !important;
     bottom: auto !important;
     left: 50% !important;
     right: auto !important;
@@ -635,6 +635,8 @@
     max-width: calc(100vw - 24px) !important;
     max-height: min(70vh, 560px) !important;
     overflow: hidden !important;
+    z-index: 10000 !important;
+    pointer-events: auto !important;
   }
 
   .map-toolbar .map-tool-divider {
