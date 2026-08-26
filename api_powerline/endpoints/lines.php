@@ -114,7 +114,9 @@ function registerLineRoutes(Router $router): void
         // فقط line_code یکتا است (در سطح دیتابیس با UNIQUE INDEX بررسی می‌شود)
 
         // ساخت.geom از LINESTRING اگه مسیری داده شده
-        $geomWkt = null;
+        // geom در دیتابیس NOT NULL است؛ خط جدید ممکن است هنوز مسیر GIS نداشته باشد.
+        // در این حالت یک LINESTRING خالی ذخیره می‌کنیم تا ثبت خط بدون مسیر هم معتبر باشد.
+        $geomWkt = 'LINESTRING EMPTY';
         if (!empty($body['path']) && is_array($body['path'])) {
             $points = [];
             foreach ($body['path'] as $p) {
@@ -137,7 +139,7 @@ function registerLineRoutes(Router $router): void
                  owner_org_id, contractor_id, geom, is_active, created_at)
                 VALUES
                 (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-                 " . ($geomWkt ? "ST_GeomFromText(?)" : "NULL") . ", 1, NOW())";
+                 ST_GeomFromText(?), 1, NOW())";
 
         $params = [
             $body['line_code'],
@@ -164,7 +166,8 @@ function registerLineRoutes(Router $router): void
             $body['owner_org_id'] ?? null,
             $body['contractor_id'] ?? null,
         ];
-        if ($geomWkt) $params[] = $geomWkt;
+        // geom همیشه باید ارسال شود چون ستون در دیتابیس NOT NULL است.
+        $params[] = $geomWkt;
 
         try {
             $db->execute($sql, $params);

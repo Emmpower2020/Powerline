@@ -23,7 +23,10 @@ export interface Conductor {
   [k: string]: unknown;
 }
 
-/** فهرست ثابت قبلی — fallback وقتی جدول هنوز ساخته نشده/خالی است */
+/**
+ * فهرست ثابت قبلی حذف شد: فرم خط باید مستقیماً از جدول انواع سیم‌ها تغذیه شود.
+ * اگر جدول خالی باشد، فهرست هم خالی می‌ماند تا کاربر متوجه کمبود داده مرجع شود.
+ */
 export const FALLBACK_CONDUCTOR_OPTIONS: SearchableOption[] = [
   { value: "لینکس (Lynx)", label: "لینکس (Lynx)" },
   { value: "کاناری (Canary)", label: "کاناری (Canary)" },
@@ -84,14 +87,20 @@ export function useConductors() {
     [data]
   );
 
-  /** گزینه‌های کمبوباکس — از جدول یا fallback (نمایش: «لینکس (Lynx) (۲۲۶٫۲ mm²)») */
+  /**
+   * گزینه‌های کمبوباکس مستقیماً از جدول conductors.
+   * value = نام خام رکورد دیتابیس تا مقدار ذخیره‌شده با مرجع جدول دقیقاً یکسان بماند.
+   * label = نام فارسی/استاندارد + سطح مقطع برای نمایش کاربر.
+   */
   const options = useMemo<SearchableOption[]>(() => {
-    if (conductors.length === 0) return FALLBACK_CONDUCTOR_OPTIONS;
     return conductors.map(c => {
-      const display = conductorDisplayName(c.name);
+      const rawName = normalizeConductorName(c.name);
+      const display = conductorDisplayName(rawName);
       return {
-        value: display,
-        label: c.sectional_area_all != null ? `${display} (${Number(c.sectional_area_all).toLocaleString("fa-IR")} mm²)` : display,
+        value: rawName,
+        label: c.sectional_area_all != null
+          ? `${display} (${Number(c.sectional_area_all).toLocaleString("fa-IR")} mm²)`
+          : display,
         group: c.standard || undefined,
       };
     });

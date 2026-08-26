@@ -195,7 +195,8 @@ function registerTowerRoutes(Router $router): void
                 VALUES
                 (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ST_GeomFromText(?), ?, 1, NOW())";
 
-        $db->execute($sql, [
+        try {
+            $db->execute($sql, [
             $lineId,
             $towerCode,
             $body['tower_number'],
@@ -223,7 +224,15 @@ function registerTowerRoutes(Router $router): void
             $gpsLng,
             $geomWkt,
             $supervisor,
-        ]);
+            ]);
+        } catch (\PDOException $e) {
+            $message = $e->getMessage();
+            if (strpos($message, 'Duplicate') !== false || strpos($message, 'uniq_line_tower') !== false) {
+                Response::error(409, 'کد دکل در این خط قبلاً ثبت شده است.');
+            }
+            Logger::error('Tower create failed', ['error' => $message]);
+            Response::error(500, 'ثبت دکل در دیتابیس انجام نشد: ' . $message);
+        }
 
         $newId = (int) $db->lastInsertId();
         Logger::info('Tower created', ['tower_id' => $newId, 'user_id' => $user['id']]);

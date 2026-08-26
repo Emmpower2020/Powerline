@@ -155,7 +155,8 @@ export function SearchableSelect({
  */
 export function SearchableMultiSelect({
   values, onChange, options, placeholder = "انتخاب...", searchPlaceholder = "جستجو...",
-  emptyText = "موردی یافت نشد", disabled = false, maxItems, className, align = "start",
+  emptyText = "موردی یافت نشد", disabled = false, maxItems, confirmSelection = false,
+  confirmLabel = "تأیید انتخاب", className, align = "start",
 }: {
   values: string[];
   onChange: (values: string[]) => void;
@@ -165,6 +166,9 @@ export function SearchableMultiSelect({
   emptyText?: string;
   disabled?: boolean;
   maxItems?: number;
+  /** نمایش دکمه تأیید برای بستن لیست انتخاب‌ها پس از انتخاب چندگانه */
+  confirmSelection?: boolean;
+  confirmLabel?: string;
   className?: string;
   align?: "start" | "center" | "end";
 }) {
@@ -253,19 +257,30 @@ export function SearchableMultiSelect({
                 })}
               </CommandGroup>
             </CommandList>
-            {values.length > 0 && (
-              <div className="border-t p-1">
+            <div className="border-t p-1 flex items-center gap-1">
+              {confirmSelection && (
+                <Button
+                  type="button"
+                  variant="default"
+                  className="flex-1 h-8 bg-indigo-600 hover:bg-indigo-700 text-white"
+                  onClick={() => { setOpen(false); setQuery(""); }}
+                >
+                  <Check className="w-4 h-4 ml-1" />
+                  {confirmLabel}
+                </Button>
+              )}
+              {values.length > 0 && (
                 <Button
                   type="button"
                   variant="ghost"
                   size="sm"
-                  className="w-full text-xs text-slate-500 hover:text-red-600"
+                  className={cn("text-xs text-slate-500 hover:text-red-600", confirmSelection ? "shrink-0" : "w-full")}
                   onClick={() => onChange([])}
                 >
                   پاک کردن همه ({values.length.toLocaleString("fa-IR")})
                 </Button>
-              </div>
-            )}
+              )}
+            </div>
           </Command>
         </PopoverContent>
       </Popover>

@@ -198,14 +198,29 @@ async function handleRequest(request: NextRequest) {
   const looksLikeHostDown = (resp: Response | null, text: string): boolean => {
     if (!resp) return true; // خطای شبکه
     if (resp.status === 405) return true; // nginx به‌جای PHP
-    if (resp.status >= 500) return true;
+
+    // پاسخ JSON از خود API حتی اگر 4xx/5xx باشد، «سرور قطع» نیست؛
+    // این یک خطای واقعی برنامه/دیتابیس است و باید عیناً به کلاینت برسد تا علت مشخص بماند.
+    const contentType = resp.headers.get("content-type") || "";
+    if (contentType.includes("application/json")) {
+      try {
+        JSON.parse(text);
+        return false;
+      } catch {
+        // JSON نامعتبر → بررسی HTML در ادامه
+      }
+    }
+
     if (
       text.includes("<html") ||
       text.includes("<!DOCTYPE") ||
       text.includes("<head>")
     ) {
-      return true; // صفحه خطای HTML
+      return true; // صفحه خطای HTML/محافظ هاست
     }
+
+    // خطاهای 5xx بدون بدنه JSON معمولاً از وب‌سرور/هاست هستند.
+    if (resp.status >= 500) return true;
     return false;
   };
 

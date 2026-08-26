@@ -558,13 +558,6 @@ function DataTableInner<T extends { id: number }>({
             )}
           ><RotateCcw className="w-4 h-4" /></Button>
 
-          {/* فقط شمارنده انتخاب */}
-          {selCount > 0 && (
-            <span className="text-xs px-2.5 py-1 bg-indigo-50 text-indigo-700 rounded-md nums-fa border border-indigo-200 inline-flex items-center gap-1 ml-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-indigo-500"></span>{selCount.toLocaleString("fa-IR")} ردیف انتخاب شده
-            </span>
-          )}
-
           {/* Settings همیشه آخرین دکمه */}
           <div className="relative" ref={columnMenuRef}>
             <Button variant="outline" size="icon" title="تنظیمات ستون‌ها" className="h-9 w-9" onClick={() => setShowColumnMenu(o => !o)}>
@@ -593,6 +586,13 @@ function DataTableInner<T extends { id: number }>({
               </div>
             )}
           </div>
+
+          {/* شمارنده انتخاب — همیشه بعد از Settings و بدون امکان انتخاب همه */}
+          {selCount > 0 && (
+            <span className="text-xs px-2.5 py-1 bg-indigo-50 text-indigo-700 rounded-md nums-fa border border-indigo-200 inline-flex items-center gap-1 mr-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-indigo-500"></span>{selCount.toLocaleString("fa-IR")} ردیف انتخاب شده
+            </span>
+          )}
 
         </div>
 

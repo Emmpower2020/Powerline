@@ -124,7 +124,11 @@ export function CreateLineDialog({ open, onClose, onCreated, editRow, duplicateF
           voltage: sourceRow.voltage_kv ? String(sourceRow.voltage_kv) : (sourceRow.voltage ? String(sourceRow.voltage) : ""),
           circuit_count: sourceRow.circuit_count != null ? String(sourceRow.circuit_count) : "1",
           bundle_count: sourceRow.bundle_count != null ? String(sourceRow.bundle_count) : "",
-          conductor_type: sourceRow.conductor_type || "",
+          conductor_type: (() => {
+            const raw = String(sourceRow.conductor_type || "").trim();
+            const matched = conductorOptions.find(o => o.value === raw || o.label === raw || o.label.startsWith(`${raw} (`));
+            return matched?.value || raw;
+          })(),
           tower_structure_type: sourceRow.tower_structure_type || "",
           length_km: sourceRow.length_km != null ? String(sourceRow.length_km) : "",
           circuit_length_km: sourceRow.circuit_length_km != null ? String(sourceRow.circuit_length_km) : "",
@@ -251,6 +255,8 @@ export function CreateLineDialog({ open, onClose, onCreated, editRow, duplicateF
                   options={dispatchOptions}
                   placeholder="انتخاب مدار(ها)..."
                   searchPlaceholder="جستجوی کد دیسپاچینگ یا نام مدار..."
+                  confirmSelection
+                  confirmLabel="تأیید کدهای انتخاب‌شده"
                 />
               ) : (
                 <div className="text-xs text-amber-600 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900 rounded-md p-2.5 text-right">
@@ -284,9 +290,7 @@ export function CreateLineDialog({ open, onClose, onCreated, editRow, duplicateF
                 <SearchableSelect
                   value={form.conductor_type}
                   onChange={v => set("conductor_type", v)}
-                  options={form.conductor_type && !conductorOptions.some(o => o.value === form.conductor_type)
-                    ? [...conductorOptions, { value: form.conductor_type, label: form.conductor_type }]
-                    : conductorOptions}
+                  options={conductorOptions}
                   placeholder="انتخاب نوع سیم..."
                   searchPlaceholder="جستجوی نام سیم..."
                   allowClear
