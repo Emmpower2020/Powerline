@@ -303,6 +303,21 @@
   outline: none;
 }
 
+/* v4.2.5: تایپوگرافی لایه‌های برداری نقشه — مخصوصاً نام خطوط */
+.leaflet-overlay-pane svg text,
+.leaflet-overlay-pane svg textPath,
+.leaflet-overlay-pane svg .powerline-route-label {
+  font-family: var(--font-vazirmatn), Vazirmatn, Tahoma, sans-serif !important;
+  font-synthesis: none;
+  text-rendering: geometricPrecision;
+}
+
+.leaflet-overlay-pane svg .powerline-route-label {
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.05px;
+}
+
 /* پاپ‌آپ دکل‌ها */
 .leaflet-popup.tower-popup .leaflet-popup-content-wrapper {
   border-radius: 14px;

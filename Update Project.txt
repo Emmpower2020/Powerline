@@ -1,4 +1,4 @@
 git status
-git add .
+git add -A -f
 git commit -m "Update Project"
-git push
+git push -u origin main --force

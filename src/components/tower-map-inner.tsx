@@ -85,12 +85,12 @@ const ShapeCanvasRenderer = (L.Canvas as any).extend({
     const label: string | undefined = layer.options.towerLabel;
     if (label && zoom >= (layer.options.labelMinZoom ?? LABEL_MIN_ZOOM)) {
       ctx.save();
-      ctx.font = `600 11px Vazirmatn, Tahoma, sans-serif`;
+      ctx.font = `600 11.5px Vazirmatn, Tahoma, sans-serif`;
       ctx.textBaseline = "middle";
       ctx.direction = "rtl";
       ctx.textAlign = "left";
       const tx = p.x + r + 4;
-      ctx.lineWidth = 3.5;
+      ctx.lineWidth = 2.8;
       ctx.strokeStyle = "rgba(255,255,255,0.95)";
       ctx.strokeText(label, tx, p.y);
       ctx.fillStyle = "#334155";
@@ -303,26 +303,25 @@ function RoutesOverlay({
         const lineName = line ? `${line.name}` : `خط ${part.lineId}`;
         const lineCode = line?.line_code || "";
 
-        // v4.2.4: نام خط موازی با مسیر — وزن فونت سبک (500) طبق درخواست کاربر
-        // فونت: Vazirmatn (با CSS var که next/font ثبت کرده) + fallback کلاسیک
-        // font-size 16px، stroke-width 5 → هاله سفید پهن برای کنتراست روی هر پس‌زمینه
-        // paint-order: stroke fill → هاله اول کشیده می‌شود تا کاراکترها روی آن بیفتند
+        // v4.2.5: بهبود خوانایی نام خطوط روی نقشه
+        // فونت Vazirmatn، وزن متوسط، اندازه متعادل و هاله باریک برای جلوگیری از ظاهر درشت/تاری
         (main as any).setText(lineName, {
           repeat: false,
           center: true,
           offset: -10,
           attributes: {
-            "font-size": "16",
-            "font-weight": "500",
-            "font-family": "var(--font-vazirmatn), Tahoma, sans-serif",
+            "class": "powerline-route-label",
+            "font-size": "14",
+            "font-weight": "600",
+            "font-family": "Vazirmatn, Tahoma, sans-serif",
             fill: labelColor,
             stroke: labelColor === "#ffffff" ? "rgba(15, 23, 42, 0.9)" : "#ffffff",
-            "stroke-width": "5",
+            "stroke-width": "3.2",
             "stroke-linejoin": "round",
             "stroke-linecap": "round",
             "paint-order": "stroke fill",
             "text-anchor": "middle",
-            "letter-spacing": "0",
+            "letter-spacing": "0.05px",
           },
         });
 
