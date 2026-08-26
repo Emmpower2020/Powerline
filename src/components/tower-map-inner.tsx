@@ -202,6 +202,8 @@ function RoutesOverlay({
   fitTrigger,
   labelColor,
   bmIsDark,
+  showLineLabels,
+  labelSafeLeft,
 }: {
   routes: BuiltRoutes;
   towersById: Map<number, Tower>;
@@ -211,6 +213,8 @@ function RoutesOverlay({
   fitTrigger: number;
   labelColor: string;
   bmIsDark: boolean;
+  showLineLabels: boolean;
+  labelSafeLeft: number;
 }) {
   const map = useMap();
   // رندرکننده SVG جداگانه برای مسیرها
@@ -267,7 +271,7 @@ function RoutesOverlay({
     const mains: L.Polyline[] = [];
     const connectors: L.Polyline[] = [];
     const markers: L.CircleMarker[] = [];
-    const routeLabels: L.Marker[] = [];
+    const routeLabels: Array<{ marker: L.Marker; latlngs: [number, number][] }> = [];
 
     for (const g of routes.groups) {
       for (const part of g.parts) {
@@ -307,9 +311,8 @@ function RoutesOverlay({
         // v4.2.6: برچسب HTML به‌جای SVG textPath.
         // این کار شکل‌دهی صحیح حروف فارسی/عربی را به موتور متن مرورگر می‌سپارد
         // و مشکل «شکسته شدن» یا جدا افتادن حروف روی مسیر را از بین می‌برد.
-        routeLabels.push(
-          createRouteLabel(routeMidpoint(latlngs), lineName, labelColor, bmIsDark)
-        );
+        const routeLabel = createRouteLabel(routeMidpoint(latlngs), lineName, labelColor, bmIsDark);
+        routeLabels.push({ marker: routeLabel, latlngs });
 
         // تولتیپ تعاملی هنگام hover — با جزئیات بیشتر
         main.bindTooltip(
@@ -365,8 +368,40 @@ function RoutesOverlay({
     for (const m of mains) m.addTo(group);
     for (const cn of connectors) cn.addTo(group);
     for (const mk of markers) mk.addTo(group);
-    for (const label of routeLabels) label.addTo(group);
-  }, [routes, towersById, linesById, labelColor]);
+    for (const entry of routeLabels) entry.marker.addTo(group);
+
+    // نام خط همیشه در مرکزِ بخش قابل‌مشاهده همان خط قرار می‌گیرد.
+    // این محاسبه با هر pan/zoom تکرار می‌شود تا برچسب در ناحیه‌ای که واقعاً
+    // روی صفحه دیده می‌شود باقی بماند؛ نه در مرکز کل مسیر که ممکن است خارج از viewport باشد.
+    const updateVisibleRouteLabels = () => {
+      const size = map.getSize();
+      const left = Math.max(0, Math.min(labelSafeLeft, size.x - 20));
+      const right = Math.max(left + 20, size.x - 10);
+      const top = 8;
+      const bottom = Math.max(top + 20, size.y - 8);
+
+      for (const entry of routeLabels) {
+        if (!showLineLabels) {
+          entry.marker.setOpacity(0);
+          continue;
+        }
+        const pos = visiblePolylineMidpoint(map, entry.latlngs, { left, top, right, bottom });
+        if (!pos) {
+          entry.marker.setOpacity(0);
+        } else {
+          entry.marker.setLatLng(pos);
+          entry.marker.setOpacity(1);
+        }
+      }
+    };
+
+    updateVisibleRouteLabels();
+    map.on("move zoom resize", updateVisibleRouteLabels);
+
+    return () => {
+      map.off("move zoom resize", updateVisibleRouteLabels);
+    };
+  }, [routes, towersById, linesById, labelColor, bmIsDark, showLineLabels, labelSafeLeft]);
 
   // هایلایت خطِ hover شده از فهرست کناری
   useEffect(() => {
@@ -775,6 +810,87 @@ function routeMidpoint(latlngs: [number, number][]): [number, number] {
   return latlngs[latlngs.length - 1];
 }
 
+function visiblePolylineMidpoint(
+  map: L.Map,
+  latlngs: [number, number][],
+  viewport: { left: number; top: number; right: number; bottom: number }
+): [number, number] | null {
+  if (latlngs.length === 0) return null;
+  if (latlngs.length === 1) {
+    const p = map.latLngToContainerPoint(latlngs[0]);
+    return p.x >= viewport.left && p.x <= viewport.right && p.y >= viewport.top && p.y <= viewport.bottom
+      ? latlngs[0]
+      : null;
+  }
+
+  type Pt = { x: number; y: number };
+  const clipSegment = (a: Pt, b: Pt): [Pt, Pt] | null => {
+    // Liang-Barsky clipping against the visible map rectangle.
+    let t0 = 0;
+    let t1 = 1;
+    const dx = b.x - a.x;
+    const dy = b.y - a.y;
+    const checks: Array<[number, number]> = [
+      [-dx, a.x - viewport.left],
+      [dx, viewport.right - a.x],
+      [-dy, a.y - viewport.top],
+      [dy, viewport.bottom - a.y],
+    ];
+    for (const [p, q] of checks) {
+      if (p === 0) {
+        if (q < 0) return null;
+        continue;
+      }
+      const r = q / p;
+      if (p < 0) {
+        if (r > t1) return null;
+        if (r > t0) t0 = r;
+      } else {
+        if (r < t0) return null;
+        if (r < t1) t1 = r;
+      }
+    }
+    return [
+      { x: a.x + t0 * dx, y: a.y + t0 * dy },
+      { x: a.x + t1 * dx, y: a.y + t1 * dy },
+    ];
+  };
+
+  const visibleSegments: Array<{ a: Pt; b: Pt; length: number }> = [];
+  let total = 0;
+  for (let i = 1; i < latlngs.length; i++) {
+    const a = map.latLngToContainerPoint(latlngs[i - 1]);
+    const b = map.latLngToContainerPoint(latlngs[i]);
+    const clipped = clipSegment(a, b);
+    if (!clipped) continue;
+    const dx = clipped[1].x - clipped[0].x;
+    const dy = clipped[1].y - clipped[0].y;
+    const length = Math.hypot(dx, dy);
+    if (length > 1) {
+      visibleSegments.push({ a: clipped[0], b: clipped[1], length });
+      total += length;
+    }
+  }
+
+  // اگر بخش قابل مشاهده خیلی کوتاه است، برچسب را مخفی می‌کنیم تا روی نقشه مزاحم نشود.
+  if (total < 45) return null;
+
+  let target = total / 2;
+  for (const seg of visibleSegments) {
+    if (target <= seg.length) {
+      const t = target / seg.length;
+      const point = {
+        x: seg.a.x + (seg.b.x - seg.a.x) * t,
+        y: seg.a.y + (seg.b.y - seg.a.y) * t,
+      };
+      const ll = map.containerPointToLatLng(point);
+      return [ll.lat, ll.lng];
+    }
+    target -= seg.length;
+  }
+  return null;
+}
+
 function createRouteLabel(
   position: [number, number],
   text: string,
@@ -823,6 +939,10 @@ export interface TowerMapInnerProps {
   zoomOutTrigger?: number;
   /** با افزایش، نقشه روی محدوده همه خطوط (خانه) تنظیم می‌شود */
   homeTrigger?: number;
+  /** نمایش/عدم نمایش نام خطوط روی نقشه */
+  showLineLabels?: boolean;
+  /** فاصله امن سمت چپ برای جلوگیری از قرار گرفتن برچسب زیر پنل انتخاب خطوط */
+  labelSafeLeft?: number;
   /** هنگام اتمام یک ابزار (مثلاً بعد از زوم به ناحیه یا اندازه‌گیری) صدا زده می‌شود */
   onToolDone?: () => void;
 }
@@ -839,6 +959,8 @@ export function TowerMapInner({
   zoomInTrigger = 0,
   zoomOutTrigger = 0,
   homeTrigger = 0,
+  showLineLabels = true,
+  labelSafeLeft = 12,
   onToolDone,
 }: TowerMapInnerProps) {
   const bm = basemapById(basemapId);
@@ -886,6 +1008,8 @@ export function TowerMapInner({
           fitTrigger={fitTrigger}
           labelColor={labelColor}
           bmIsDark={!!bm.dark}
+          showLineLabels={showLineLabels}
+          labelSafeLeft={labelSafeLeft}
         />
         <MapTools
           activeTool={activeTool}

@@ -46,6 +46,8 @@ import {
   Minus,
   Home,
   Scan,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 
 /**
@@ -128,6 +130,7 @@ export function MapPage() {
   const [zoomInTrigger, setZoomInTrigger] = useState(0);
   const [zoomOutTrigger, setZoomOutTrigger] = useState(0);
   const [homeTrigger, setHomeTrigger] = useState(0);
+  const [showLineLabels, setShowLineLabels] = useState(true);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -318,6 +321,8 @@ export function MapPage() {
             zoomInTrigger={zoomInTrigger}
             zoomOutTrigger={zoomOutTrigger}
             homeTrigger={homeTrigger}
+            showLineLabels={showLineLabels}
+            labelSafeLeft={sidebarOpen ? 320 : 12}
             onToolDone={() => setActiveTool(null)}
           />
         )}
@@ -414,6 +419,15 @@ export function MapPage() {
             onClick={() => setHomeTrigger((t) => t + 1)}
           >
             <Home className="w-4 h-4" />
+          </ToolBtn>
+
+          {/* نمایش / عدم نمایش نام خطوط */}
+          <ToolBtn
+            active={showLineLabels}
+            title={showLineLabels ? "مخفی کردن نام خطوط" : "نمایش نام خطوط"}
+            onClick={() => setShowLineLabels((v) => !v)}
+          >
+            {showLineLabels ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
           </ToolBtn>
 
           <span className="map-tool-divider" />
