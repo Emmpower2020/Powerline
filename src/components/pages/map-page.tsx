@@ -38,7 +38,6 @@ import {
   ListFilter,
   AlertTriangle,
   RefreshCw,
-  MousePointerClick,
   Ruler,
   Square,
   MapPin,
@@ -234,10 +233,13 @@ export function MapPage() {
   }, []);
 
   const clearSelection = useCallback(() => setSelectedLineIds(new Set()), []);
-  const selectGroupOnly = useCallback((gLines: LineInfo[]) => {
-    setSelectedLineIds(new Set(gLines.map((l) => l.id)));
-    setTimeout(() => setFitTrigger((t) => t + 1), 80);
-  }, []);
+  const toggleAllLines = useCallback(() => {
+    setSelectedLineIds((prev) => {
+      const ids = lineInfos.map((l) => l.id);
+      const allSelected = ids.length > 0 && ids.every((id) => prev.has(id));
+      return allSelected ? new Set<number>() : new Set(ids);
+    });
+  }, [lineInfos]);
 
   // با اولین انتخاب نقشه روی محدوده خطوط تنظیم می‌شود
   const hadSelectionRef = useRef(false);
@@ -336,40 +338,10 @@ export function MapPage() {
         )}
       </div>
 
-      {/* راهنمای حالت خالی — هیچ خطی انتخاب نشده */}
-      {!loading && !error && selectedCount === 0 && (
-        <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-[500]" style={{ paddingTop: "4rem" }}>
-          <div className="pointer-events-auto mx-4 rounded-2xl bg-white/95 dark:bg-slate-900/95 backdrop-blur border border-slate-200 dark:border-slate-700 shadow-xl px-6 py-5 text-center max-w-md">
-            <div className="w-12 h-12 rounded-full bg-violet-100 dark:bg-violet-950/60 flex items-center justify-center mx-auto mb-3">
-              <MousePointerClick className="w-6 h-6 text-violet-600 dark:text-violet-400" />
-            </div>
-            <h3 className="font-bold text-slate-800 dark:text-slate-100 mb-1">هیچ خطی روی نقشه نمایش داده نشده</h3>
-            <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed mb-4">
-              از پنل «انتخاب خطوط» در سمت چپ، خطوط مورد نظر را انتخاب کنید.
-              خطوط هم‌مجموعه به‌صورت یک مسیر پیوسته رسم می‌شوند.
-            </p>
-            <div className="flex flex-wrap items-center justify-center gap-1.5">
-              {voltageGroups.map((g) => (
-                <button
-                  key={String(g.kv)}
-                  onClick={() => selectGroupOnly(g.lines)}
-                  className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium border transition-all hover:shadow-md cursor-pointer"
-                  style={{ borderColor: g.border, background: g.bg, color: g.text }}
-                >
-                  <span className="w-2 h-2 rounded-full" style={{ background: g.color }} />
-                  نمایش {g.label}
-                  <span className="opacity-70 nums-fa">({fa(g.lines.length)})</span>
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* ─── نوار ابزار بالای نقشه ─── */}
       {!loading && !error && (
         <div
-          className="map-toolbar map-floating-panel absolute z-[1000] top-2 left-1/2 -translate-x-1/2 flex items-center gap-0.5 bg-white/95 dark:bg-slate-900/95 backdrop-blur px-1.5 py-1.5"
+          className="map-toolbar map-floating-panel absolute z-[1000] top-2 flex items-center gap-0.5 bg-white/95 dark:bg-slate-900/95 backdrop-blur px-1.5 py-1.5"
           onClick={(e) => e.stopPropagation()}
         >
           {/* اندازه‌گیری طول */}
@@ -602,10 +574,26 @@ export function MapPage() {
               onClick={() => setSidebarOpen((v) => !v)}
             >
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <ListFilter className="w-4 h-4 text-violet-600 dark:text-violet-400" />
-                  <h3 className="text-base font-bold text-slate-800 dark:text-slate-100">انتخاب خطوط</h3>
+                <div className="flex items-center gap-2 min-w-0">
+                  <ListFilter className="w-4 h-4 text-violet-600 dark:text-violet-400 shrink-0" />
+                  <h3 className="text-base font-bold text-slate-800 dark:text-slate-100 truncate">انتخاب خطوط</h3>
                 </div>
+                <label
+                  className="flex items-center gap-1.5 shrink-0 text-[11px] font-medium text-slate-600 dark:text-slate-300 cursor-pointer select-none"
+                  title="انتخاب یا لغو انتخاب همه خطوط"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <Checkbox
+                    checked={lineInfos.length > 0 && lineInfos.every((l) => selectedLineIds.has(l.id))
+                      ? true
+                      : selectedLineIds.size > 0
+                        ? "indeterminate"
+                        : false}
+                    onCheckedChange={toggleAllLines}
+                    disabled={lineInfos.length === 0}
+                  />
+                  <span>همه</span>
+                </label>
                 <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
                   {sidebarOpen && selectedCount > 0 && (
                     <button
