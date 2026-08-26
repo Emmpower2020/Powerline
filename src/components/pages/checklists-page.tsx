@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/select";
 import { DataTable, type DataTableColumn } from "@/components/data-table";
 import { Loader2, Plus, ClipboardList } from "lucide-react";
+import { GenericBulkActions } from "@/components/generic-bulk-actions";
 
 /**
  * صفحه چک‌لیست‌ها — v2.8.1
@@ -109,6 +110,7 @@ export function ChecklistsPage() {
           layoutKey="checklist-templates"
           onAdd={() => setShowCreate(true)}
           onRefresh={() => setRefreshKey(k => k + 1)}
+          toolbarExtra={(rows) => <GenericBulkActions rows={rows} endpoint={API_ENDPOINTS.checklistTemplates} entityName="چک‌لیست" onApplied={() => setRefreshKey(k => k + 1)} canToggleActive />}
         />
       )}
 

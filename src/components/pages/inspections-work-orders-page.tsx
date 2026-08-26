@@ -7,6 +7,7 @@ import type { Inspection, WorkOrder, PaginatedResponse } from "@/lib/types";
 import { DataTable, type DataTableColumn } from "@/components/data-table";
 import { CreateInspectionDialog, CreateWorkOrderDialog } from "@/components/create-dialogs";
 import { Badge } from "@/components/ui/badge";
+import { GenericBulkActions } from "@/components/generic-bulk-actions";
 
 export function InspectionsPage() {
   const [data, setData] = useState<Inspection[]>([]);
@@ -49,7 +50,8 @@ export function InspectionsPage() {
       <DataTable data={data} columns={columns} loading={loading}
         searchKeys={columns.map(c => c.key)}
         title="بازدیدها" onAdd={() => setShowCreate(true)} onRefresh={() => setRefreshKey(k => k + 1)}
-        onCopy={() => {}} onDelete={handleDelete} onDuplicate={handleDuplicate} onImport={() => alert("برای وارد کردن اطلاعات بازدید از قالب اکسل پروژه استفاده کنید.")} onLoadAllRows={async () => data} />
+        onCopy={() => {}} onDelete={handleDelete} onDuplicate={handleDuplicate} onImport={() => alert("برای وارد کردن اطلاعات بازدید از قالب اکسل پروژه استفاده کنید.")} onLoadAllRows={async () => data}
+        toolbarExtra={(rows) => <GenericBulkActions rows={rows} endpoint={API_ENDPOINTS.inspections} entityName="بازدید" onApplied={() => setRefreshKey(k => k + 1)} />} />
       <CreateInspectionDialog open={showCreate} onClose={() => setShowCreate(false)} onCreated={() => { setShowCreate(false); setRefreshKey(k => k + 1); }} />
     </div>
   );
@@ -95,7 +97,8 @@ export function WorkOrdersPage() {
       <DataTable data={data} columns={columns} loading={loading}
         searchKeys={columns.map(c => c.key)}
         title="دستورکارها" onAdd={() => setShowCreate(true)} onRefresh={() => setRefreshKey(k => k + 1)}
-        onCopy={() => {}} onDelete={handleDelete} onDuplicate={handleDuplicate} onImport={() => alert("برای وارد کردن اطلاعات دستورکار از قالب اکسل پروژه استفاده کنید.")} onLoadAllRows={async () => data} />
+        onCopy={() => {}} onDelete={handleDelete} onDuplicate={handleDuplicate} onImport={() => alert("برای وارد کردن اطلاعات دستورکار از قالب اکسل پروژه استفاده کنید.")} onLoadAllRows={async () => data}
+        toolbarExtra={(rows) => <GenericBulkActions rows={rows} endpoint={API_ENDPOINTS.workOrders} entityName="دستورکار" onApplied={() => setRefreshKey(k => k + 1)} />} />
       <CreateWorkOrderDialog open={showCreate} onClose={() => setShowCreate(false)} onCreated={() => { setShowCreate(false); setRefreshKey(k => k + 1); }} />
     </div>
   );

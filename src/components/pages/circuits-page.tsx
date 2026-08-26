@@ -16,6 +16,7 @@ import { ImportExcelDialog } from "@/components/import-excel-dialog";
 import { BulkDeleteDialog } from "@/components/bulk-delete-dialog";
 import { useBulkDelete } from "@/hooks/use-bulk-delete";
 import { useToast } from "@/hooks/use-toast";
+import { GenericBulkActions } from "@/components/generic-bulk-actions";
 import { logError } from "@/lib/error-log";
 import { Loader2, Zap } from "lucide-react";
 
@@ -202,6 +203,7 @@ export function CircuitsPage() {
         onCopy={handleCopy}
         onDelete={bulkDelete.requestDelete}
         onImport={() => setShowImport(true)}
+        toolbarExtra={(rows) => <GenericBulkActions rows={rows} endpoint={API_ENDPOINTS.circuits} entityName="مدار" onApplied={() => setRefreshKey(k => k + 1)} />}
       />
 
       {/* دیالوگ ایجاد/ویرایش/کپی مدار */}

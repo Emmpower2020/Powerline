@@ -1,6 +1,9 @@
 "use client";
 
 import { useState, useMemo, useRef, useEffect, useCallback, type ReactNode } from "react";
+import { DndContext, PointerSensor, useSensor, useSensors, closestCenter, type DragEndEvent } from "@dnd-kit/core";
+import { SortableContext, verticalListSortingStrategy, useSortable, arrayMove } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import type { JSX } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -55,7 +58,7 @@ interface DataTableProps<T extends { id: number }> {
   /** گرفتن همه ردیف‌ها از سرور برای خروجی "همه" — اگر پاس نشه، فقط گزینه current/filtered قابل انتخاب است */
   onLoadAllRows?: () => Promise<T[]>;
   /** عنصر اضافه در ردیف دکمه‌های نوار ابزار (مثلاً دکمه عملیات گروهی ماژول) — بعد از دکمه‌های اصلی رندر می‌شود */
-  toolbarExtra?: ReactNode;
+  toolbarExtra?: ReactNode | ((selectedRows: T[]) => ReactNode);
   pageSize?: number;
   searchable?: boolean;
   tableRef?: React.MutableRefObject<DataTableHandle | null>;
@@ -64,6 +67,20 @@ interface DataTableProps<T extends { id: number }> {
    * ترتیب/مخفی‌سازی ستون‌ها برای هر کاربر در localStorage نگهداری و در ورود بعدی بازیابی می‌شود
    */
   layoutKey?: string;
+}
+
+function SortableColumnRow({ id, header, hidden, onToggle, onUp, onDown, first, last }: { id: string; header: string; hidden: boolean; onToggle: () => void; onUp: () => void; onDown: () => void; first: boolean; last: boolean }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
+  const style = { transform: CSS.Transform.toString(transform), transition };
+  return <div ref={setNodeRef} style={style} className={cn("flex items-center gap-1 px-2 py-1.5 hover:bg-slate-50 dark:hover:bg-slate-800 rounded", isDragging && "opacity-60 bg-indigo-50")}>
+    <button type="button" {...attributes} {...listeners} title="کشیدن برای جابه‌جایی" className="cursor-grab active:cursor-grabbing p-1 text-slate-400 hover:text-indigo-600 shrink-0">⋮⋮</button>
+    <label className="flex items-center gap-2 flex-1 cursor-pointer text-right min-w-0">
+      <input type="checkbox" checked={!hidden} onChange={onToggle} className="w-4 h-4 cursor-pointer shrink-0" />
+      <span className="text-sm truncate">{header}</span>
+    </label>
+    <button onClick={onUp} disabled={first} className="p-1 hover:text-indigo-600 disabled:opacity-30 cursor-pointer shrink-0" title="بالا"><ArrowUp className="w-3.5 h-3.5" /></button>
+    <button onClick={onDown} disabled={last} className="p-1 hover:text-indigo-600 disabled:opacity-30 cursor-pointer shrink-0" title="پایین"><ArrowDown className="w-3.5 h-3.5" /></button>
+  </div>;
 }
 
 function DataTableInner<T extends { id: number }>({
@@ -108,6 +125,7 @@ function DataTableInner<T extends { id: number }>({
   const [showExportDialog, setShowExportDialog] = useState(false);
   const [showPrintDialog, setShowPrintDialog] = useState(false);
   const columnMenuRef = useRef<HTMLDivElement>(null);
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
 
   // v2.4.3: ذخیرهٔ خودکار چیدمان برای همین کاربر — با هر تغییر ترتیب/مخفی‌سازی
   useEffect(() => {
@@ -505,7 +523,7 @@ function DataTableInner<T extends { id: number }>({
           )}
 
           {/* عنصر اضافه ماژول (مثل دکمه عملیات گروهی) — همان ردیف دکمه‌های اصلی */}
-          {toolbarExtra}
+          {typeof toolbarExtra === "function" ? toolbarExtra(filtered.filter(r => selectedRows.has(r.id))) : toolbarExtra}
 
           {onImport && (
             <Button variant="outline" size="icon" onClick={onImport} title="وارد کردن از اکسل" className="h-9 w-9 text-green-600 hover:bg-green-50 border-green-200">
@@ -516,73 +534,54 @@ function DataTableInner<T extends { id: number }>({
           {onRefresh && <Button variant="outline" size="icon" onClick={onRefresh} title="بارگذاری مجدد" className="h-9 w-9"><RefreshCw className="w-4 h-4" /></Button>}
           <Button variant="outline" size="icon" onClick={handlePrint} title="چاپ گزارش" className="h-9 w-9 text-indigo-600 hover:bg-indigo-50 border-indigo-200"><Printer className="w-4 h-4" /></Button>
 
-          {/* Column Settings — last button with gear icon */}
+          {/* انتخاب همه — روی تمام ردیف‌های فیلترشده، نه فقط صفحه فعلی */}
+          <Button
+            variant="outline" size="icon" onClick={toggleSelectAll} disabled={filtered.length === 0}
+            title={filtered.length > 0 && filtered.every(r => selectedRows.has(r.id)) ? "لغو انتخاب همه" : "انتخاب همه"}
+            className="h-9 w-9 text-indigo-600 hover:bg-indigo-50 border-indigo-200"
+          ><CheckCheck className="w-4 h-4" /></Button>
+
+          {/* بازنشانی کامل فیلترها و مرتب‌سازی */}
+          <Button
+            variant="outline" size="icon" onClick={resetFilters} disabled={!hasAnyFilters}
+            title="ریست فیلترها و مرتب‌سازی" className="h-9 w-9 text-red-600 hover:bg-slate-50 border-slate-200"
+          ><RotateCcw className="w-4 h-4" /></Button>
+
+          {/* فقط شمارنده انتخاب */}
+          {selCount > 0 && (
+            <span className="text-xs px-2.5 py-1 bg-indigo-50 text-indigo-700 rounded-md nums-fa border border-indigo-200 inline-flex items-center gap-1 ml-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-indigo-500"></span>{selCount.toLocaleString("fa-IR")} ردیف انتخاب شده
+            </span>
+          )}
+
+          {/* Settings همیشه آخرین دکمه */}
           <div className="relative" ref={columnMenuRef}>
             <Button variant="outline" size="icon" title="تنظیمات ستون‌ها" className="h-9 w-9" onClick={() => setShowColumnMenu(o => !o)}>
               <SettingsIcon className="w-4 h-4" />
             </Button>
             {showColumnMenu && (
-              <div className="absolute z-50 mt-1 left-0 w-72 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg" dir="rtl">
+              <div className="absolute z-50 mt-1 left-0 w-80 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg" dir="rtl">
                 <div className="px-3 py-2 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
                   <span className="text-sm font-medium text-slate-700 dark:text-slate-200">تنظیم ستون‌ها</span>
                   <button onClick={() => setShowColumnMenu(false)} className="text-slate-400 hover:text-slate-700 cursor-pointer"><X className="w-4 h-4" /></button>
                 </div>
-                <div className="max-h-80 overflow-y-auto p-1">
-                  {columnOrder.map((key, idx) => {
-                    const col = columns.find(c => c.key === key);
-                    if (!col) return null;
-                    const isHidden = hiddenColumns.has(key);
-                    return (
-                      <div key={key} className="flex items-center gap-1 px-2 py-1.5 hover:bg-slate-50 dark:hover:bg-slate-800 rounded">
-                        <label className="flex items-center gap-2 flex-1 cursor-pointer text-right min-w-0">
-                          <input type="checkbox" checked={!isHidden} onChange={() => toggleColumnVisibility(key)} className="w-4 h-4 cursor-pointer shrink-0" />
-                          <span className="text-sm truncate">{col.header}</span>
-                        </label>
-                        <button onClick={() => moveColumn(key, "up")} disabled={idx === 0} className="p-1 hover:text-indigo-600 disabled:opacity-30 cursor-pointer shrink-0" title="بالا">
-                          <ArrowUp className="w-3.5 h-3.5" />
-                        </button>
-                        <button onClick={() => moveColumn(key, "down")} disabled={idx === columnOrder.length - 1} className="p-1 hover:text-indigo-600 disabled:opacity-30 cursor-pointer shrink-0" title="پایین">
-                          <ArrowDown className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    );
-                  })}
-                </div>
+                <div className="px-3 py-2 text-[11px] text-slate-400 border-b border-slate-100 dark:border-slate-800">ستون را با کشیدن و رها کردن به بالا یا پایین جابه‌جا کنید.</div>
+                <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={(e: DragEndEvent) => {
+                  const { active, over } = e; if (!over || active.id === over.id) return;
+                  setColumnOrder(items => { const oi = items.indexOf(String(active.id)); const ni = items.indexOf(String(over.id)); return oi < 0 || ni < 0 ? items : arrayMove(items, oi, ni); });
+                }}>
+                  <SortableContext items={columnOrder} strategy={verticalListSortingStrategy}>
+                    <div className="max-h-80 overflow-y-auto p-1">
+                      {columnOrder.map((key, idx) => {
+                        const col = columns.find(c => c.key === key); if (!col) return null;
+                        return <SortableColumnRow key={key} id={key} header={col.header} hidden={hiddenColumns.has(key)} onToggle={() => toggleColumnVisibility(key)} onUp={() => moveColumn(key, "up")} onDown={() => moveColumn(key, "down")} first={idx===0} last={idx===columnOrder.length-1} />;
+                      })}
+                    </div>
+                  </SortableContext>
+                </DndContext>
               </div>
             )}
           </div>
-
-          {/* انتخاب همه — روی تمام ردیف‌های فیلترشده، نه فقط صفحه فعلی */}
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={toggleSelectAll}
-            disabled={filtered.length === 0}
-            title={filtered.length > 0 && filtered.every(r => selectedRows.has(r.id)) ? "لغو انتخاب همه" : "انتخاب همه"}
-            className="h-9 w-9 text-indigo-600 hover:bg-indigo-50 border-indigo-200"
-          >
-            <CheckCheck className="w-4 h-4" />
-          </Button>
-
-          {/* بازنشانی کامل فیلترها و مرتب‌سازی */}
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={resetFilters}
-            disabled={!hasAnyFilters}
-            title="ریست فیلترها و مرتب‌سازی"
-            className="h-9 w-9 text-red-600 hover:bg-slate-50 border-slate-200"
-          >
-            <RotateCcw className="w-4 h-4" />
-          </Button>
-
-          {/* فقط شمارنده انتخاب — هیچ عملیات انتخابی داخل این متن نیست */}
-          {selCount > 0 && (
-            <span className="text-xs px-2.5 py-1 bg-indigo-50 text-indigo-700 rounded-md nums-fa border border-indigo-200 inline-flex items-center gap-1 ml-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-indigo-500"></span>
-              {selCount.toLocaleString("fa-IR")} ردیف انتخاب شده
-            </span>
-          )}
 
         </div>
 

@@ -18,6 +18,7 @@ import { useBulkDelete } from "@/hooks/use-bulk-delete";
 import { normalizeConductorName, conductorDisplayName } from "@/hooks/use-conductors";
 import { logError } from "@/lib/error-log";
 import { useToast } from "@/hooks/use-toast";
+import { GenericBulkActions } from "@/components/generic-bulk-actions";
 import { Loader2, Cable, Layers, Gauge } from "lucide-react";
 
 /**
@@ -295,6 +296,7 @@ export function ConductorsPage() {
         onCopy={handleCopy}
         onDelete={bulkDelete.requestDelete}
         onImport={() => setShowImport(true)}
+        toolbarExtra={(rows) => <GenericBulkActions rows={rows} endpoint={API_ENDPOINTS.conductors} entityName="سیم" onApplied={() => setRefreshKey(k => k + 1)} canToggleActive />}
       />
 
       <ConductorDialog

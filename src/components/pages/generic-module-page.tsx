@@ -11,6 +11,7 @@ import { Loader2, Plus, Upload as UploadIcon } from "lucide-react";
 import { DataTable, type DataTableColumn } from "@/components/data-table";
 import { CreateContractDialog, CreateSafetyDialog, CreatePersonnelDialog, CreateContractorDialog, CreateEquipmentDialog } from "@/components/create-dialogs";
 import type { PaginatedResponse } from "@/lib/types";
+import { GenericBulkActions } from "@/components/generic-bulk-actions";
 
 interface GenericItem { id: number; [key: string]: unknown }
 
@@ -230,6 +231,7 @@ export function GenericModulePage({ moduleKey, endpoint }: { moduleKey: string; 
       onDelete={deleteRows}
       onImport={() => inputRef.current?.click()}
       onLoadAllRows={async () => data}
+      toolbarExtra={(rows) => <GenericBulkActions rows={rows} endpoint={endpoint} entityName={config.title.replace("ها","")} onApplied={() => setRefreshKey(k => k + 1)} canToggleActive={data.some(r => "is_active" in r)} />}
     />
     {renderCreate()}
     <EditorDialog open={editor.open} row={editor.row} keys={selectedKeys} title={config.title} mode={editor.mode} endpoint={endpoint} onClose={() => setEditor({open:false,mode:editor.mode,row:null})} onSaved={() => { setEditor({open:false,mode:editor.mode,row:null}); setRefreshKey(k => k + 1); }} />

@@ -1,4 +1,5 @@
 "use client";
+import { GenericBulkActions } from "@/components/generic-bulk-actions";
 
 import { useEffect, useState, useSyncExternalStore, useCallback } from "react";
 import { Card, CardContent } from "@/components/ui/card";
@@ -123,6 +124,7 @@ export function ErrorLogPage() {
           layoutKey="error-log"
           onRefresh={() => setRefreshKey(k => k + 1)}
           pageSize={20}
+          toolbarExtra={(rows) => <GenericBulkActions rows={rows} endpoint="/audit-log" entityName="لاگ" onApplied={() => setRefreshKey(k => k + 1)} />}
         />
       )}
     </div>

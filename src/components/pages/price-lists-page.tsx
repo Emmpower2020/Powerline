@@ -22,6 +22,7 @@ import { DataTable, type DataTableColumn } from "@/components/data-table";
 import { JalaliDatePicker } from "@/components/jalali-date-picker";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, Plus, ListChecks, FileSpreadsheet } from "lucide-react";
+import { GenericBulkActions } from "@/components/generic-bulk-actions";
 
 /**
  * صفحه فهرست بها — v2.8.1
@@ -265,6 +266,7 @@ export function PriceListsPage() {
           onCopy={() => {}}
           onImport={() => importInputRef.current?.click()}
           onLoadAllRows={async () => items}
+          toolbarExtra={(rows) => <GenericBulkActions rows={rows} endpoint={API_ENDPOINTS.priceListItems} entityName="قلم" onApplied={() => setRefreshKey(k => k + 1)} canToggleActive />}
         />
       )}
 
