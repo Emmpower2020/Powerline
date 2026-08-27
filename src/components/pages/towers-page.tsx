@@ -453,6 +453,7 @@ export function TowersPage() {
         toolbarExtra={<BulkTowersActions getSelection={getSelection} onApplied={handleBulkApplied} />}
         tableRef={tableRef}
         layoutKey="towers"
+        defaultSort={[{ key: "voltage_kv", direction: "asc", order: [400, 230, 132, 63] }, { key: "tower_number", direction: "asc" }]}
       />
       <CreateTowerDialog
         open={showCreate}

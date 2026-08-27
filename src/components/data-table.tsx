@@ -68,6 +68,8 @@ interface DataTableProps<T extends { id: number }> {
    * ترتیب/مخفی‌سازی ستون‌ها برای هر کاربر در localStorage نگهداری و در ورود بعدی بازیابی می‌شود
    */
   layoutKey?: string;
+  /** مرتب‌سازی اولیهٔ جدول؛ فقط در بارگذاری اولیه اعمال می‌شود و مرتب‌سازی دستی کاربر را تحت تأثیر قرار نمی‌دهد */
+  defaultSort?: Array<{ key: string; direction?: "asc" | "desc"; order?: Array<string | number> }>;
 }
 
 function SortableColumnRow({ id, header, hidden, onToggle, onUp, onDown, first, last }: { id: string; header: string; hidden: boolean; onToggle: () => void; onUp: () => void; onDown: () => void; first: boolean; last: boolean }) {
@@ -87,12 +89,13 @@ function DataTableInner<T extends { id: number }>({
   data, columns, loading, searchKeys, title,
   onAdd, onRefresh, onRowClick, onCopy, onDelete, onEdit, onDuplicate,
   onImport, onLoadAllRows, toolbarExtra,
-  pageSize = 15, searchable = true, tableRef, layoutKey,
+  pageSize = 15, searchable = true, tableRef, layoutKey, defaultSort,
 }: DataTableProps<T>) {
   const { toast } = useToast();
   const [search, setSearch] = useState("");
   const [sortKey, setSortKey] = useState<string | null>(null);
   const [sortDir, setSortDir] = useState<SortState>("none");
+  const [hasUserSorted, setHasUserSorted] = useState(false);
   const [page, setPage] = useState(1);
   // v2.4.3: چیدمان ستون‌ها (ترتیب + مخفی) از حافظهٔ اختصاصی همین کاربر بازیابی می‌شود
   const savedLayout = useMemo(() => {
@@ -249,14 +252,50 @@ function DataTableInner<T extends { id: number }>({
       if (filter.search) result = result.filter(row => String(row[key as keyof T] ?? "").toLowerCase().includes(filter.search.toLowerCase()));
       if (filter.selectedValues.size > 0) result = result.filter(row => filter.selectedValues.has(String(row[key as keyof T] ?? "")));
     });
-    if (sortKey && sortDir !== "none") result.sort((a, b) => { const av = a[sortKey as keyof T]; const bv = b[sortKey as keyof T]; if (av == null) return 1; if (bv == null) return -1; if (typeof av === "number" && typeof bv === "number") return sortDir === "asc" ? av - bv : bv - av; const c = String(av).localeCompare(String(bv), "fa"); return sortDir === "asc" ? c : -c; });
+    const compareBySort = (a: T, b: T, key: string, direction: "asc" | "desc", order?: Array<string | number>) => {
+      const av = a[key as keyof T];
+      const bv = b[key as keyof T];
+      if (av == null && bv == null) return 0;
+      if (av == null) return 1;
+      if (bv == null) return -1;
+      if (order?.length) {
+        const ai = order.findIndex(v => String(v) === String(av));
+        const bi = order.findIndex(v => String(v) === String(bv));
+        if (ai !== -1 || bi !== -1) {
+          if (ai === -1) return 1;
+          if (bi === -1) return -1;
+          return direction === "asc" ? ai - bi : bi - ai;
+        }
+      }
+      if (typeof av === "number" && typeof bv === "number") return direction === "asc" ? av - bv : bv - av;
+      const c = String(av).localeCompare(String(bv), "fa", { numeric: true, sensitivity: "base" });
+      return direction === "asc" ? c : -c;
+    };
+    if (sortKey && sortDir !== "none") result.sort((a, b) => compareBySort(a, b, sortKey, sortDir, defaultSort?.find(s => s.key === sortKey)?.order));
+    // مرتب‌سازی اولیه چندمرحله‌ای تا وقتی کاربر ترتیب را دستی تغییر نداده است.
+    if (!hasUserSorted && defaultSort?.length) {
+      result.sort((a, b) => {
+        for (const s of defaultSort) {
+          const c = compareBySort(a, b, s.key, s.direction ?? "asc", s.order);
+          if (c !== 0) return c;
+        }
+        return 0;
+      });
+    }
     return result;
   }, [data, search, searchKeys, appliedFilters, sortKey, sortDir]);
 
   const totalPages = Math.ceil(filtered.length / pageSize);
   const paginated = filtered.slice((page - 1) * pageSize, page * pageSize);
 
-  const toggleSort = (key: string) => { if (sortKey === key) { if (sortDir === "none") setSortDir("asc"); else if (sortDir === "asc") setSortDir("desc"); else { setSortDir("none"); setSortKey(null); } } else { setSortKey(key); setSortDir("asc"); } };
+  const toggleSort = (key: string) => {
+    setHasUserSorted(true);
+    if (sortKey === key) {
+      if (sortDir === "none") setSortDir("asc");
+      else if (sortDir === "asc") setSortDir("desc");
+      else { setSortDir("none"); setSortKey(null); }
+    } else { setSortKey(key); setSortDir("asc"); }
+  };
   const toggleColumnVisibility = (key: string) => { const n = new Set(hiddenColumns); if (n.has(key)) n.delete(key); else n.add(key); setHiddenColumns(n); };
   const moveColumn = (key: string, dir: "up" | "down") => setColumnOrder(prev => { const idx = prev.indexOf(key); if (idx === -1) return prev; const n = [...prev]; const s = dir === "up" ? idx - 1 : idx + 1; if (s < 0 || s >= n.length) return prev; [n[idx], n[s]] = [n[s], n[idx]]; return n; });
   const toggleRowSelection = (id: number) => setSelectedRows(prev => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n; });

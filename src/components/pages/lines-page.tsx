@@ -398,6 +398,7 @@ export function LinesPage() {
         toolbarExtra={<BulkLinesActions getSelection={getSelection} onApplied={handleBulkApplied} />}
         tableRef={tableRef}
         layoutKey="lines"
+        defaultSort={[{ key: "voltage_kv", direction: "asc", order: [400, 230, 132, 63] }, { key: "line_code", direction: "asc" }]}
       />
       <CreateLineDialog
         open={showCreate}
