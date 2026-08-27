@@ -157,7 +157,7 @@ export function DashboardLayout({ children, currentPage, onNavigate, title, subt
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex" dir="rtl">
-      <aside className={cn("fixed lg:sticky top-0 right-0 z-40 h-screen w-64 bg-white dark:bg-slate-900 border-l border-slate-200 dark:border-slate-800 transition-transform duration-300", sidebarOpen ? "translate-x-0" : "translate-x-full lg:translate-x-0")}>
+      <aside className={cn("fixed lg:sticky top-0 right-0 z-[1000000] h-screen w-64 bg-white dark:bg-slate-900 border-l border-slate-200 dark:border-slate-800 transition-transform duration-300", sidebarOpen ? "translate-x-0" : "translate-x-full lg:translate-x-0")}>
         <div className="flex flex-col h-full">
           <div className="p-5 border-b border-slate-100 dark:border-slate-800">
             <div className="flex items-center gap-3">
@@ -198,7 +198,7 @@ export function DashboardLayout({ children, currentPage, onNavigate, title, subt
           </div>
         </div>
       </aside>
-      {sidebarOpen && <div className="fixed inset-0 bg-black/20 z-30 lg:hidden" onClick={() => setSidebarOpen(false)} />}
+      {sidebarOpen && <div className="fixed inset-0 bg-black/20 z-[999999] lg:hidden" onClick={() => setSidebarOpen(false)} />}
       <div className="flex-1 flex flex-col min-w-0">
         {/* v2.8.0: هدر با ارتفاع کم‌تر (h-16 → h-14) و padding کم‌تر */}
         <header className="h-14 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between px-4 lg:px-6 sticky top-0 z-20">

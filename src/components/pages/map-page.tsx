@@ -541,7 +541,7 @@ export function MapPage() {
             top: "0.5rem",
             bottom: sidebarOpen ? "2.5rem" : "auto",
             left: "0.75rem",
-            width: "340px",
+            width: "300px",
             height: sidebarOpen ? undefined : "auto",
           }}
         >

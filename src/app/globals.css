@@ -545,7 +545,7 @@
 
 .map-line-sidebar {
   min-width: 0;
-  width: 340px !important;
+  width: 300px !important;
 }
 .map-line-sidebar > .map-floating-panel {
   width: 100%;
@@ -620,11 +620,11 @@
     position: absolute !important;
     top: auto !important;
     bottom: calc(100% + 10px) !important;
-    left: 0 !important;
+    left: 50% !important;
     right: auto !important;
-    transform: none !important;
-    width: min(360px, calc(100vw - 12px)) !important;
-    max-width: calc(100vw - 12px) !important;
+    transform: translateX(-50%) !important;
+    width: min(300px, calc(100vw - 24px)) !important;
+    max-width: calc(100vw - 24px) !important;
     max-height: none !important;
     overflow: hidden !important;
     z-index: 10000 !important;
@@ -736,5 +736,24 @@
   }
   .map-toolbar {
     z-index: 55000 !important;
+  }
+}
+
+/* v4.3.25: ریسپانسیو نهایی نقشه در موبایل — پنل‌ها هرگز از صفحه بیرون نزنند */
+@media (max-width: 767px) {
+  .map-line-sidebar {
+    width: calc(100% - 20px) !important;
+    left: 10px !important;
+    right: 10px !important;
+  }
+
+  .map-legend-popup {
+    width: min(220px, calc(100vw - 24px)) !important;
+    max-width: calc(100vw - 24px) !important;
+  }
+
+  .map-basemap-popup {
+    width: min(300px, calc(100vw - 24px)) !important;
+    max-width: calc(100vw - 24px) !important;
   }
 }
