@@ -10,6 +10,7 @@ import {
   voltageStyle,
   towerTypeStyle,
   towerTypeLabel,
+  towerStructureStyle,
   type BasemapId,
 } from "@/lib/map-config";
 import type { BuiltRoutes, RoutePoint } from "@/lib/line-routes";
@@ -403,10 +404,10 @@ function RoutesOverlay({
         for (const p of part.points) {
           const tower = towersById.get(p.towerId);
           if (!tower) continue;
-          const ts = towerTypeStyle(tower.tower_type);
+          const ss = towerStructureStyle(tower.tower_structure);
           markers.push(
             makeShapeMarker([p.lat, p.lng], {
-              shape: ts.shape,
+              shape: ss.shape,
               color: vs.color,
               radius: 7.5,
               renderer: canvasRenderer,

@@ -18,6 +18,8 @@ function towerTableColumns(Database $db): array
 function towerCodeColumn(Database $db): string
 {
     $columns = towerTableColumns($db);
+    if (isset($columns['tower_type_code'])) return 'tower_type_code';
+    if (isset($columns['foundation_type_code'])) return 'foundation_type_code';
     return 'tower_type_code';
 }
 
@@ -35,14 +37,18 @@ function syncLineTowerStructure(PDO $pdo, ?int $lineId): void
     $stmt = $pdo->prepare("SELECT tower_structure, COUNT(*) AS cnt FROM towers WHERE line_id = ? AND is_active = 1 AND tower_structure IS NOT NULL AND tower_structure <> '' GROUP BY tower_structure ORDER BY cnt DESC, tower_structure ASC LIMIT 1");
     $stmt->execute([$lineId]);
     $row = $stmt->fetch(PDO::FETCH_ASSOC);
-    if (!$row) return;
-
     $sets = [];
     $params = [];
-    foreach ($structureCols as $col) { $sets[] = "`$col` = ?"; $params[] = $row['tower_structure']; }
+
+    // اگر هیچ دکل فعالِ دارای ساختار باقی نمانده، ساختار قبلی خط را هم پاک کن.
+    $structureValue = $row ? ($row['tower_structure'] ?? null) : null;
+    $params[] = $structureValue;
+
+    foreach ($structureCols as $col) { $sets[] = "`$col` = ?"; }
     $sets[] = 'updated_at = NOW()';
     $params[] = $lineId;
     $pdo->prepare("UPDATE `lines` SET " . implode(', ', $sets) . " WHERE id = ?")->execute($params);
+    
 }
 
 function registerTowerRoutes(Router $router): void
@@ -209,7 +215,7 @@ function registerTowerRoutes(Router $router): void
         }
 
         $dbColumns = towerTableColumns($db);
-        $towerCodeColumn = 'tower_type_code';
+        $towerCodeColumn = towerCodeColumn($db);
         
         // GPS
         $gpsLat = $body['gps_lat'] ?? null;
@@ -572,7 +578,7 @@ function registerTowerRoutes(Router $router): void
             $pdo->beginTransaction();
 
             $towerColumns = towerTableColumns($db);
-            $towerCodeField = 'tower_type_code';
+            $towerCodeField = towerCodeColumn($db);
             $insertTower = function (array $d) use ($pdo, $towerColumns, $towerCodeField) {
                 $cols = ['line_id','tower_code','tower_number'];
                 $vals = ['?','?','?']; $params = [$d['line_id'], $d['tower_code'], $d['tower_number']];

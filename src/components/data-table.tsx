@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo, useRef, useEffect, useCallback, type ReactNode } from "react";
+import { useToast } from "@/hooks/use-toast";
 import { DndContext, PointerSensor, useSensor, useSensors, closestCenter, type DragEndEvent } from "@dnd-kit/core";
 import { SortableContext, verticalListSortingStrategy, useSortable, arrayMove } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
@@ -11,7 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import {
   ChevronUp, ChevronDown, ChevronsUpDown, ChevronRight, ChevronLeft, Search, RefreshCw,
   Plus, Eye, EyeOff, Filter, X, Check, Copy, CopyPlus, Trash2, ArrowUp, ArrowDown, Pencil,
-  Settings as SettingsIcon, Upload, Download, Printer, RotateCcw, CheckCheck,
+  Settings as SettingsIcon, Upload, Download, Printer, RotateCcw,
 } from "lucide-react";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
@@ -72,8 +73,7 @@ interface DataTableProps<T extends { id: number }> {
 function SortableColumnRow({ id, header, hidden, onToggle, onUp, onDown, first, last }: { id: string; header: string; hidden: boolean; onToggle: () => void; onUp: () => void; onDown: () => void; first: boolean; last: boolean }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
   const style = { transform: CSS.Transform.toString(transform), transition };
-  return <div ref={setNodeRef} style={style} className={cn("flex items-center gap-1 px-2 py-1.5 hover:bg-slate-50 dark:hover:bg-slate-800 rounded", isDragging && "opacity-60 bg-indigo-50")}>
-    <button type="button" {...attributes} {...listeners} title="کشیدن برای جابه‌جایی" className="cursor-grab active:cursor-grabbing p-1 text-slate-400 hover:text-indigo-600 shrink-0">⋮⋮</button>
+  return <div ref={setNodeRef} style={style} {...attributes} {...listeners} className={cn("flex items-center gap-1 px-2 py-1.5 hover:bg-slate-50 dark:hover:bg-slate-800 rounded cursor-grab active:cursor-grabbing", isDragging && "opacity-60 bg-indigo-50")}>
     <label className="flex items-center gap-2 flex-1 cursor-pointer text-right min-w-0">
       <input type="checkbox" checked={!hidden} onChange={onToggle} className="w-4 h-4 cursor-pointer shrink-0" />
       <span className="text-sm truncate">{header}</span>
@@ -89,6 +89,7 @@ function DataTableInner<T extends { id: number }>({
   onImport, onLoadAllRows, toolbarExtra,
   pageSize = 15, searchable = true, tableRef, layoutKey,
 }: DataTableProps<T>) {
+  const { toast } = useToast();
   const [search, setSearch] = useState("");
   const [sortKey, setSortKey] = useState<string | null>(null);
   const [sortDir, setSortDir] = useState<SortState>("none");
@@ -455,9 +456,10 @@ function DataTableInner<T extends { id: number }>({
       return;
     }
     if (selCount > 1) {
-      // Show inline warning via window alert as fallback if parent has not provided toast
-      const msg = `لطفاً فقط یک ردیف را برای ویرایش انتخاب کنید.\nشما ${selCount.toLocaleString("fa-IR")} ردیف انتخاب کرده‌اید.`;
-      if (typeof window !== "undefined") window.alert(msg);
+      toast({
+        title: "ویرایش یک ردیف در هر بار",
+        description: `لطفاً فقط یک ردیف را انتخاب کنید. اکنون ${selCount.toLocaleString("fa-IR")} ردیف انتخاب شده است.`,
+      });
       return;
     }
     // exactly 1 — find the row
@@ -533,18 +535,6 @@ function DataTableInner<T extends { id: number }>({
           <Button variant="outline" size="icon" onClick={handleExport} title="خروجی گرفتن" className="h-9 w-9 text-blue-600 hover:bg-blue-50 border-blue-200"><Upload className="w-4 h-4" /></Button>
           {onRefresh && <Button variant="outline" size="icon" onClick={onRefresh} title="بارگذاری مجدد" className="h-9 w-9"><RefreshCw className="w-4 h-4" /></Button>}
           <Button variant="outline" size="icon" onClick={handlePrint} title="چاپ گزارش" className="h-9 w-9 text-indigo-600 hover:bg-indigo-50 border-indigo-200"><Printer className="w-4 h-4" /></Button>
-
-          {/* انتخاب همه — روی تمام ردیف‌های فیلترشده، نه فقط صفحه فعلی */}
-          <Button
-            variant="outline" size="icon" onClick={toggleSelectAll} disabled={filtered.length === 0}
-            title={filtered.length > 0 && filtered.every(r => selectedRows.has(r.id)) ? "لغو انتخاب همه" : "انتخاب همه"}
-            className={cn(
-              "h-9 w-9 border-indigo-200 transition-colors",
-              filtered.length > 0 && filtered.every(r => selectedRows.has(r.id))
-                ? "bg-indigo-100 text-indigo-700 hover:bg-indigo-200"
-                : "text-indigo-600 hover:bg-indigo-50"
-            )}
-          ><CheckCheck className="w-4 h-4" /></Button>
 
           {/* بازنشانی کامل فیلترها و مرتب‌سازی — در حالت عادی قرمز نیست؛ فقط هنگام فعال بودن فیلتر/مرتب‌سازی قرمز می‌شود */}
           <Button

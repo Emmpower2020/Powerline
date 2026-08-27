@@ -8,7 +8,7 @@ import {
   BASEMAPS,
   VOLTAGE_STYLES,
   UNKNOWN_VOLTAGE_STYLE,
-  TOWER_TYPE_STYLES,
+  TOWER_STRUCTURE_STYLES,
   basemapById,
   basemapThumbUrl,
   voltageStyle,
@@ -505,8 +505,8 @@ export function MapPage() {
                 <div className="border-t border-slate-100 dark:border-slate-800 pt-2">
                   <p className="text-[11px] font-bold text-slate-500 dark:text-slate-400 mb-1.5">نوع سازه دکل (شکل)</p>
                   <div className="space-y-1.5">
-                    {TOWER_TYPE_STYLES.filter((t) => t.type !== "other").map((t) => (
-                      <div key={t.type} className="flex items-center gap-2">
+                    {TOWER_STRUCTURE_STYLES.map((t) => (
+                      <div key={t.structure} className="flex items-center gap-2">
                         <ShapeIcon shape={t.shape} color="#64748b" size={15} />
                         <span className="text-[11px] text-slate-600 dark:text-slate-300">{t.label}</span>
                       </div>

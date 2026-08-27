@@ -72,6 +72,50 @@ export function towerTypeLabel(towerType?: string | null): string {
   return towerTypeStyle(towerType).label;
 }
 
+export interface TowerStructureStyle {
+  structure: string;
+  shape: TowerShape;
+  label: string;
+}
+
+/**
+ * شکل نماد دکل بر اساس «ساختار دکل» ذخیره‌شده در towers.tower_structure.
+ * این مقادیر همان نام‌های جدول مرجع tower_structures هستند.
+ */
+export const TOWER_STRUCTURE_STYLES: TowerStructureStyle[] = [
+  { structure: "مشبک فلزی", shape: "square", label: "مشبک فلزی" },
+  { structure: "تلسکوپی فلزی", shape: "diamond", label: "تلسکوپی فلزی" },
+  { structure: "تلسکوپی بتنی", shape: "diamond", label: "تلسکوپی بتنی" },
+  { structure: "تیر چوبی", shape: "triangle", label: "تیر چوبی" },
+  { structure: "تیر بتنی", shape: "circle", label: "تیر بتنی" },
+];
+
+export function towerStructureStyle(structure?: string | null): TowerStructureStyle {
+  const normalized = String(structure ?? "").trim().replace(/ي/g, "ی").replace(/ك/g, "ک");
+  const found = TOWER_STRUCTURE_STYLES.find((s) => s.structure === normalized);
+  if (found) return found;
+
+  // چند نگاشت سازگار برای داده‌های قدیمی/نوشتارهای رایج
+  if (/مشبک|مشبک فلزی|فلزی مشبک/i.test(normalized)) {
+    return TOWER_STRUCTURE_STYLES[0];
+  }
+  if (/تلسکوپی.*فلز|فلزی.*تلسکوپی/i.test(normalized)) {
+    return TOWER_STRUCTURE_STYLES[1];
+  }
+  if (/تلسکوپی.*بتن|بتنی.*تلسکوپی/i.test(normalized)) {
+    return TOWER_STRUCTURE_STYLES[2];
+  }
+  if (/چوب/i.test(normalized)) {
+    return TOWER_STRUCTURE_STYLES[3];
+  }
+  if (/بتن/i.test(normalized)) {
+    return TOWER_STRUCTURE_STYLES[4];
+  }
+
+  // داده ناشناخته دیگر نباید به «ضربدر سفید» تبدیل شود.
+  return { structure: normalized || "نامشخص", shape: "circle", label: normalized || "نامشخص" };
+}
+
 // ─── نقشه‌های پایه ───
 export type BasemapId =
   | "blank"

@@ -20,6 +20,9 @@ SET @sql = IF(
 );
 PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 
+-- قبل از NOT NULL شدن، داده‌های خالی/NULL را به یک مقدار معتبر تبدیل می‌کنیم تا Migration روی دیتابیس‌های قدیمی متوقف نشود.
+UPDATE `towers` SET `tower_type` = 'آویزی' WHERE `tower_type` IS NULL OR TRIM(`tower_type`) = '';
+
 -- tower_type دیگر ساختار دکل نیست و فقط «آویزی/کششی» را نگه می‌دارد.
 ALTER TABLE `towers`
   MODIFY COLUMN `tower_type` VARCHAR(20) NOT NULL COMMENT 'نوع دکل: آویزی / کششی';
