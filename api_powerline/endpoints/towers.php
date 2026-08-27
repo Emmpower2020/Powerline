@@ -35,12 +35,7 @@ function syncLineTowerStructure(PDO $pdo, ?int $lineId): void
     $stmt = $pdo->prepare("SELECT tower_structure, COUNT(*) AS cnt FROM towers WHERE line_id = ? AND is_active = 1 AND tower_structure IS NOT NULL AND tower_structure <> '' GROUP BY tower_structure ORDER BY cnt DESC, tower_structure ASC LIMIT 1");
     $stmt->execute([$lineId]);
     $row = $stmt->fetch(PDO::FETCH_ASSOC);
-    if (!$row) {
-        // اگر آخرین دکل فعال/دارای ساختار حذف یا غیرفعال شد، مقدار قدیمی
-        // lines.tower_structure نباید باقی بماند.
-        $pdo->prepare("UPDATE `lines` SET `tower_structure` = NULL, `updated_at` = NOW() WHERE id = ?")->execute([$lineId]);
-        return;
-    }
+    if (!$row) return;
 
     $sets = [];
     $params = [];
@@ -301,8 +296,7 @@ function registerTowerRoutes(Router $router): void
         }
 
         // اتصال دکل به خط (یا قطع اتصال با null)
-        $oldLineId = $existing['line_id'] !== null ? (int) $existing['line_id'] : null;
-        $effectiveLineId = $oldLineId;
+        $effectiveLineId = $existing['line_id'];
         if (array_key_exists('line_id', $body)) {
             $newLineId = !empty($body['line_id']) ? (int) $body['line_id'] : null;
             if ($newLineId !== null && !$db->exists('lines', 'id = ?', [$newLineId])) {
@@ -345,19 +339,8 @@ function registerTowerRoutes(Router $router): void
         $params[] = (int) $id;
 
         $sql = "UPDATE towers SET " . implode(', ', $updates) . " WHERE id = ?";
-        try {
-            $db->execute($sql, $params);
-        } catch (\PDOException $e) {
-            $message = $e->getMessage();
-            if (strpos($message, 'Duplicate') !== false || strpos($message, 'uniq_line_tower') !== false) {
-                Response::error(409, 'کد دکل در این خط قبلاً ثبت شده است.');
-            }
-            Logger::error('Tower update failed', ['tower_id' => $id, 'error' => $message]);
-            Response::error(500, 'ویرایش دکل در دیتابیس انجام نشد: ' . $message);
-        }
-        $pdo = $db->getConnection();
-        if ($oldLineId !== null) syncLineTowerStructure($pdo, $oldLineId);
-        if ($effectiveLineId !== null) syncLineTowerStructure($pdo, (int) $effectiveLineId);
+        $db->execute($sql, $params);
+        syncLineTowerStructure($db->getConnection(), $effectiveLineId ? (int)$effectiveLineId : null);
 
         Logger::info('Tower updated', ['tower_id' => $id, 'user_id' => $user['id']]);
         Response::success(null, 'دکل با موفقیت ویرایش شد');
@@ -425,17 +408,6 @@ function registerTowerRoutes(Router $router): void
         $idPlaceholders = implode(',', array_fill(0, count($ids), '?'));
 
         try {
-            // قبل از حذف، خطوط درگیر را ذخیره می‌کنیم تا بعد از حذف بتوانیم
-            // tower_structure خط‌های قبلی را نیز دوباره محاسبه کنیم.
-            $affectedLineRows = $db->fetchAll(
-                "SELECT DISTINCT line_id FROM towers WHERE id IN ($idPlaceholders) AND line_id IS NOT NULL",
-                $ids
-            );
-            $affectedLines = array_values(array_unique(array_map(
-                static fn($r) => (int) $r['line_id'],
-                $affectedLineRows
-            )));
-
             $pdo->beginTransaction();
 
             foreach (['defects', 'inspections', 'work_orders', 'safety_incidents'] as $tbl) {
@@ -447,6 +419,8 @@ function registerTowerRoutes(Router $router): void
             $deleted = $stmt->rowCount();
 
             $pdo->commit();
+            $affectedLines = [];
+            foreach ($linesCache as $lid => $lr) { if ($lid) $affectedLines[] = (int)$lid; }
             foreach ($affectedLines as $lid) syncLineTowerStructure($pdo, $lid);
         } catch (\PDOException $e) {
             if ($pdo->inTransaction()) {
@@ -516,18 +490,6 @@ function registerTowerRoutes(Router $router): void
 
         // v2.4.0: کش کدهای موجود هر خط — به‌جای کوئری exists برای هر ردیف، یک SELECT در هر خط
         $lineCodesCache = [];
-        $existingTowerLineIds = [];
-        $existingIds = array_values(array_filter(array_map(
-            static fn($r) => !empty($r['id']) ? (int) $r['id'] : 0,
-            $rows
-        )));
-        if ($existingIds) {
-            $ph = implode(',', array_fill(0, count($existingIds), '?'));
-            foreach ($db->fetchAll("SELECT id, line_id FROM towers WHERE id IN ($ph)", $existingIds) as $er) {
-                $existingTowerLineIds[(int) $er['id']] = $er['line_id'] !== null ? (int) $er['line_id'] : null;
-            }
-        }
-        $affectedLineIds = [];
         $getLineCodes = function ($lineId) use ($db, &$lineCodesCache) {
             if ($lineId === null) return [];
             if (!isset($lineCodesCache[$lineId])) {
@@ -620,16 +582,6 @@ function registerTowerRoutes(Router $router): void
 
                     // اگر id داشته باشد → ویرایش، وگرنه → درج با کد خودکار
                     if (!empty($r['id'])) {
-                        $towerId = (int) $r['id'];
-                        if (!array_key_exists($towerId, $existingTowerLineIds)) {
-                            throw new Exception("دکل با شناسه {$towerId} پیدا نشد");
-                        }
-                        if ($existingTowerLineIds[$towerId] !== null) {
-                            $affectedLineIds[(int) $existingTowerLineIds[$towerId]] = true;
-                        }
-                        if ($lineId !== null) {
-                            $affectedLineIds[(int) $lineId] = true;
-                        }
                         $code = $line ? $line['line_code'] . '-' . str_pad((string) $number, 3, '0', STR_PAD_LEFT) : null;
                         $updateTower([
                             'id'=>(int)$r['id'], 'line_id'=>$lineId, 'tower_number'=>$number,
@@ -672,7 +624,6 @@ function registerTowerRoutes(Router $router): void
                             'insulator_count_r2'=>$n('insulator_count_r2'), 'insulator_count_s2'=>$n('insulator_count_s2'), 'insulator_count_t2'=>$n('insulator_count_t2'),
                             'gps_lat'=>$gpsLat, 'gps_lng'=>$gpsLng, 'geom_wkt'=>$geomWkt, 'line_supervisor'=>$supervisor,
                         ]);
-                        if ($lineId !== null) $affectedLineIds[(int) $lineId] = true;
                         $inserted++; $statuses[] = 'inserted'; $errors[] = null;
                     }
                 } catch (Exception $e) {
@@ -685,7 +636,7 @@ function registerTowerRoutes(Router $router): void
 
             $pdo->commit();
             // بعد از import انبوه، ساختار غالب هر خط مجدداً محاسبه شود.
-            foreach (array_keys($affectedLineIds) as $syncLineId) {
+            foreach (array_keys($lineCodesCache) as $syncLineId) {
                 try { syncLineTowerStructure($pdo, (int)$syncLineId); } catch (Throwable $syncError) { Logger::error('Tower bulk line sync failed', ['line_id'=>(int)$syncLineId, 'error'=>$syncError->getMessage()]); }
             }
         } catch (\PDOException $e) {

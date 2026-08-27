@@ -244,8 +244,7 @@ function DataTableInner<T extends { id: number }>({
   const filtered = useMemo(() => {
     let result = [...data];
     if (search && searchKeys) { const l = search.toLowerCase(); result = result.filter(row => searchKeys.some(k => String(row[k as keyof T] ?? "").toLowerCase().includes(l))); }
-    Object.entries(appliedFilters).forEach(([key, rawFilter]) => {
-      const filter = rawFilter as { search: string; selectedValues: Set<string> };
+    Object.entries(appliedFilters).forEach(([key, filter]) => {
       if (filter.search) result = result.filter(row => String(row[key as keyof T] ?? "").toLowerCase().includes(filter.search.toLowerCase()));
       if (filter.selectedValues.size > 0) result = result.filter(row => filter.selectedValues.has(String(row[key as keyof T] ?? "")));
     });
@@ -264,22 +263,15 @@ function DataTableInner<T extends { id: number }>({
   const pageIds = paginated.map(r => r.id);
   const allPageSelected = pageIds.length > 0 && pageIds.every(id => selectedRows.has(id));
   const somePageSelected = pageIds.some(id => selectedRows.has(id));
-  const toggleSelectPage = () => {
-    const next = new Set(selectedRows);
-    if (allPageSelected) {
-      pageIds.forEach(id => next.delete(id));
-    } else {
-      pageIds.forEach(id => next.add(id));
-    }
-    setSelectedRows(next);
-  };
-
   const toggleSelectAll = () => {
     const next = new Set(selectedRows);
     const filteredIds = filtered.map(r => r.id);
     const allFilteredSelected = filteredIds.length > 0 && filteredIds.every(id => selectedRows.has(id));
-    if (allFilteredSelected) filteredIds.forEach(id => next.delete(id));
-    else filteredIds.forEach(id => next.add(id));
+    if (allFilteredSelected) {
+      filteredIds.forEach(id => next.delete(id));
+    } else {
+      filteredIds.forEach(id => next.add(id));
+    }
     setSelectedRows(next);
   };
   const getSortIcon = (key: string) => { if (sortKey !== key || sortDir === "none") return <ChevronsUpDown className="w-3 h-3 opacity-40" />; return sortDir === "asc" ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />; };
@@ -654,7 +646,7 @@ function DataTableInner<T extends { id: number }>({
                       type="checkbox"
                       checked={allPageSelected}
                       ref={(el) => { if (el) el.indeterminate = !allPageSelected && somePageSelected; }}
-                      onChange={toggleSelectPage}
+                      onChange={toggleSelectAll}
                       className="w-4 h-4 cursor-pointer"
                       title="انتخاب/لغو انتخاب ردیف‌های همین صفحه (انتخاب‌های صفحات دیگر حفظ می‌شود)"
                     />

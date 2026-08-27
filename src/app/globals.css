@@ -466,8 +466,8 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 40px;
-  height: 40px;
+  width: 36px;
+  height: 36px;
   border-radius: 10px;
   background: transparent;
   color: #475569;
@@ -524,9 +524,9 @@
   right: auto;
   transform: translateX(-50%);
   box-sizing: border-box;
-  width: 480px;
+  width: 440px;
   max-width: calc(100% - 16px);
-  min-height: 54px;
+  min-height: 50px;
   justify-content: center;
   /* دقیقاً همان سایه پنل انتخاب خطوط */
   box-shadow: 0 4px 14px rgba(15, 23, 42, 0.12), 0 1px 3px rgba(15, 23, 42, 0.05);
@@ -604,9 +604,9 @@
   }
 
   .map-toolbar .map-tool-btn {
-    flex: 0 0 36px;
-    width: 36px;
-    height: 36px;
+    flex: 0 0 33px;
+    width: 33px;
+    height: 33px;
     border-radius: 9px;
   }
   .map-toolbar {
@@ -1036,7 +1036,7 @@
 /* اندازه دکل: حدود 25٪ کوچک‌تر از نسخه 4.3.27 و در عین حال قابل کلیک */
 @media (min-width: 768px) {
   .map-toolbar {
-    width: clamp(400px, 42vw, 480px);
+    width: clamp(360px, 38vw, 440px);
   }
   .map-line-sidebar {
     width: clamp(240px, 22vw, 300px) !important;
@@ -1053,8 +1053,8 @@
   }
   .map-toolbar .map-tool-btn {
     flex: 0 1 auto;
-    width: clamp(34px, 9.5vw, 36px);
-    height: clamp(34px, 9.5vw, 36px);
+    width: clamp(30px, 8.8vw, 33px);
+    height: clamp(30px, 8.8vw, 33px);
   }
   .map-basemap-popup,
   .map-legend-popup {
