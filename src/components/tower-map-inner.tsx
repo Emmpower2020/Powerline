@@ -151,7 +151,7 @@ function makeShapeMarker(
     interactive: true,
     bubblingMouseEvents: false,
   }) as L.CircleMarker;
-  if (opts.popupHtml) marker.bindPopup(opts.popupHtml, { maxWidth: 300, className: "tower-popup" });
+  if (opts.popupHtml) marker.bindPopup(opts.popupHtml, { maxWidth: 340, minWidth: 280, className: "tower-popup" });
   if (opts.towerId != null && opts.onTowerClick) {
     marker.on("click", () => opts.onTowerClick?.(opts.towerId!));
   }
@@ -171,24 +171,32 @@ function towerPopupHtml(tower: Tower, line?: Line): string {
       .replace(/</g, "&lt;")
       .replace(/>/g, "&gt;")
       .replace(/"/g, "&quot;");
-  const row = (k: string, v: string) =>
-    `<tr><td style="padding:2px 8px 2px 0;color:#64748b;font-size:11px;white-space:nowrap">${k}</td><td style="padding:2px 0;font-size:12px;font-weight:600;color:#0f172a">${v}</td></tr>`;
+
+  const row = (label: string, value: string, extraClass = "") => `
+    <div class="tower-popup-row ${extraClass}">
+      <div class="tower-popup-label">${label}</div>
+      <div class="tower-popup-value">${value}</div>
+    </div>`;
+
   return `
-  <div dir="rtl" style="font-family:Vazirmatn,Tahoma,sans-serif;min-width:220px">
-    <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
-      <span style="width:12px;height:12px;border-radius:3px;background:${vs.color};display:inline-block"></span>
-      <b style="font-size:14px;color:#0f172a">دکل ${esc(formatTowerLabel(tower) ?? "—")}</b>
-      ${tower.tower_code ? `<span style="background:#f1f5f9;border-radius:99px;padding:1px 8px;font-size:11px;color:#475569">کد ${esc(tower.tower_code)}</span>` : ""}
+  <div dir="rtl" class="tower-popup-card">
+    <div class="tower-popup-header">
+      <div class="tower-popup-title-wrap">
+        <span class="tower-popup-dot" style="background:${vs.color}"></span>
+        <div class="tower-popup-title">دکل ${esc(formatTowerLabel(tower) ?? "—")}</div>
+      </div>
+      ${tower.tower_code ? `<div class="tower-popup-code">کد ${esc(tower.tower_code)}</div>` : ""}
     </div>
-    <table style="border-collapse:collapse">
-      ${row("خط", esc(line ? `${line.name}` : tower.line_name || "—"))}
+
+    <div class="tower-popup-body">
+      ${row("خط", esc(line?.name ?? tower.line_name ?? "—"))}
       ${row("کد خط", esc(line?.line_code ?? tower.line_code ?? "—"))}
-      ${row("ولتاژ", `<span style="color:${vs.color}">${vs.label}</span>`)}
-      ${row("نوع سازه", `<svg width="14" height="14" style="vertical-align:-2px" viewBox="0 0 14 14"><rect x="2" y="2" width="10" height="10" rx="2" fill="${vs.color}"/></svg> ${ts.label}`)}
+      ${row("ولتاژ", `<span class="tower-popup-accent" style="color:${vs.color}">${esc(vs.label)}</span>`)}
+      ${row("نوع سازه", `<span class="tower-popup-inline-icon"><span class="tower-popup-shape" style="background:${vs.color}"></span>${esc(ts.label)}</span>`)}
       ${tower.foundation_type ? row("ساختار", esc(tower.foundation_type)) : ""}
       ${tower.tower_structure ? row("نوع دکل", esc(tower.tower_structure)) : ""}
-      ${row("مختصات", `<span dir="ltr" style="font-size:11px">${tower.gps_lat?.toFixed(5) ?? "—"}, ${tower.gps_lng?.toFixed(5) ?? "—"}</span>`)}
-    </table>
+      ${row("مختصات", `<span dir="ltr" class="tower-popup-coords">${tower.gps_lat?.toFixed(5) ?? "—"}, ${tower.gps_lng?.toFixed(5) ?? "—"}</span>`)}
+    </div>
   </div>`;
 }
 
@@ -344,7 +352,7 @@ function RoutesOverlay({
             makeShapeMarker([p.lat, p.lng], {
               shape: ts.shape,
               color: vs.color,
-              radius: 5,
+              radius: 10,
               renderer: canvasRenderer,
               towerLabel: formatTowerLabel(tower),
               popupHtml: towerPopupHtml(tower, line),

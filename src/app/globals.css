@@ -757,3 +757,204 @@
     max-width: calc(100vw - 24px) !important;
   }
 }
+
+
+/* v4.3.27: Popup جدید و مرتب اطلاعات دکل */
+.tower-popup-card {
+  direction: rtl;
+  width: 100%;
+  min-width: 250px;
+  box-sizing: border-box;
+  padding: 4px;
+  font-family: var(--font-vazirmatn), Vazirmatn, Tahoma, sans-serif;
+  color: #0f172a;
+  text-align: right;
+}
+.tower-popup-header {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 4px 2px 12px;
+  margin-bottom: 10px;
+  border-bottom: 1px solid #e2e8f0;
+}
+.tower-popup-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+  text-align: right;
+}
+.tower-popup-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 4px;
+  flex: 0 0 auto;
+  box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.10);
+}
+.tower-popup-title {
+  font-size: 15px;
+  line-height: 1.5;
+  font-weight: 800;
+  color: #0f172a;
+  text-align: right;
+}
+.tower-popup-code {
+  flex: 0 0 auto;
+  padding: 4px 9px;
+  border-radius: 8px;
+  background: #f1f5f9;
+  color: #475569;
+  font-size: 10.5px;
+  font-weight: 700;
+  white-space: nowrap;
+  direction: rtl;
+}
+.tower-popup-body {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  width: 100%;
+}
+.tower-popup-row {
+  display: grid;
+  grid-template-columns: 86px minmax(0, 1fr);
+  align-items: center;
+  column-gap: 12px;
+  min-height: 31px;
+  padding: 7px 10px;
+  box-sizing: border-box;
+  border: 1px solid #e8edf3;
+  border-radius: 9px;
+  background: #f8fafc;
+  text-align: right;
+}
+.tower-popup-label,
+.tower-popup-value {
+  min-width: 0;
+  color: #334155;
+  font-size: 11px;
+  line-height: 1.55;
+  text-align: right;
+  direction: rtl;
+}
+.tower-popup-label {
+  font-weight: 700;
+}
+.tower-popup-value {
+  font-weight: 600;
+  color: #0f172a;
+  overflow-wrap: anywhere;
+}
+.tower-popup-accent {
+  font-weight: 800;
+}
+.tower-popup-inline-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 7px;
+}
+.tower-popup-shape {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  display: inline-block;
+  flex: 0 0 auto;
+}
+.tower-popup-coords {
+  display: inline-block;
+  direction: ltr;
+  text-align: left;
+  font-family: Tahoma, Arial, sans-serif;
+  font-size: 10.5px;
+  font-weight: 700;
+  color: #334155;
+}
+.tower-popup .leaflet-popup-content-wrapper {
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 12px 34px rgba(15, 23, 42, 0.16);
+}
+.tower-popup .leaflet-popup-content {
+  margin: 14px 14px 13px;
+  width: auto !important;
+}
+.tower-popup .leaflet-popup-tip {
+  box-shadow: 0 6px 12px rgba(15, 23, 42, 0.08);
+}
+.tower-popup .leaflet-popup-close-button {
+  left: 8px !important;
+  right: auto !important;
+  top: 7px !important;
+  width: 26px !important;
+  height: 26px !important;
+  padding: 0 !important;
+  z-index: 3;
+  border-radius: 8px;
+  color: #64748b !important;
+  font-size: 22px !important;
+  line-height: 24px !important;
+  text-align: center !important;
+  background: transparent !important;
+}
+.tower-popup .leaflet-popup-close-button:hover {
+  background: #f1f5f9 !important;
+  color: #0f172a !important;
+}
+.dark .tower-popup-card {
+  color: #e2e8f0;
+}
+.dark .tower-popup-header {
+  border-color: #334155;
+}
+.dark .tower-popup-title {
+  color: #f8fafc;
+}
+.dark .tower-popup-code {
+  background: #1e293b;
+  color: #cbd5e1;
+}
+.dark .tower-popup-row {
+  border-color: #334155;
+  background: #172033;
+}
+.dark .tower-popup-label {
+  color: #cbd5e1;
+}
+.dark .tower-popup-value,
+.dark .tower-popup-coords {
+  color: #f1f5f9;
+}
+.dark .tower-popup .leaflet-popup-content-wrapper,
+.dark .tower-popup .leaflet-popup-tip {
+  background: #0f172a;
+}
+.dark .tower-popup .leaflet-popup-close-button:hover {
+  background: #1e293b !important;
+  color: #f8fafc !important;
+}
+@media (max-width: 767px) {
+  .tower-popup .leaflet-popup-content {
+    margin: 13px 12px 12px;
+  }
+  .tower-popup-card {
+    min-width: 0;
+  }
+  .tower-popup-row {
+    grid-template-columns: 78px minmax(0, 1fr);
+    column-gap: 10px;
+    min-height: 29px;
+    padding: 6px 8px;
+  }
+  .tower-popup-title {
+    font-size: 14px;
+  }
+  .tower-popup-code {
+    font-size: 10px;
+    padding: 3px 7px;
+  }
+}
+
