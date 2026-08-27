@@ -24,13 +24,7 @@ export interface Line {
   updated_at: string;
 }
 
-export type TowerType =
-  | "lattice_steel"
-  | "wood"
-  | "concrete"
-  | "concrete_tele"
-  | "steel_tele"
-  | "other";
+export type TowerType = "آویزی" | "کششی";
 
 // v2.1.0: ساختار بر اساس اکسل رسمی دکل‌ها — فیلدهای اضافی حذف شدند
 export interface Tower {
@@ -43,7 +37,6 @@ export interface Tower {
   tower_type: TowerType;
   tower_structure: string | null;
   tower_type_code: string | null;
-  foundation_type: string | null;
   base_height_a: number | null;
   base_height_b: number | null;
   base_height_c: number | null;

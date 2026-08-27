@@ -221,7 +221,7 @@ export function TowersPage() {
   const handleImportRow = useCallback(async (row: Record<string, unknown>, mode: "insert" | "update", existingId?: number) => {
     const allowedFields = [
       "line_id", "tower_code", "tower_number", "tower_structure",
-      "tower_type_code", "foundation_type",
+      "tower_type", "tower_type_code",
       "base_height_a", "base_height_b", "base_height_c", "base_height_d",
       "insulator_r1", "insulator_s1", "insulator_t1", "insulator_r2", "insulator_s2", "insulator_t2",
       "insulator_count_r1", "insulator_count_s1", "insulator_count_t1",
@@ -391,7 +391,7 @@ export function TowersPage() {
       render: (row: any) => structureBadge(row.tower_structure),
     },
     { key: "tower_type_code", header: "کد نوع دکل", sortable: true, filterable: true, align: "right" },
-    { key: "foundation_type", header: "نوع پایه", sortable: true, filterable: true, align: "right" },
+    { key: "tower_type", header: "نوع دکل", sortable: true, filterable: true, align: "right" },
     { key: "base_height_a", header: "ارتفاع پایه A", sortable: true, type: "number", hidden: true, align: "right" },
     { key: "base_height_b", header: "ارتفاع پایه B", sortable: true, type: "number", hidden: true, align: "right" },
     { key: "base_height_c", header: "ارتفاع پایه C", sortable: true, type: "number", hidden: true, align: "right" },
@@ -440,7 +440,7 @@ export function TowersPage() {
         data={filteredData}
         columns={columns}
         loading={loading}
-        searchKeys={["tower_code", "line_code", "line_name", "tower_structure", "foundation_type", "tower_type_code", "line_supervisor", "voltage_kv"]}
+        searchKeys={["tower_code", "line_code", "line_name", "tower_structure", "tower_type", "tower_type_code", "line_supervisor", "voltage_kv"]}
         title="دکل‌ها"
         onAdd={() => { setEditRow(null); setDuplicateFrom(null); setShowCreate(true); }}
         onRefresh={() => setRefreshKey(k => k + 1)}

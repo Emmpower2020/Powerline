@@ -33,8 +33,8 @@ export function TowersStatsBar({ data, issuesCount, onIssuesClick, issuesFilterA
     for (const row of data) {
       if (row.gps_lat != null && row.gps_lng != null) withGps++;
       if (row.line_id != null) linked++;
-      if (row.foundation_type === "کششی") tension++;
-      if (row.foundation_type === "آویزی") suspension++;
+      if (row.tower_type === "کششی") tension++;
+      if (row.tower_type === "آویزی") suspension++;
       const v = Number(row.voltage_kv);
       if (Number.isFinite(v) && v > 0) byVoltage.set(v, (byVoltage.get(v) || 0) + 1);
       if (row.is_active) activeCount++;
@@ -126,7 +126,7 @@ export function TowersStatsBar({ data, issuesCount, onIssuesClick, issuesFilterA
     },
     {
       id: "foundation",
-      label: "نوع پایه (کششی/آویزی)",
+      label: "نوع دکل (کششی/آویزی)",
       value: foundationText,
       icon: <Layers className="w-4 h-4" />,
       color: "slate",

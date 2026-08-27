@@ -290,9 +290,9 @@ CREATE TABLE IF NOT EXISTS `towers` (
     `line_id`         BIGINT UNSIGNED NOT NULL,
     `tower_code`      VARCHAR(50) NOT NULL,                        -- کد دکل
     `tower_number`    INT NULL,                                     -- شماره دکل
-    `tower_type`      ENUM('lattice_steel','wood','concrete','concrete_tele','steel_tele','other') NOT NULL,
-    `structure_type`  VARCHAR(100) NULL,                            -- نوع سازه
-    `foundation_type` VARCHAR(100) NULL,                            -- نوع فوندانسیون
+    `tower_type`      VARCHAR(20) NOT NULL,                              -- نوع دکل: کششی / آویزی
+     `tower_structure` VARCHAR(100) NULL,                              -- ساختار دکل
+     `tower_type_code` VARCHAR(20) NULL,                               -- کد نوع دکل
     `insulator_type`  VARCHAR(100) NULL,                            -- نوع مقره
     `gps_lat`         DECIMAL(10,7) NULL,                           -- عرض جغرافیایی
     `gps_lng`         DECIMAL(10,7) NULL,                           -- طول جغرافیایی
@@ -490,7 +490,7 @@ CREATE TABLE IF NOT EXISTS `defect_categories` (
     `id`            INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     `name`          VARCHAR(200) NOT NULL,                         -- مثلا: عیوب بدنه دکل فلزی مشبک مهاری
     `applies_to`    ENUM('tower','line','equipment') NOT NULL DEFAULT 'tower',
-    `tower_type`    ENUM('lattice_steel','wood','concrete','concrete_tele','steel_tele','all','other') NULL,
+    `tower_type`    VARCHAR(20) NULL,
     `is_active`     TINYINT(1) NOT NULL DEFAULT 1,
     `created_at`    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

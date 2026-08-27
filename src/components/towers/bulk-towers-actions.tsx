@@ -27,16 +27,16 @@ interface BulkTowersActionsProps {
 }
 
 type FieldAction =
-  | "tower_structure" | "tower_type_code" | "foundation_type"
+  | "tower_structure" | "tower_type" | "tower_type_code"
   | "insulator_all" | "line_supervisor" | "line_id";
 
-const FOUNDATION_TYPES = ["کششی", "آویزی"];
+const TOWER_TYPES = ["کششی", "آویزی"];
 
 const actionMeta: Record<FieldAction, { title: string; label: string; placeholder?: string }> = {
   tower_structure:      { title: "تغییر گروهی ساختار دکل", label: "ساختار دکل", placeholder: "مثلاً: مشبک فلزی" },
-  tower_type_code: { title: "تغییر گروهی کد نوع دکل", label: "کد نوع دکل (NN، LT و...)", placeholder: "مثلاً: NN" },
-  foundation_type:      { title: "تغییر گروهی نوع پایه", label: "نوع پایه" },
-  insulator_all:        { title: "تغییر گروهی نوع مقره (هر ۶ فاز)", label: "نوع مقره" },
+  tower_type: { title: "تغییر گروهی نوع دکل", label: "نوع دکل (کششی/آویزی)" },
+   tower_type_code: { title: "تغییر گروهی کد نوع دکل", label: "کد نوع دکل (NN، LT و...)", placeholder: "مثلاً: NN" },
+    insulator_all:        { title: "تغییر گروهی نوع مقره (هر ۶ فاز)", label: "نوع مقره" },
   line_supervisor:      { title: "تغییر گروهی سرپرست خط", label: "نام سرپرست خط", placeholder: "مثلاً: یادگار میری" },
   line_id:              { title: "اتصال گروهی دکل‌ها به خط", label: "خط" },
 };
@@ -128,7 +128,7 @@ export function BulkTowersActions({ getSelection, onApplied }: BulkTowersActions
   const confirmField = async () => {
     if (!fieldAction) return;
     const isText = ["tower_structure", "tower_type_code", "line_supervisor"].includes(fieldAction);
-    const isSelect = ["foundation_type", "insulator_all", "line_id"].includes(fieldAction);
+    const isSelect = ["tower_type", "insulator_all", "line_id"].includes(fieldAction);
 
     if (isText && !value.trim()) {
       toast({ title: "مقدار را وارد کنید" });
@@ -143,7 +143,7 @@ export function BulkTowersActions({ getSelection, onApplied }: BulkTowersActions
     switch (fieldAction) {
       case "tower_structure":      patch = { tower_structure: value.trim() }; break;
       case "tower_type_code": patch = { tower_type_code: value.trim() }; break;
-      case "foundation_type":      patch = { foundation_type: value }; break;
+      case "tower_type":           patch = { tower_type: value }; break;
       case "line_supervisor":      patch = { line_supervisor: value.trim() }; break;
       case "line_id":              patch = { line_id: Number(value) }; break;
       case "insulator_all":
@@ -191,7 +191,7 @@ export function BulkTowersActions({ getSelection, onApplied }: BulkTowersActions
           <DropdownMenuSeparator />
           <ItemRow icon={<Building2 className="w-4 h-4 text-slate-600" />} label="ساختار دکل" onClick={() => startFieldAction("tower_structure")} />
           <ItemRow icon={<Radio className="w-4 h-4 text-indigo-600" />} label="کد نوع دکل" onClick={() => startFieldAction("tower_type_code")} />
-          <ItemRow icon={<Layers className="w-4 h-4 text-indigo-600" />} label="نوع پایه" onClick={() => startFieldAction("foundation_type")} />
+          <ItemRow icon={<Layers className="w-4 h-4 text-indigo-600" />} label="نوع دکل" onClick={() => startFieldAction("tower_type")} />
           <ItemRow icon={<Cable className="w-4 h-4 text-blue-600" />} label="نوع مقره (هر ۶ فاز)" onClick={() => startFieldAction("insulator_all")} />
           <DropdownMenuSeparator />
           <ItemRow icon={<UserCog className="w-4 h-4 text-indigo-600" />} label="سرپرست خط" onClick={() => startFieldAction("line_supervisor")} />
@@ -244,14 +244,14 @@ export function BulkTowersActions({ getSelection, onApplied }: BulkTowersActions
                   searchPlaceholder="نام سرپرست اکیپ..."
                 />
               </div>
-            ) : fieldAction === "foundation_type" ? (
+            ) : fieldAction === "tower_type" ? (
               <div className="space-y-2">
-                <Label className="text-right block">{actionMeta.foundation_type.label}</Label>
+                <Label className="text-right block">{actionMeta.tower_type.label}</Label>
                 <Select value={value} onValueChange={setValue}>
-                  <SelectTrigger className="w-full bg-white"><SelectValue placeholder="انتخاب نوع پایه..." /></SelectTrigger>
+                  <SelectTrigger className="w-full bg-white"><SelectValue placeholder="انتخاب نوع دکل..." /></SelectTrigger>
                   <SelectContent>
-                    {FOUNDATION_TYPES.map(f => (
-                      <SelectItem key={f} value={f}>{f}</SelectItem>
+                    {TOWER_TYPES.map(t => (
+                      <SelectItem key={t} value={t}>{t}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>

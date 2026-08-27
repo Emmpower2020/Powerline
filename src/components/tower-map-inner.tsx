@@ -237,8 +237,8 @@ function towerPopupHtml(tower: Tower, line?: Line): string {
       ${row("کد خط", esc(line?.line_code ?? tower.line_code ?? "—"))}
       ${row("ولتاژ", `<span class="tower-popup-accent" style="color:${vs.color}">${esc(vs.label)}</span>`)}
       ${row("نوع سازه", `<span class="tower-popup-inline-icon"><span class="tower-popup-shape" style="background:${vs.color}"></span>${esc(ts.label)}</span>`)}
-      ${tower.foundation_type ? row("ساختار", esc(tower.foundation_type)) : ""}
-      ${tower.tower_structure ? row("نوع دکل", esc(tower.tower_structure)) : ""}
+      ${tower.tower_type ? row("نوع دکل", esc(tower.tower_type)) : ""}
+      ${tower.tower_structure ? row("ساختار دکل", esc(tower.tower_structure)) : ""}
       ${row("مختصات", `<span dir="ltr" class="tower-popup-coords">${tower.gps_lat?.toFixed(5) ?? "—"}, ${tower.gps_lng?.toFixed(5) ?? "—"}</span>`)}
     </div>
   </div>`;

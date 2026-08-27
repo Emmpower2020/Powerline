@@ -18,7 +18,7 @@ function towerTableColumns(Database $db): array
 function towerCodeColumn(Database $db): string
 {
     $columns = towerTableColumns($db);
-    return isset($columns['tower_type_code']) ? 'tower_type_code' : 'foundation_type_code';
+    return 'tower_type_code';
 }
 
 /** بعد از ایجاد/ویرایش/حذف دکل، ساختار غالب دکل‌های خط را روی جدول خطوط منعکس می‌کند. */
@@ -102,7 +102,7 @@ function registerTowerRoutes(Router $router): void
         $params = [];
 
         if (!empty($search)) {
-            $where .= ' AND (t.tower_code LIKE ? OR CAST(t.tower_number AS CHAR) LIKE ? OR t.tower_structure LIKE ? OR t.foundation_type LIKE ? OR t.line_supervisor LIKE ?)';
+            $where .= ' AND (t.tower_code LIKE ? OR CAST(t.tower_number AS CHAR) LIKE ? OR t.tower_structure LIKE ? OR t.tower_type LIKE ? OR t.line_supervisor LIKE ?)';
             $searchParam = "%$search%";
             $params[] = $searchParam;
             $params[] = $searchParam;
@@ -174,7 +174,7 @@ function registerTowerRoutes(Router $router): void
 
         $body = Helpers::getJsonBody();
 
-        $required = ['tower_number', 'tower_structure', 'foundation_type'];
+        $required = ['tower_number', 'tower_structure', 'tower_type'];
         foreach ($required as $field) {
             if (empty($body[$field])) {
                 Response::error(400, "فیلد '$field' الزامی است");
@@ -209,9 +209,8 @@ function registerTowerRoutes(Router $router): void
         }
 
         $dbColumns = towerTableColumns($db);
-        $towerCodeColumn = isset($dbColumns['tower_type_code']) ? 'tower_type_code' : 'foundation_type_code';
-        // ستون tower_type در دیتابیس فعلی صرفاً قدیمی/سازگاری است و دیگر از فرم مدیریت نمی‌شود.
-
+        $towerCodeColumn = 'tower_type_code';
+        
         // GPS
         $gpsLat = $body['gps_lat'] ?? null;
         $gpsLng = $body['gps_lng'] ?? null;
@@ -231,8 +230,8 @@ function registerTowerRoutes(Router $router): void
         $values = ['?','?','?'];
         $params = [$lineId, $towerCode, $body['tower_number']];
         $columns[]='tower_structure'; $values[]='?'; $params[]=$body['tower_structure'];
+        $columns[]='tower_type'; $values[]='?'; $params[]=$body['tower_type'];
         $columns[]=$towerCodeColumn; $values[]='?'; $params[]=$body['tower_type_code'] ?? null;
-        $columns[]='foundation_type'; $values[]='?'; $params[]=$body['foundation_type'];
         foreach (['base_height_a','base_height_b','base_height_c','base_height_d','insulator_r1','insulator_s1','insulator_t1','insulator_r2','insulator_s2','insulator_t2','insulator_count_r1','insulator_count_s1','insulator_count_t1','insulator_count_r2','insulator_count_s2','insulator_count_t2'] as $f) { $columns[]=$f; $values[]='?'; $params[]=$body[$f] ?? null; }
         $columns[]='gps_lat'; $values[]='?'; $params[]=$gpsLat;
         $columns[]='gps_lng'; $values[]='?'; $params[]=$gpsLng;
@@ -278,7 +277,7 @@ function registerTowerRoutes(Router $router): void
         // v2.1.0: فیلدهای قابل ویرایش بر اساس ساختار اکسل رسمی
         $codeField = towerCodeColumn($db);
         $allowedFields = [
-            'tower_number', 'tower_structure', $codeField, 'foundation_type',
+            'tower_number', 'tower_structure', 'tower_type', $codeField,
             'base_height_a', 'base_height_b', 'base_height_c', 'base_height_d',
             'insulator_r1', 'insulator_s1', 'insulator_t1', 'insulator_r2', 'insulator_s2', 'insulator_t2',
             'insulator_count_r1', 'insulator_count_s1', 'insulator_count_t1',
@@ -499,11 +498,6 @@ function registerTowerRoutes(Router $router): void
             return $lineCodesCache[$lineId];
         };
 
-        $typeByStructure = [
-            'مشبک فلزی' => 'lattice_steel', 'تیر چوبی' => 'wood', 'تیر بتنی' => 'concrete',
-            'تلسکوپی بتنی' => 'concrete_tele', 'تلسکوپی فلزی' => 'steel_tele',
-        ];
-
         $inserted = 0; $updated = 0; $failed = 0;
         $firstError = '';
         $failIndexes = [];
@@ -514,16 +508,13 @@ function registerTowerRoutes(Router $router): void
             $pdo->beginTransaction();
 
             $towerColumns = towerTableColumns($db);
-            $towerCodeField = isset($towerColumns['tower_type_code']) ? 'tower_type_code' : 'foundation_type_code';
-            $hasLegacyTowerType = isset($towerColumns['tower_type']);
-
-            $insertTower = function (array $d) use ($pdo, $towerColumns, $towerCodeField, $hasLegacyTowerType) {
+            $towerCodeField = 'tower_type_code';
+            $insertTower = function (array $d) use ($pdo, $towerColumns, $towerCodeField) {
                 $cols = ['line_id','tower_code','tower_number'];
                 $vals = ['?','?','?']; $params = [$d['line_id'], $d['tower_code'], $d['tower_number']];
-                if ($hasLegacyTowerType) { $cols[]='tower_type'; $vals[]='?'; $params[]=$d['tower_type'] ?? 'other'; }
+                if (isset($towerColumns['tower_type'])) { $cols[]='tower_type'; $vals[]='?'; $params[]=$d['tower_type'] ?? null; }
                 $cols[]='tower_structure'; $vals[]='?'; $params[]=$d['tower_structure'] ?? null;
                 $cols[]=$towerCodeField; $vals[]='?'; $params[]=$d['tower_type_code'] ?? null;
-                $cols[]='foundation_type'; $vals[]='?'; $params[]=$d['foundation_type'] ?? null;
                 foreach (['base_height_a','base_height_b','base_height_c','base_height_d','insulator_r1','insulator_s1','insulator_t1','insulator_r2','insulator_s2','insulator_t2','insulator_count_r1','insulator_count_s1','insulator_count_t1','insulator_count_r2','insulator_count_s2','insulator_count_t2','gps_lat','gps_lng','line_supervisor'] as $f) {
                     if (isset($towerColumns[$f])) { $cols[]=$f; $vals[]='?'; $params[]=$d[$f] ?? null; }
                 }
@@ -534,18 +525,18 @@ function registerTowerRoutes(Router $router): void
                 $pdo->prepare($sql)->execute($params);
             };
 
-            $updateTower = function (array $d) use ($pdo, $towerColumns, $towerCodeField, $hasLegacyTowerType) {
+            $updateTower = function (array $d) use ($pdo, $towerColumns, $towerCodeField) {
                 $sets=[]; $params=[];
                 if (isset($towerColumns['line_id'])) { $sets[]='`line_id`=?'; $params[]=$d['line_id']; }
                 if (isset($towerColumns['tower_number'])) { $sets[]='`tower_number`=?'; $params[]=$d['tower_number']; }
                 if (isset($towerColumns['tower_structure'])) { $sets[]='`tower_structure`=?'; $params[]=$d['tower_structure'] ?? null; }
                 if (isset($towerColumns[$towerCodeField])) { $sets[]="`$towerCodeField`=?"; $params[]=$d['tower_type_code'] ?? null; }
-                if (isset($towerColumns['foundation_type'])) { $sets[]='`foundation_type`=?'; $params[]=$d['foundation_type'] ?? null; }
+                if (isset($towerColumns['tower_type'])) { $sets[]='`tower_type`=?'; $params[]=$d['tower_type'] ?? null; }
                 foreach (['base_height_a','base_height_b','base_height_c','base_height_d','insulator_r1','insulator_s1','insulator_t1','insulator_r2','insulator_s2','insulator_t2','insulator_count_r1','insulator_count_s1','insulator_count_t1','insulator_count_r2','insulator_count_s2','insulator_count_t2','gps_lat','gps_lng','line_supervisor'] as $f) {
                     if (isset($towerColumns[$f])) { $sets[]="`$f`=?"; $params[]=$d[$f] ?? null; }
                 }
                 if (isset($towerColumns['geom'])) { $sets[]='`geom`=ST_GeomFromText(?)'; $params[]=$d['geom_wkt'] ?? 'POINT EMPTY'; }
-                if ($hasLegacyTowerType && isset($towerColumns['tower_type'])) { $sets[]='`tower_type`=?'; $params[]=$d['tower_type'] ?? 'other'; }
+                
                 if (isset($towerColumns['updated_at'])) { $sets[]='`updated_at`=NOW()'; }
                 if (!$sets) return;
                 $params[]=$d['id'];
@@ -585,8 +576,7 @@ function registerTowerRoutes(Router $router): void
                         $code = $line ? $line['line_code'] . '-' . str_pad((string) $number, 3, '0', STR_PAD_LEFT) : null;
                         $updateTower([
                             'id'=>(int)$r['id'], 'line_id'=>$lineId, 'tower_number'=>$number,
-                            'tower_structure'=>$structure, 'tower_type_code'=>$n('tower_type_code') ?? $n('foundation_type_code'),
-                            'foundation_type'=>$n('foundation_type'), 'tower_type'=>$towerType,
+                            'tower_structure'=>$structure, 'tower_type'=>$towerType, 'tower_type_code'=>$n('tower_type_code'),
                             'base_height_a'=>$n('base_height_a'), 'base_height_b'=>$n('base_height_b'), 'base_height_c'=>$n('base_height_c'), 'base_height_d'=>$n('base_height_d'),
                             'insulator_r1'=>$n('insulator_r1'), 'insulator_s1'=>$n('insulator_s1'), 'insulator_t1'=>$n('insulator_t1'),
                             'insulator_r2'=>$n('insulator_r2'), 'insulator_s2'=>$n('insulator_s2'), 'insulator_t2'=>$n('insulator_t2'),
@@ -615,8 +605,7 @@ function registerTowerRoutes(Router $router): void
                         $lineCodesCache[(int) $lineId][] = $code;
                         $insertTower([
                             'line_id'=>$lineId, 'tower_code'=>$code, 'tower_number'=>$number, 'tower_type'=>$towerType,
-                            'tower_structure'=>$structure, 'tower_type_code'=>$n('tower_type_code') ?? $n('foundation_type_code'),
-                            'foundation_type'=>$n('foundation_type'), 'base_height_a'=>$n('base_height_a'), 'base_height_b'=>$n('base_height_b'),
+                            'tower_structure'=>$structure, 'tower_type_code'=>$n('tower_type_code'), 'base_height_a'=>$n('base_height_a'), 'base_height_b'=>$n('base_height_b'),
                             'base_height_c'=>$n('base_height_c'), 'base_height_d'=>$n('base_height_d'),
                             'insulator_r1'=>$n('insulator_r1'), 'insulator_s1'=>$n('insulator_s1'), 'insulator_t1'=>$n('insulator_t1'),
                             'insulator_r2'=>$n('insulator_r2'), 'insulator_s2'=>$n('insulator_s2'), 'insulator_t2'=>$n('insulator_t2'),
@@ -679,8 +668,7 @@ function formatTowerRow(array $row): array
         'tower_number'      => $int($row['tower_number']),
         'tower_type'        => $row['tower_type'] ?? null,
         'tower_structure'   => $row['tower_structure'] ?? null,
-        'tower_type_code'   => $row['tower_type_code'] ?? ($row['foundation_type_code'] ?? null),
-        'foundation_type'   => $row['foundation_type'] ?? null,
+        'tower_type_code'   => $row['tower_type_code'] ?? null,
         'base_height_a'     => $num($row['base_height_a'] ?? null),
         'base_height_b'     => $num($row['base_height_b'] ?? null),
         'base_height_c'     => $num($row['base_height_c'] ?? null),

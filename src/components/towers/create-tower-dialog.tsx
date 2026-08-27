@@ -17,11 +17,11 @@ import { useTowerReferences } from "@/hooks/use-tower-references";
 
 /** سه نوع مقره — v2.1.0 */
 export const INSULATOR_TYPES = ["سرامیکی", "شیشه‌ای", "سیلیکونی"] as const;
-const FOUNDATION_TYPES = ["کششی", "آویزی"] as const;
+const TOWER_TYPES = ["کششی", "آویزی"] as const;
 
 interface FormData {
   line_id: string; tower_number: string; line_supervisor: string;
-  tower_structure: string; tower_type_code: string; foundation_type: string;
+  tower_structure: string; tower_type: string; tower_type_code: string;
   base_height_a: string; base_height_b: string; base_height_c: string; base_height_d: string;
   insulator_r1: string; insulator_s1: string; insulator_t1: string;
   insulator_r2: string; insulator_s2: string; insulator_t2: string;
@@ -32,7 +32,7 @@ interface FormData {
 
 const empty: FormData = {
   line_id: "", tower_number: "", line_supervisor: "",
-  tower_structure: "", tower_type_code: "", foundation_type: "",
+  tower_structure: "", tower_type: "", tower_type_code: "",
   base_height_a: "", base_height_b: "", base_height_c: "", base_height_d: "",
   insulator_r1: "", insulator_s1: "", insulator_t1: "",
   insulator_r2: "", insulator_s2: "", insulator_t2: "",
@@ -134,8 +134,8 @@ export function CreateTowerDialog({ open, onClose, onCreated, editRow, duplicate
           tower_number: isEdit ? s(sourceRow.tower_number) : "",
           line_supervisor: s(sourceRow.line_supervisor),
           tower_structure: s(sourceRow.tower_structure),
-          tower_type_code: s(sourceRow.tower_type_code ?? sourceRow.foundation_type_code),
-          foundation_type: s(sourceRow.foundation_type),
+          tower_type: s(sourceRow.tower_type),
+          tower_type_code: s(sourceRow.tower_type_code),
           base_height_a: s(sourceRow.base_height_a),
           base_height_b: s(sourceRow.base_height_b),
           base_height_c: s(sourceRow.base_height_c),
@@ -164,7 +164,7 @@ export function CreateTowerDialog({ open, onClose, onCreated, editRow, duplicate
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.tower_number) { setError("شماره دکل الزامی است"); return; }
-    if (!form.foundation_type) { setError("نوع پایه (کششی/آویزی) الزامی است"); return; }
+    if (!form.tower_type) { setError("نوع دکل (کششی/آویزی) الزامی است"); return; }
     if (!autoCode) { setError("برای تولید کد دکل، خط و شماره دکل را مشخص کنید"); return; }
     if (form.gps_lat && !form.gps_lng) { setError("عرض و طول جغرافیایی هر دو باید وارد شوند"); return; }
     if (form.gps_lng && !form.gps_lat) { setError("عرض و طول جغرافیایی هر دو باید وارد شوند"); return; }
@@ -178,8 +178,8 @@ export function CreateTowerDialog({ open, onClose, onCreated, editRow, duplicate
         tower_code: autoCode,
         tower_number: num(form.tower_number),
         tower_structure: form.tower_structure,
+        tower_type: form.tower_type,
         tower_type_code: str(form.tower_type_code),
-        foundation_type: form.foundation_type,
         base_height_a: num(form.base_height_a),
         base_height_b: num(form.base_height_b),
         base_height_c: num(form.base_height_c),
@@ -298,13 +298,13 @@ export function CreateTowerDialog({ open, onClose, onCreated, editRow, duplicate
               <Field label="کد نوع دکل">
                 <SearchableSelect value={form.tower_type_code} onChange={v=>set("tower_type_code",v)} options={typeCodes.map(x=>({value:x.code,label:x.code}))} placeholder="انتخاب کد..." searchPlaceholder="جستجوی کد..." allowClear />
               </Field>
-              <Field label="نوع پایه">
-                <Select value={form.foundation_type || "__none__"} onValueChange={v => set("foundation_type", v === "__none__" ? "" : v)}>
-                  <SelectTrigger className="w-full bg-white"><SelectValue placeholder="انتخاب..." /></SelectTrigger>
+              <Field label="نوع دکل">
+                <Select value={form.tower_type || "__none__"} onValueChange={v => set("tower_type", v === "__none__" ? "" : v)}>
+                  <SelectTrigger className="w-full bg-white"><SelectValue placeholder="انتخاب نوع دکل..." /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="__none__">نامشخص</SelectItem>
-                    {FOUNDATION_TYPES.map(f => (
-                      <SelectItem key={f} value={f}>{f}</SelectItem>
+                    {TOWER_TYPES.map(t => (
+                      <SelectItem key={t} value={t}>{t}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>

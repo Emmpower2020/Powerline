@@ -37,7 +37,7 @@ const MOCK_LINES: any[] = [];
 
 // ─── دکل‌های نمونه ───
 const TOWER_STRUCTURES = ["مشبک فلزی", "تیر چوبی", "تیر بتنی", "تلسکوپی بتنی", "تلسکوپی فلزی"];
-const FOUNDATION_TYPES = ["کششی", "آویزی"];
+const TOWER_TYPES = ["کششی", "آویزی"];
 const INSULATOR_TYPES = ["سرامیکی", "شیشه‌ای", "سیلیکونی"];
 
 function generateMockTowers(lineId: number, lineCode: string, count: number, startNumber = 1) {
@@ -47,7 +47,7 @@ function generateMockTowers(lineId: number, lineCode: string, count: number, sta
   for (let i = 0; i < count; i++) {
     const towerNumber = startNumber + i;
     const towerCode = `${lineCode}-${String(towerNumber).padStart(3, "0")}`;
-    const foundationType = FOUNDATION_TYPES[i % 2];
+    const towerType = TOWER_TYPES[i % 2];
     const structure = TOWER_STRUCTURES[i % TOWER_STRUCTURES.length];
     const insulator = INSULATOR_TYPES[i % INSULATOR_TYPES.length];
     const hasGps = i % 5 !== 0; // 80% have GPS
@@ -60,8 +60,8 @@ function generateMockTowers(lineId: number, lineCode: string, count: number, sta
       line_name: MOCK_LINES.find(l => l.id === lineId)?.name || "",
       voltage_kv: lineVoltageKv ?? null, // v2.6.0
       tower_structure: structure,
-      tower_type_code: foundationType === "کششی" ? "NN" : "AN",
-      foundation_type: foundationType,
+      tower_type_code: towerType === "کششی" ? "NN" : "AN",
+      tower_type: towerType,
       base_height_a: 12 + (i % 5),
       base_height_b: 11.5 + (i % 4),
       base_height_c: 11 + (i % 3),
@@ -438,7 +438,7 @@ export async function handleMockRequest(request: NextRequest): Promise<NextRespo
         String(t.tower_code).includes(q) ||
         String(t.line_code).includes(q) ||
         String(t.line_name || "").toLowerCase().includes(q) ||
-        String(t.foundation_type || "").includes(q) ||
+        String(t.tower_type || "").includes(q) ||
         String(t.line_supervisor || "").includes(q)
       );
     }
