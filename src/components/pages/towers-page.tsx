@@ -383,7 +383,7 @@ export function TowersPage() {
     },
     // v2.6.0: نام خط با بج رنگی بر اساس ولتاژ — نه ساختار دکل
     {
-      key: "line_name", header: "نام خط", sortable: true, filterable: true, align: "right",
+      key: "line_name", header: "نام خط", sortable: true, filterable: true, wrap: true, width: "260px", align: "right",
       render: (row: any) => lineNameBadge(row),
     },
     {

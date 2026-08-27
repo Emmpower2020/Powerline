@@ -477,6 +477,27 @@ export async function handleMockRequest(request: NextRequest): Promise<NextRespo
     return NextResponse.json({ success: true, data: { id: newId, tower_code: code }, message: "دکل با موفقیت ایجاد شد" }, { status: 201 });
   }
 
+  // ─── towers/bulk-update — v4.3.31: شبیه‌سازی ویرایش گروهی ۱۰۰تایی ───
+  if (path === "/towers/bulk-update" && method === "POST") {
+    let body: any = {};
+    try { body = await request.json(); } catch { /* empty */ }
+    const ids: number[] = Array.isArray(body.ids) ? body.ids : [];
+    const patch: Record<string, any> = body.patch && typeof body.patch === "object" ? body.patch : {};
+    if (!ids.length) return NextResponse.json({ success: false, error: { code: 400, message: "لیست شناسه‌ها ارسال نشده" } }, { status: 400 });
+    if (ids.length > 100) return NextResponse.json({ success: false, error: { code: 400, message: "حداکثر ۱۰۰ دکل در هر درخواست" } }, { status: 400 });
+    const allowed = new Set(["tower_structure","tower_type","tower_type_code","insulator_r1","insulator_s1","insulator_t1","insulator_r2","insulator_s2","insulator_t2","line_supervisor","is_active"]);
+    const safePatch = Object.fromEntries(Object.entries(patch).filter(([k]) => allowed.has(k)));
+    if (!Object.keys(safePatch).length) return NextResponse.json({ success: false, error: { code: 400, message: "هیچ فیلد مجازی برای ویرایش ارسال نشده" } }, { status: 400 });
+    let updated = 0;
+    for (const id of ids) {
+      const row = MOCK_TOWERS.find(t => t.id === id);
+      if (!row) continue;
+      Object.assign(row, safePatch);
+      updated++;
+    }
+    return NextResponse.json({ success: true, data: { updated }, message: `${updated} دکل ویرایش شد` });
+  }
+
   // ─── towers/bulk-import / bulk-delete ───
   if (path === "/towers/bulk-import" && method === "POST") {
     let body: any = {};

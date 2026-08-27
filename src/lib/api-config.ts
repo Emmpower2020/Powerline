@@ -7,7 +7,7 @@ export const API_ENDPOINTS = {
   login: "/auth/login", logout: "/auth/logout", refresh: "/auth/refresh",
   me: "/auth/me", changePassword: "/auth/change-password",
   lines: "/lines", lineTowers: (id: number) => `/lines/${id}/towers`,
-  towers: "/towers", towerNearby: "/towers/nearby",
+  towers: "/towers", towerBulkUpdate: "/towers/bulk-update", towerNearby: "/towers/nearby",
   defects: "/defects", defectApprove: (id: number) => `/defects/${id}/approve`,
   defectVerify: (id: number) => `/defects/${id}/verify`,
   defectCategories: "/defect-categories", defectDefinitions: "/defect-definitions",

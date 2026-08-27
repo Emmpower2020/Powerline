@@ -345,6 +345,70 @@ function registerTowerRoutes(Router $router): void
         Response::success(null, 'دکل با موفقیت ویرایش شد');
     });
 
+    // ویرایش گروهی دکل‌ها — v4.3.31: حداکثر ۱۰۰ دکل در هر درخواست و یک UPDATE تراکنشی
+    // بدنه: {"ids":[...], "patch":{"tower_structure":"..."}}
+    $router->post('towers/bulk-update', function () {
+        $user = Auth::authenticate();
+        Auth::requirePermission('towers.update');
+
+        $body = Helpers::getJsonBody();
+        $ids = $body['ids'] ?? [];
+        $patch = $body['patch'] ?? [];
+
+        if (!is_array($ids) || count($ids) === 0) Response::error(400, 'لیست شناسه‌ها ارسال نشده');
+        if (count($ids) > 100) Response::error(400, 'حداکثر ۱۰۰ دکل در هر درخواست');
+        if (!is_array($patch) || count($patch) === 0) Response::error(400, 'مقدار ویرایش ارسال نشده');
+
+        $ids = array_values(array_unique(array_filter(array_map('intval', $ids), fn($v) => $v > 0)));
+        if (count($ids) === 0) Response::error(400, 'شناسه معتبر ارسال نشده');
+
+        $db = Database::getInstance();
+        $pdo = $db->getConnection();
+        $allowedFields = [
+            'tower_structure', 'tower_type', 'tower_type_code',
+            'insulator_r1', 'insulator_s1', 'insulator_t1',
+            'insulator_r2', 'insulator_s2', 'insulator_t2',
+            'line_supervisor', 'is_active',
+        ];
+
+        $updates = [];
+        $params = [];
+        foreach ($allowedFields as $field) {
+            if (array_key_exists($field, $patch)) {
+                $updates[] = "`$field` = ?";
+                $params[] = $patch[$field];
+            }
+        }
+        if (!$updates) Response::error(400, 'هیچ فیلد مجازی برای ویرایش ارسال نشده');
+
+        $idPlaceholders = implode(',', array_fill(0, count($ids), '?'));
+        $affectedLines = [];
+        if (array_key_exists('tower_structure', $patch)) {
+            $lineRows = $db->fetchAll("SELECT DISTINCT line_id FROM towers WHERE id IN ($idPlaceholders) AND line_id IS NOT NULL", $ids);
+            foreach ($lineRows as $lr) { $affectedLines[(int)$lr['line_id']] = true; }
+        }
+
+        try {
+            $pdo->beginTransaction();
+            $params = array_merge($params, $ids);
+            $stmt = $pdo->prepare("UPDATE `towers` SET " . implode(', ', $updates) . ", updated_at = NOW() WHERE id IN ($idPlaceholders)");
+            $stmt->execute($params);
+            $updated = $stmt->rowCount();
+            $pdo->commit();
+        } catch (Throwable $e) {
+            if ($pdo->inTransaction()) $pdo->rollBack();
+            Logger::error('Towers bulk-update failed', ['error' => $e->getMessage(), 'count' => count($ids)]);
+            Response::error(500, 'ویرایش گروهی دکل‌ها ناموفق بود: ' . $e->getMessage());
+        }
+
+        foreach (array_keys($affectedLines) as $lineId) {
+            syncLineTowerStructure($pdo, (int)$lineId);
+        }
+
+        Logger::info('Towers bulk-updated', ['count' => $updated, 'user_id' => $user['id']]);
+        Response::success(['updated' => $updated], "{$updated} دکل ویرایش شد");
+    });
+
     // حذف دکل (v2.0.0: HARD DELETE — هماهنگ با رفتار خطوط)
     $router->delete('towers/{id}', function ($id) {
         $user = Auth::authenticate();

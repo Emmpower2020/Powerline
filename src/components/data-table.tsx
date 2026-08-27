@@ -739,7 +739,7 @@ function DataTableInner<T extends { id: number }>({
                                     return (
                                       <label key={val} className="flex items-center gap-2 p-2 hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer text-sm" onClick={e => e.stopPropagation()}>
                                         <input type="checkbox" checked={checked} onChange={() => togglePendingValue(col.key, val)} className="w-4 h-4 cursor-pointer" />
-                                        <span className="truncate">{val}</span>
+                                        <span className="min-w-0 max-h-16 overflow-y-auto whitespace-normal break-words leading-5 text-right">{val}</span>
                                       </label>
                                     );
                                   })

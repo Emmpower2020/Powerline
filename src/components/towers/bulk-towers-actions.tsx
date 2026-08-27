@@ -43,13 +43,14 @@ const actionMeta: Record<FieldAction, { title: string; label: string; placeholde
 };
 
 /**
- * عملیات گروهی روی دکل‌های انتخاب‌شده — v2.1.0 بر اساس ساختار اکسل رسمی
+ * عملیات گروهی روی دکل‌های انتخاب‌شده — v4.3.31 بر اساس ساختار اکسل رسمی
  */
 export function BulkTowersActions({ getSelection, onApplied }: BulkTowersActionsProps) {
   const [fieldAction, setFieldAction] = useState<FieldAction | null>(null);
   const [rows, setRows] = useState<any[]>([]);
   const [value, setValue] = useState("");
   const [applying, setApplying] = useState(false);
+  const [progress, setProgress] = useState({ completed: 0, total: 0, batch: 0, totalBatches: 0 });
   const [lines, setLines] = useState<any[]>([]);
   const [linesLoaded, setLinesLoaded] = useState(false);
   // v3.0.0: سرپرست‌ها از پرسنل با کمبوباکس قابل جستجو
@@ -100,22 +101,38 @@ export function BulkTowersActions({ getSelection, onApplied }: BulkTowersActions
     setFieldAction(action);
   };
 
+  // v4.3.31: ویرایش گروهی با درخواست‌های ۱۰۰تایی؛ از ارسال صدها PUT جداگانه جلوگیری می‌کند.
   const applyPatch = async (targetRows: any[], patch: Record<string, unknown>, successText: string) => {
     if (targetRows.length === 0) return;
+    const BATCH_SIZE = 100;
+    const batches = Array.from({ length: Math.ceil(targetRows.length / BATCH_SIZE) }, (_, i) =>
+      targetRows.slice(i * BATCH_SIZE, (i + 1) * BATCH_SIZE)
+    );
     setApplying(true);
+    setProgress({ completed: 0, total: targetRows.length, batch: 0, totalBatches: batches.length });
     let success = 0;
     const errors: string[] = [];
-    for (const row of targetRows) {
-      try {
-        await apiClient.put(`${API_ENDPOINTS.towers}/${row.id}`, patch);
-        success++;
-      } catch (err: any) {
-        errors.push(`${row.tower_code || row.id}: ${err?.message || "خطا"}`);
-      }
-    }
-    setApplying(false);
-    setFieldAction(null);
 
+    try {
+      for (let i = 0; i < batches.length; i++) {
+        const batch = batches[i];
+        try {
+          const res = await apiClient.post<any>(API_ENDPOINTS.towerBulkUpdate, {
+            ids: batch.map((row: any) => row.id),
+            patch,
+          }, { timeoutMs: 60_000 });
+          success += Number(res?.data?.updated ?? batch.length);
+        } catch (err: any) {
+          errors.push(`بسته ${i + 1}: ${err?.message || "خطای نامشخص"}`);
+        }
+        const completed = Math.min((i + 1) * BATCH_SIZE, targetRows.length);
+        setProgress({ completed, total: targetRows.length, batch: i + 1, totalBatches: batches.length });
+      }
+    } finally {
+      setApplying(false);
+    }
+
+    setFieldAction(null);
     onApplied();
 
     if (errors.length === 0) {
@@ -123,7 +140,7 @@ export function BulkTowersActions({ getSelection, onApplied }: BulkTowersActions
     } else {
       toast({
         title: "اعمال ناقص",
-        description: `${success.toLocaleString("fa-IR")} ردیف موفق، ${errors.length.toLocaleString("fa-IR")} ناموفق — اولین خطا: ${errors[0]}`,
+        description: `${success.toLocaleString("fa-IR")} ردیف موفق، ${errors.length.toLocaleString("fa-IR")} بسته ناموفق — اولین خطا: ${errors[0]}`,
         variant: "destructive",
       });
     }
@@ -211,6 +228,25 @@ export function BulkTowersActions({ getSelection, onApplied }: BulkTowersActions
               {fieldAction ? actionMeta[fieldAction].title : ""}
             </DialogTitle>
           </DialogHeader>
+          {applying && (
+            <div className="rounded-xl border border-indigo-100 bg-indigo-50/70 dark:border-indigo-900/50 dark:bg-indigo-950/30 p-4 space-y-3">
+              <div className="flex items-center justify-between text-sm">
+                <span className="font-medium text-indigo-800 dark:text-indigo-200">در حال اعمال تغییرات گروهی...</span>
+                <span className="font-bold nums-fa text-indigo-700 dark:text-indigo-300">{progress.completed.toLocaleString("fa-IR")} / {progress.total.toLocaleString("fa-IR")}</span>
+              </div>
+              <div className="h-2.5 w-full overflow-hidden rounded-full bg-indigo-100 dark:bg-indigo-950">
+                <div
+                  className="h-full rounded-full bg-indigo-600 transition-all duration-300"
+                  style={{ width: `${progress.total ? (progress.completed / progress.total) * 100 : 0}%` }}
+                />
+              </div>
+              <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
+                <span>بسته {progress.batch.toLocaleString("fa-IR")} از {progress.totalBatches.toLocaleString("fa-IR")}</span>
+                <span>{progress.total ? Math.round((progress.completed / progress.total) * 100).toLocaleString("fa-IR") : 0}%</span>
+              </div>
+              <p className="text-[11px] text-slate-500 text-right">هر درخواست حداکثر ۱۰۰ دکل را پردازش می‌کند.</p>
+            </div>
+          )}
           <div className="space-y-3">
             <p className="text-sm text-slate-500 text-right">
               این مقدار روی <span className="font-bold text-indigo-600 nums-fa">{rows.length.toLocaleString("fa-IR")}</span> دکل انتخاب‌شده اعمال می‌شود.
