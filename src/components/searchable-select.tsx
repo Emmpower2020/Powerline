@@ -7,7 +7,7 @@ import {
 } from "@/components/ui/command";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ChevronsUpDown, Check, X, Search } from "lucide-react";
+import { ChevronsUpDown, Check, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 /**
@@ -39,7 +39,7 @@ export function SearchableSelect({
   searchPlaceholder?: string;
   emptyText?: string;
   disabled?: boolean;
-  /** نمایش دکمه × برای پاک کردن انتخاب */
+  /** سازگاری با فراخوانی‌های قدیمی؛ دکمه × دیگر نمایش داده نمی‌شود. */
   allowClear?: boolean;
   className?: string;
   align?: "start" | "center" | "end";
@@ -47,18 +47,23 @@ export function SearchableSelect({
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
 
-  const selected = options.find(o => o.value === value) || null;
+  const UNKNOWN_VALUE = "__unknown__";
+  const displayOptions = useMemo(() => [
+    { value: UNKNOWN_VALUE, label: "نامشخص" },
+    ...options.filter(o => o.value !== UNKNOWN_VALUE),
+  ], [options]);
+  const selected = value ? (options.find(o => o.value === value) || null) : null;
 
   // گروه‌بندی گزینه‌ها (اختیاری)
   const grouped = useMemo(() => {
     const groups = new Map<string, SearchableOption[]>();
-    for (const opt of options) {
+    for (const opt of displayOptions) {
       const g = opt.group || "";
       if (!groups.has(g)) groups.set(g, []);
       groups.get(g)!.push(opt);
     }
     return Array.from(groups.entries());
-  }, [options]);
+  }, [displayOptions]);
 
   return (
     <div className={cn("flex gap-1", className)}>
@@ -110,7 +115,7 @@ export function SearchableSelect({
                       key={opt.value}
                       value={`${opt.label} ${opt.value} ${opt.description || ""}`}
                       onSelect={() => {
-                        onChange(opt.value === value ? "" : opt.value);
+                        onChange(opt.value === UNKNOWN_VALUE ? "" : (opt.value === value ? "" : opt.value));
                         setOpen(false);
                         setQuery("");
                       }}
@@ -131,18 +136,6 @@ export function SearchableSelect({
           </Command>
         </PopoverContent>
       </Popover>
-      {allowClear && value && (
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon"
-          className="shrink-0 h-9 w-9 text-slate-400 hover:text-red-600"
-          onClick={() => onChange("")}
-          title="پاک کردن"
-        >
-          <X className="w-4 h-4" />
-        </Button>
-      )}
     </div>
   );
 }

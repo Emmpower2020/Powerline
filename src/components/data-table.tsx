@@ -720,7 +720,7 @@ function DataTableInner<T extends { id: number }>({
 
                               {/* بخش جستجو در مقادیر ستون */}
                               <Input placeholder="جستجو در این ستون..." value={getPendingFilter(col.key).search} onChange={e => setPendingSearch(col.key, e.target.value)} className="text-sm text-right" onClick={e => e.stopPropagation()} autoFocus />
-                              <div className="max-h-48 overflow-y-auto border border-slate-100 dark:border-slate-700 rounded">
+                              <div className="max-h-60 overflow-y-auto border border-slate-100 dark:border-slate-700 rounded [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
                                 {getFilteredUniqueValues(col.key).length === 0 ? (
                                   <div className="p-3 text-center text-slate-400 text-sm">موردی یافت نشد</div>
                                 ) : (
@@ -729,7 +729,7 @@ function DataTableInner<T extends { id: number }>({
                                     return (
                                       <label key={val} className="flex items-center gap-2 p-2 hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer text-sm" onClick={e => e.stopPropagation()}>
                                         <input type="checkbox" checked={checked} onChange={() => togglePendingValue(col.key, val)} className="w-4 h-4 cursor-pointer" />
-                                        <span className="min-w-0 max-h-16 overflow-y-auto whitespace-normal break-words leading-5 text-right">{val}</span>
+                                        <span className="min-w-0 whitespace-normal break-words leading-5 text-right line-clamp-2">{val}</span>
                                       </label>
                                     );
                                   })
