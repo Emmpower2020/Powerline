@@ -589,7 +589,7 @@ function DataTableInner<T extends { id: number }>({
 
           {/* Settings همیشه آخرین دکمه */}
           <div className="relative" ref={columnMenuRef}>
-            <Button variant="outline" size="icon" title="تنظیمات ستون‌ها" className="h-9 w-9" onClick={() => setShowColumnMenu(o => !o)}>
+            <Button variant="outline" size="icon" title="تنظیمات و جابه‌جایی ستون‌ها" aria-label="تنظیمات و جابه‌جایی ستون‌ها" className="h-9 w-9 text-slate-700 hover:text-indigo-600" onClick={() => setShowColumnMenu(o => !o)}>
               <SettingsIcon className="w-4 h-4" />
             </Button>
             {showColumnMenu && (
@@ -604,7 +604,7 @@ function DataTableInner<T extends { id: number }>({
                   setColumnOrder(items => { const oi = items.indexOf(String(active.id)); const ni = items.indexOf(String(over.id)); return oi < 0 || ni < 0 ? items : arrayMove(items, oi, ni); });
                 }}>
                   <SortableContext items={columnOrder} strategy={verticalListSortingStrategy}>
-                    <div className="max-h-80 overflow-y-auto p-1">
+                    <div className="max-h-[70vh] overflow-y-auto p-1">
                       {columnOrder.map((key, idx) => {
                         const col = columns.find(c => c.key === key); if (!col) return null;
                         return <SortableColumnRow key={key} id={key} header={col.header} hidden={hiddenColumns.has(key)} onToggle={() => toggleColumnVisibility(key)} onUp={() => moveColumn(key, "up")} onDown={() => moveColumn(key, "down")} first={idx===0} last={idx===columnOrder.length-1} />;

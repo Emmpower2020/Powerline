@@ -195,7 +195,7 @@ export function CircuitsPage() {
         searchKeys={["dispatch_code", "name"]}
         title="مدارها (کدهای دیسپاچینگ)"
         layoutKey="circuits"
-        defaultSort={[{ key: "voltage", direction: "asc", order: [400, 230, 132, 63] }, { key: "dispatch_code", direction: "asc" }]}
+        defaultSort={[{ key: "voltage", direction: "asc", order: [400, 230, 132, 63] }, { key: "name", direction: "asc" }, { key: "dispatch_code", direction: "asc" }]}
         tableRef={tableRef}
         onAdd={() => { setEditRow(null); setDuplicateFrom(null); setShowCreate(true); }}
         onRefresh={() => setRefreshKey(k => k + 1)}
