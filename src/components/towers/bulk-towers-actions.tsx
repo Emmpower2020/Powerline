@@ -18,6 +18,7 @@ import {
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { SearchableSelect } from "@/components/searchable-select";
 import { usePersonnelOptions } from "@/hooks/use-personnel-options";
+import { useTowerReferences } from "@/hooks/use-tower-references";
 import { useToast } from "@/hooks/use-toast";
 import { logError } from "@/lib/error-log";
 
@@ -53,6 +54,9 @@ export function BulkTowersActions({ getSelection, onApplied }: BulkTowersActions
   const [linesLoaded, setLinesLoaded] = useState(false);
   // v3.0.0: سرپرست‌ها از پرسنل با کمبوباکس قابل جستجو
   const { supervisorOptions } = usePersonnelOptions();
+  const { structures: towerStructures, typeCodes: towerTypeCodes, loading: towerReferencesLoading } = useTowerReferences(
+    fieldAction === "tower_structure" || fieldAction === "tower_type_code"
+  );
   const { toast } = useToast();
 
   // v3.4.0: خطای لود خطوط فقط یک‌بار Toast می‌دهد (نه پشت‌سرهم) و در لاگ خطاها ثبت می‌شود
@@ -127,7 +131,7 @@ export function BulkTowersActions({ getSelection, onApplied }: BulkTowersActions
 
   const confirmField = async () => {
     if (!fieldAction) return;
-    const isText = ["tower_structure", "tower_type_code", "line_supervisor"].includes(fieldAction);
+    const isText = ["line_supervisor"].includes(fieldAction);
     const isSelect = ["tower_type", "insulator_all", "line_id"].includes(fieldAction);
 
     if (isText && !value.trim()) {
@@ -243,6 +247,42 @@ export function BulkTowersActions({ getSelection, onApplied }: BulkTowersActions
                   placeholder="جستجوی نام سرپرست..."
                   searchPlaceholder="نام سرپرست اکیپ..."
                 />
+              </div>
+            ) : fieldAction === "tower_structure" ? (
+              <div className="space-y-2">
+                <Label className="text-right block">{actionMeta.tower_structure.label}</Label>
+                {towerReferencesLoading ? (
+                  <div className="flex items-center gap-2 text-sm text-slate-400 p-2">
+                    <Loader2 className="w-4 h-4 animate-spin" /> در حال دریافت ساختارهای دکل...
+                  </div>
+                ) : (
+                  <SearchableSelect
+                    value={value}
+                    onChange={setValue}
+                    options={towerStructures.map(x => ({ value: x.name, label: x.name }))}
+                    placeholder="انتخاب ساختار دکل..."
+                    searchPlaceholder="جستجوی ساختار دکل..."
+                    allowClear
+                  />
+                )}
+              </div>
+            ) : fieldAction === "tower_type_code" ? (
+              <div className="space-y-2">
+                <Label className="text-right block">{actionMeta.tower_type_code.label}</Label>
+                {towerReferencesLoading ? (
+                  <div className="flex items-center gap-2 text-sm text-slate-400 p-2">
+                    <Loader2 className="w-4 h-4 animate-spin" /> در حال دریافت کدهای نوع دکل...
+                  </div>
+                ) : (
+                  <SearchableSelect
+                    value={value}
+                    onChange={setValue}
+                    options={towerTypeCodes.map(x => ({ value: x.code, label: x.title ? `${x.code} — ${x.title}` : x.code }))}
+                    placeholder="انتخاب کد نوع دکل..."
+                    searchPlaceholder="جستجوی کد نوع دکل..."
+                    allowClear
+                  />
+                )}
               </div>
             ) : fieldAction === "tower_type" ? (
               <div className="space-y-2">
