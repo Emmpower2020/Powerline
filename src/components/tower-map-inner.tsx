@@ -22,9 +22,6 @@ import type { Line, Tower } from "@/lib/types";
  * ──────────────────────────────────────────────────────────────── */
 
 const LABEL_MIN_ZOOM = 14;
-// برچسب نام خطوط از دو سطح زوم پایین‌تر از زوم پیش‌فرض (10) مخفی می‌شود.
-// زوم پیش‌فرض = 10، بنابراین از زوم 8 به پایین هیچ نام خطی نمایش داده نمی‌شود.
-const LINE_NAME_HIDE_BELOW_ZOOM = 8;
 /** زیر این زوم، دکل‌ها رسم نمی‌شوند و فقط مسیر خط دیده می‌شود */
 const MARKER_MIN_ZOOM = 14;
 
@@ -455,9 +452,8 @@ function RoutesOverlay({
       const bottom = Math.max(top + 20, size.y - 8);
 
       for (const entry of routeLabels) {
-        // نام خطوط فقط در محدوده زوم نزدیک به نمای اولیه نمایش داده شود.
-        // در زوم 8 و پایین‌تر (دو سطح پایین‌تر از زوم پیش‌فرض 10) همه نام‌ها مخفی هستند.
-        if (!showLineLabels || map.getZoom() <= LINE_NAME_HIDE_BELOW_ZOOM) {
+        // نام خطوط طبق تنظیم فعلی همیشه نمایش داده می‌شود؛ فقط اگر گزینه خاموش شده باشد مخفی است.
+        if (!showLineLabels) {
           entry.marker.setOpacity(0);
           continue;
         }
@@ -638,7 +634,8 @@ function MapTools({
     };
   }, [activeTool, map, drawMeasure]);
 
-  // ابزار موقعیت جغرافیایی — استفاده از موقعیت واقعی دستگاه/مرورگر
+  // ابزار موقعیت جغرافیایی — استفاده مستقیم از Geolocation API مرورگر
+  // این روش از map.locate مستقل است و در مرورگرهای مختلف پایدارتر عمل می‌کند.
   useEffect(() => {
     if (activeTool !== "coordinates") {
       if (coordDivRef.current) {
@@ -659,39 +656,52 @@ function MapTools({
       background: rgba(255,255,255,0.96); border: 1px solid #cbd5e1;
       border-radius: 10px; padding: 6px 10px; font-size: 11px;
       color: #1e293b; pointer-events: none;
-      box-shadow: 0 4px 14px rgba(0,0,0,0.15); font-weight: 600;
-      min-width: 170px; text-align: center;
+      box-shadow: 0 4px 14px rgba(15,23,42,0.15); font-weight: 600;
+      min-width: 190px; text-align: center;
     `;
     div.innerHTML = "در حال دریافت موقعیت…";
     map.getContainer().appendChild(div);
     coordDivRef.current = div;
 
-    const onFound = (e: L.LocationEvent) => {
-      const lat = e.latlng.lat.toFixed(5);
-      const lng = e.latlng.lng.toFixed(5);
-      div.innerHTML = `<span dir="rtl">موقعیت شما:</span> <span dir="ltr">${lat}°, ${lng}°</span>`;
-      if (locationMarkerRef.current) locationMarkerRef.current.remove();
-      locationMarkerRef.current = L.circleMarker(e.latlng, {
-        radius: 8,
-        color: "#2563eb",
-        weight: 3,
-        fillColor: "#60a5fa",
-        fillOpacity: 0.35,
-        interactive: false,
-      }).addTo(map);
+    const showError = (message: string) => {
+      div.innerHTML = `<span dir="rtl">${message}</span>`;
     };
 
-    const onError = (e: L.ErrorEvent) => {
-      div.innerHTML = e.message || "دریافت موقعیت جغرافیایی ممکن نیست";
-    };
-
-    map.on("locationfound", onFound);
-    map.on("locationerror", onError);
-    map.locate({ setView: true, maxZoom: Math.max(map.getZoom(), 15), enableHighAccuracy: true });
+    if (typeof window === "undefined" || !window.isSecureContext) {
+      showError("برای دریافت موقعیت، اتصال HTTPS لازم است");
+    } else if (!("geolocation" in navigator)) {
+      showError("مرورگر شما از موقعیت جغرافیایی پشتیبانی نمی‌کند");
+    } else {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          if (activeToolRef.current !== "coordinates") return;
+          const lat = position.coords.latitude;
+          const lng = position.coords.longitude;
+          div.innerHTML = `<span dir="rtl">موقعیت شما:</span> <span dir="ltr">${lat.toFixed(5)}°, ${lng.toFixed(5)}°</span>`;
+          if (locationMarkerRef.current) locationMarkerRef.current.remove();
+          locationMarkerRef.current = L.circleMarker([lat, lng], {
+            radius: 8,
+            color: "#2563eb",
+            weight: 3,
+            fillColor: "#60a5fa",
+            fillOpacity: 0.35,
+            interactive: false,
+          }).addTo(map);
+          map.setView([lat, lng], Math.max(map.getZoom(), 15), { animate: true });
+        },
+        (error) => {
+          const messages: Record<number, string> = {
+            1: "دسترسی به موقعیت رد شد؛ مجوز Location مرورگر را فعال کنید",
+            2: "موقعیت فعلی قابل تشخیص نیست؛ GPS یا Location دستگاه را بررسی کنید",
+            3: "دریافت موقعیت بیش از حد طول کشید؛ دوباره تلاش کنید",
+          };
+          showError(messages[error.code] || "دریافت موقعیت جغرافیایی ممکن نیست");
+        },
+        { enableHighAccuracy: true, timeout: 15000, maximumAge: 30000 },
+      );
+    }
 
     return () => {
-      map.off("locationfound", onFound);
-      map.off("locationerror", onError);
       map.stopLocate();
       if (locationMarkerRef.current) {
         locationMarkerRef.current.remove();

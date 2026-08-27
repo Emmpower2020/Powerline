@@ -370,7 +370,7 @@ export function TowersPage() {
 
   // ستون‌ها بر اساس ساختار اکسل رسمی (v2.1.0) — نام‌ها همان واژگان خود شماست
   const columns: DataTableColumn<any>[] = [
-    { key: "tower_code", header: "کد دکل", sortable: true, filterable: true, align: "right" },
+    { key: "tower_code", header: "نام دکل", sortable: true, filterable: true, align: "right" },
     { key: "tower_number", header: "شماره دکل", sortable: true, filterable: true, type: "number", align: "right" },
     // v2.8.0: ستون «ولتاژ» اضافه شد — از JOIN با lines و پیش‌فرض قبل از نام خط
     {
@@ -471,7 +471,7 @@ export function TowersPage() {
         getExistingRows={async () => data}
         defaultUniqueKey="tower_code"
         uniqueKeyOptions={[
-          { value: "tower_code", label: "کد دکل" },
+          { value: "tower_code", label: "نام دکل" },
         ]}
         entityName="دکل"
         headerMap={headerMap}

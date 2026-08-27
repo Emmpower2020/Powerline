@@ -321,7 +321,7 @@ export function MapPage() {
             zoomOutTrigger={zoomOutTrigger}
             homeTrigger={homeTrigger}
             showLineLabels={true}
-            labelSafeLeft={12}
+            labelSafeLeft={sidebarOpen ? 320 : 12}
             onToolDone={() => setActiveTool(null)}
           />
         )}
