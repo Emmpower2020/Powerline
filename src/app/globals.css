@@ -958,3 +958,141 @@
   }
 }
 
+
+/* v4.3.28: ریسپانسیو پیشرفته نقشه + Popup خطوط */
+.line-popup-card {
+  direction: rtl;
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  padding: 2px;
+  font-family: var(--font-vazirmatn), Vazirmatn, Tahoma, sans-serif;
+  color: #0f172a;
+  text-align: right;
+}
+.line-popup-header {
+  padding: 2px 2px 11px;
+  margin-bottom: 10px;
+  border-bottom: 1px solid #e2e8f0;
+}
+.line-popup-title-wrap {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  min-width: 0;
+}
+.line-popup-dot {
+  width: 11px;
+  height: 11px;
+  margin-top: 5px;
+  border-radius: 4px;
+  flex: 0 0 auto;
+}
+.line-popup-title,
+.line-popup-subtitle,
+.line-popup-label,
+.line-popup-value { text-align: right; direction: rtl; }
+.line-popup-title {
+  font-size: 14px;
+  line-height: 1.6;
+  font-weight: 800;
+  overflow-wrap: anywhere;
+}
+.line-popup-subtitle {
+  margin-top: 2px;
+  color: #64748b;
+  font-size: 10.5px;
+  font-weight: 600;
+}
+.line-popup-body { display: flex; flex-direction: column; gap: 6px; width: 100%; }
+.line-popup-row {
+  display: grid;
+  grid-template-columns: 92px minmax(0,1fr);
+  align-items: center;
+  column-gap: 10px;
+  min-height: 30px;
+  padding: 6px 9px;
+  border: 1px solid #e8edf3;
+  border-radius: 9px;
+  background: #f8fafc;
+  box-sizing: border-box;
+}
+.line-popup-label { font-size: 10.5px; font-weight: 700; color: #475569; }
+.line-popup-value { font-size: 11px; font-weight: 650; color: #0f172a; overflow-wrap:anywhere; }
+.line-popup-accent { font-weight: 800; }
+.line-popup .leaflet-popup-content-wrapper { border-radius: 16px; box-shadow: 0 12px 34px rgba(15,23,42,.16); }
+.line-popup .leaflet-popup-content { width: auto !important; max-width: 100%; margin: 13px 14px 12px; }
+.line-popup .leaflet-popup-tip { box-shadow: 0 6px 12px rgba(15,23,42,.08); }
+.line-popup .leaflet-popup-close-button { left: 8px !important; right: auto !important; top: 7px !important; width: 25px !important; height: 25px !important; z-index: 3; }
+.dark .line-popup-card { color: #e2e8f0; }
+.dark .line-popup-header { border-color:#334155; }
+.dark .line-popup-subtitle { color:#94a3b8; }
+.dark .line-popup-row { border-color:#334155; background:#172033; }
+.dark .line-popup-label { color:#cbd5e1; }
+.dark .line-popup-value { color:#f1f5f9; }
+.dark .line-popup .leaflet-popup-content-wrapper,
+.dark .line-popup .leaflet-popup-tip { background:#0f172a; }
+
+/* اندازه دکل: حدود 25٪ کوچک‌تر از نسخه 4.3.27 و در عین حال قابل کلیک */
+@media (min-width: 768px) {
+  .map-toolbar {
+    width: clamp(360px, 38vw, 440px);
+  }
+  .map-line-sidebar {
+    width: clamp(240px, 22vw, 300px) !important;
+  }
+}
+
+@media (max-width: 767px) {
+  .map-toolbar {
+    left: 1.5vw !important;
+    right: 1.5vw !important;
+    width: 97vw !important;
+    max-width: 97vw !important;
+    box-sizing: border-box;
+  }
+  .map-toolbar .map-tool-btn {
+    flex: 0 1 auto;
+    width: clamp(30px, 8.8vw, 33px);
+    height: clamp(30px, 8.8vw, 33px);
+  }
+  .map-basemap-popup,
+  .map-legend-popup {
+    left: 50% !important;
+    right: auto !important;
+    top: auto !important;
+    bottom: calc(100% + 10px) !important;
+    transform: translateX(-50%) !important;
+    box-sizing: border-box !important;
+  }
+  .map-basemap-popup {
+    width: min(320px, 94vw) !important;
+    max-width: 94vw !important;
+  }
+  .map-legend-popup {
+    width: min(230px, 78vw) !important;
+    max-width: 78vw !important;
+  }
+  .line-popup .leaflet-popup-content {
+    margin: 12px 11px 11px;
+  }
+  .line-popup-card { max-width: calc(100vw - 54px); }
+  .line-popup-row {
+    grid-template-columns: 76px minmax(0,1fr);
+    column-gap: 8px;
+    padding: 6px 8px;
+  }
+  .line-popup-title { font-size: 13px; }
+  .line-popup-label { font-size: 10px; }
+  .line-popup-value { font-size: 10.5px; }
+
+  .tower-popup .leaflet-popup-content {
+    max-width: calc(100vw - 54px) !important;
+  }
+  .tower-popup-card { max-width: calc(100vw - 54px); }
+}
+
+@media (min-width: 768px) and (max-width: 1100px) {
+  .map-toolbar { width: min(420px, 42vw); }
+  .map-line-sidebar { width: min(270px, 24vw) !important; }
+}

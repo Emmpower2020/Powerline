@@ -159,6 +159,50 @@ function makeShapeMarker(
 }
 
 /* ────────────────────────────────────────────────────────────────
+ * محتوای پاپ‌آپ خط
+ * ──────────────────────────────────────────────────────────────── */
+
+function linePopupHtml(line: Line): string {
+  const vs = voltageStyle(line.voltage_kv);
+  const extendedLine = line as Line & { line_supervisor?: string | null; line_expert?: string | null };
+  const esc = (s: unknown) =>
+    String(s ?? "—")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
+  const row = (label: string, value: string, cls = "") => `
+    <div class="line-popup-row ${cls}">
+      <div class="line-popup-label">${label}</div>
+      <div class="line-popup-value">${value || "—"}</div>
+    </div>`;
+  return `
+    <div dir="rtl" class="line-popup-card">
+      <div class="line-popup-header">
+        <div class="line-popup-title-wrap">
+          <span class="line-popup-dot" style="background:${vs.color}"></span>
+          <div>
+            <div class="line-popup-title">${esc(line.name)}</div>
+            <div class="line-popup-subtitle">${line.line_code ? `کد خط: ${esc(line.line_code)}` : "اطلاعات خط"}</div>
+          </div>
+        </div>
+      </div>
+      <div class="line-popup-body">
+        ${row("کد دیسپاچینگ", esc(line.dispatch_code))}
+        ${row("ولتاژ", `<span class="line-popup-accent" style="color:${vs.color}">${esc(vs.label)}</span>`)}
+        ${row("نوع سیم", esc(line.conductor_type))}
+        ${row("تعداد مدار", esc(line.circuit_count))}
+        ${row("طول خط", line.length_km != null ? `${esc(line.length_km.toLocaleString("fa-IR"))} کیلومتر` : "—")}
+        ${row("مجموعه", esc(line.group_name))}
+        ${row("مسئول خط", esc(extendedLine.line_supervisor))}
+        ${row("کارشناس خط", esc(extendedLine.line_expert))}
+        ${row("پیمانکار", esc(line.contractor_name))}
+        ${row("وضعیت", line.is_active ? "فعال" : "غیرفعال")}
+      </div>
+    </div>`;
+}
+
+/* ────────────────────────────────────────────────────────────────
  * محتوای پاپ‌آپ دکل
  * ──────────────────────────────────────────────────────────────── */
 
@@ -337,6 +381,18 @@ function RoutesOverlay({
           `<div dir="rtl" style="font-family:Vazirmatn,Tahoma,sans-serif"><b>${lineName}</b>${lineCode ? ` <span style="color:#64748b;font-size:11px">(${lineCode})</span>` : ""}<div style="color:${vs.color};font-size:11px">${vs.label} — ${part.points.length.toLocaleString("fa-IR")} دکل</div></div>`,
           { sticky: true, className: "route-tooltip", direction: "top" }
         );
+
+        // اطلاعات خط با کلیک روی مسیر — Leaflet به‌صورت خودکار Popup را داخل viewport نگه می‌دارد
+        main.bindPopup(linePopupHtml(line), {
+          className: "line-popup",
+          maxWidth: 380,
+          minWidth: 260,
+          autoPan: true,
+          keepInView: true,
+          autoPanPadding: L.point(18, 18),
+          closeButton: true,
+          direction: "auto",
+        });
         mains.push(main);
         const idx = polylineIndexRef.current.get(part.lineId) || [];
         idx.push(main);
@@ -352,7 +408,7 @@ function RoutesOverlay({
             makeShapeMarker([p.lat, p.lng], {
               shape: ts.shape,
               color: vs.color,
-              radius: 10,
+              radius: 7.5,
               renderer: canvasRenderer,
               towerLabel: formatTowerLabel(tower),
               popupHtml: towerPopupHtml(tower, line),
