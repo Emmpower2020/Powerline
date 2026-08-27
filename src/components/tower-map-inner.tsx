@@ -22,6 +22,9 @@ import type { Line, Tower } from "@/lib/types";
  * ──────────────────────────────────────────────────────────────── */
 
 const LABEL_MIN_ZOOM = 14;
+// برچسب نام خطوط از دو سطح زوم پایین‌تر از زوم پیش‌فرض (10) مخفی می‌شود.
+// زوم پیش‌فرض = 10، بنابراین از زوم 8 به پایین هیچ نام خطی نمایش داده نمی‌شود.
+const LINE_NAME_HIDE_BELOW_ZOOM = 8;
 /** زیر این زوم، دکل‌ها رسم نمی‌شوند و فقط مسیر خط دیده می‌شود */
 const MARKER_MIN_ZOOM = 14;
 
@@ -388,7 +391,9 @@ function RoutesOverlay({
       const bottom = Math.max(top + 20, size.y - 8);
 
       for (const entry of routeLabels) {
-        if (!showLineLabels) {
+        // نام خطوط فقط در محدوده زوم نزدیک به نمای اولیه نمایش داده شود.
+        // در زوم 8 و پایین‌تر (دو سطح پایین‌تر از زوم پیش‌فرض 10) همه نام‌ها مخفی هستند.
+        if (!showLineLabels || map.getZoom() <= LINE_NAME_HIDE_BELOW_ZOOM) {
           entry.marker.setOpacity(0);
           continue;
         }
