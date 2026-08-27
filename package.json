@@ -1,6 +1,6 @@
 {
   "name": "powerline-web",
-  "version": "4.3.29",
+  "version": "4.3.32",
   "private": true,
   "scripts": {
     "dev": "next dev -p 3000",

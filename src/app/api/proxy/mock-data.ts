@@ -477,7 +477,7 @@ export async function handleMockRequest(request: NextRequest): Promise<NextRespo
     return NextResponse.json({ success: true, data: { id: newId, tower_code: code }, message: "دکل با موفقیت ایجاد شد" }, { status: 201 });
   }
 
-  // ─── towers/bulk-update — v4.3.31: شبیه‌سازی ویرایش گروهی ۱۰۰تایی ───
+  // ─── towers/bulk-update — v4.3.32: شبیه‌سازی ویرایش گروهی ۱۰۰تایی ───
   if (path === "/towers/bulk-update" && method === "POST") {
     let body: any = {};
     try { body = await request.json(); } catch { /* empty */ }

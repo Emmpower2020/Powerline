@@ -16,7 +16,7 @@ const ToastViewport = React.forwardRef<
   <ToastPrimitives.Viewport
     ref={ref}
     className={cn(
-      "fixed inset-0 z-[999999] pointer-events-none flex max-h-screen w-full flex-col items-center justify-center gap-2 p-4",
+      "fixed inset-0 z-[999999] pointer-events-none flex max-h-screen w-full flex-col items-center justify-center gap-3 p-4",
       className
     )}
     {...props}
@@ -29,9 +29,9 @@ const toastVariants = cva(
   {
     variants: {
       variant: {
-        default: "border bg-background text-foreground",
+        default: "border-slate-200 bg-white text-slate-800 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100",
         destructive:
-          "destructive group border-destructive bg-destructive text-destructive-foreground",
+          "destructive group border-red-200 bg-white text-slate-800 dark:border-red-900 dark:bg-slate-900 dark:text-slate-100",
       },
     },
     defaultVariants: {
@@ -94,7 +94,7 @@ const ToastTitle = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <ToastPrimitives.Title
     ref={ref}
-    className={cn("text-sm font-semibold [&+div]:text-xs", className)}
+    className={cn("text-sm font-semibold leading-5", className)}
     {...props}
   />
 ))
@@ -106,7 +106,7 @@ const ToastDescription = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <ToastPrimitives.Description
     ref={ref}
-    className={cn("text-sm opacity-90", className)}
+    className={cn("text-[13px] leading-5 text-slate-500 dark:text-slate-300", className)}
     {...props}
   />
 ))

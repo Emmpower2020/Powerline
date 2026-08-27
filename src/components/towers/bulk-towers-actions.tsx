@@ -43,7 +43,7 @@ const actionMeta: Record<FieldAction, { title: string; label: string; placeholde
 };
 
 /**
- * عملیات گروهی روی دکل‌های انتخاب‌شده — v4.3.31 بر اساس ساختار اکسل رسمی
+ * عملیات گروهی روی دکل‌های انتخاب‌شده — v4.3.32 بر اساس ساختار اکسل رسمی
  */
 export function BulkTowersActions({ getSelection, onApplied }: BulkTowersActionsProps) {
   const [fieldAction, setFieldAction] = useState<FieldAction | null>(null);
@@ -101,7 +101,7 @@ export function BulkTowersActions({ getSelection, onApplied }: BulkTowersActions
     setFieldAction(action);
   };
 
-  // v4.3.31: ویرایش گروهی با درخواست‌های ۱۰۰تایی؛ از ارسال صدها PUT جداگانه جلوگیری می‌کند.
+  // v4.3.32: ویرایش گروهی با درخواست‌های ۱۰۰تایی؛ از ارسال صدها PUT جداگانه جلوگیری می‌کند.
   const applyPatch = async (targetRows: any[], patch: Record<string, unknown>, successText: string) => {
     if (targetRows.length === 0) return;
     const BATCH_SIZE = 100;

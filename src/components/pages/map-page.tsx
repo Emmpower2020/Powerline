@@ -676,7 +676,6 @@ export function MapPage() {
                                     onCheckedChange={() => toggleLine(l.id)}
                                     className="mt-0.5"
                                   />
-                                  <span className="w-1.5 h-1.5 rounded-full mt-2 shrink-0" style={{ background: g.color }} />
                                   <span className="min-w-0 flex-1">
                                     <span
                                       className="block text-[13.5px] leading-snug whitespace-normal break-words text-slate-600 dark:text-slate-300"

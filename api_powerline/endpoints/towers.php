@@ -345,7 +345,7 @@ function registerTowerRoutes(Router $router): void
         Response::success(null, 'دکل با موفقیت ویرایش شد');
     });
 
-    // ویرایش گروهی دکل‌ها — v4.3.31: حداکثر ۱۰۰ دکل در هر درخواست و یک UPDATE تراکنشی
+    // ویرایش گروهی دکل‌ها — v4.3.32: حداکثر ۱۰۰ دکل در هر درخواست و یک UPDATE تراکنشی
     // بدنه: {"ids":[...], "patch":{"tower_structure":"..."}}
     $router->post('towers/bulk-update', function () {
         $user = Auth::authenticate();
