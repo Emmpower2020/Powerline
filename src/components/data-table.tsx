@@ -12,7 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import {
   ChevronUp, ChevronDown, ChevronsUpDown, ChevronRight, ChevronLeft, Search, RefreshCw,
   Plus, Eye, EyeOff, Filter, X, Check, Copy, CopyPlus, Trash2, ArrowUp, ArrowDown, Pencil,
-  Settings as SettingsIcon, Upload, Download, Printer, RotateCcw,
+  Settings as SettingsIcon, Upload, Download, Printer, RotateCcw, GripVertical,
 } from "lucide-react";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
@@ -75,13 +75,16 @@ interface DataTableProps<T extends { id: number }> {
 function SortableColumnRow({ id, header, hidden, onToggle, onUp, onDown, first, last }: { id: string; header: string; hidden: boolean; onToggle: () => void; onUp: () => void; onDown: () => void; first: boolean; last: boolean }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
   const style = { transform: CSS.Transform.toString(transform), transition };
-  return <div ref={setNodeRef} style={style} {...attributes} {...listeners} className={cn("flex items-center gap-1 px-2 py-1.5 hover:bg-slate-50 dark:hover:bg-slate-800 rounded cursor-grab active:cursor-grabbing", isDragging && "opacity-60 bg-indigo-50")}>
+  return <div ref={setNodeRef} style={style} {...attributes} className={cn("flex items-center gap-1 px-2 py-1.5 hover:bg-slate-50 dark:hover:bg-slate-800 rounded", isDragging && "opacity-60 bg-indigo-50 shadow-sm")}>
+    <button type="button" {...listeners} className="p-1 text-slate-400 hover:text-indigo-600 cursor-grab active:cursor-grabbing touch-none shrink-0" title="کشیدن برای جابه‌جایی" aria-label={`جابه‌جایی ستون ${header}`}>
+      <GripVertical className="w-4 h-4" />
+    </button>
     <label className="flex items-center gap-2 flex-1 cursor-pointer text-right min-w-0">
       <input type="checkbox" checked={!hidden} onChange={onToggle} className="w-4 h-4 cursor-pointer shrink-0" />
       <span className="text-sm truncate">{header}</span>
     </label>
-    <button onClick={onUp} disabled={first} className="p-1 hover:text-indigo-600 disabled:opacity-30 cursor-pointer shrink-0" title="بالا"><ArrowUp className="w-3.5 h-3.5" /></button>
-    <button onClick={onDown} disabled={last} className="p-1 hover:text-indigo-600 disabled:opacity-30 cursor-pointer shrink-0" title="پایین"><ArrowDown className="w-3.5 h-3.5" /></button>
+    <button type="button" onClick={onUp} disabled={first} className="p-1 hover:text-indigo-600 disabled:opacity-30 cursor-pointer shrink-0" title="بالا"><ArrowUp className="w-3.5 h-3.5" /></button>
+    <button type="button" onClick={onDown} disabled={last} className="p-1 hover:text-indigo-600 disabled:opacity-30 cursor-pointer shrink-0" title="پایین"><ArrowDown className="w-3.5 h-3.5" /></button>
   </div>;
 }
 
@@ -604,7 +607,7 @@ function DataTableInner<T extends { id: number }>({
                   setColumnOrder(items => { const oi = items.indexOf(String(active.id)); const ni = items.indexOf(String(over.id)); return oi < 0 || ni < 0 ? items : arrayMove(items, oi, ni); });
                 }}>
                   <SortableContext items={columnOrder} strategy={verticalListSortingStrategy}>
-                    <div className="max-h-[70vh] overflow-y-auto p-1">
+                    <div className="max-h-[70vh] overflow-y-auto p-1 scrollbar-thin">
                       {columnOrder.map((key, idx) => {
                         const col = columns.find(c => c.key === key); if (!col) return null;
                         return <SortableColumnRow key={key} id={key} header={col.header} hidden={hiddenColumns.has(key)} onToggle={() => toggleColumnVisibility(key)} onUp={() => moveColumn(key, "up")} onDown={() => moveColumn(key, "down")} first={idx===0} last={idx===columnOrder.length-1} />;
