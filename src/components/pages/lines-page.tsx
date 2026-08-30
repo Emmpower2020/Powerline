@@ -256,7 +256,7 @@ export function LinesPage() {
           setRowsToDelete([]);
           toast({
             title: "فایل‌های PHP جدید روی هاست آپلود نشده‌اند",
-            description: "قابلیت حذف انبوه به بسته API نسخه v2.2.0 اضافه شده — ابتدا پوشه api_powerline را روی هاست آپلود کنید.",
+            description: "قابلیت حذف انبوه به بسته API نسخه v2.2.0 اضافه شده — ابتدا پوشه Powerline را روی هاست آپلود کنید.",
             variant: "destructive",
           });
           return;

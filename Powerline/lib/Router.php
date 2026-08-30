@@ -78,9 +78,9 @@ class Router
         $path = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH);
 
         // 🔧 اصلاح مهم: حذف کل مسیر قبل از api.php
-        // مثال: /Powerline/api_powerline/api.php/auth/login → auth/login
-        // مثال: /Powerline/api_powerline/api.php → (خالی، صفحه اصلی)
-        $scriptName = $_SERVER['SCRIPT_NAME'] ?? '';  // مثلاً /Powerline/api_powerline/api.php
+        // مثال: /Powerline/api.php/auth/login → auth/login
+        // مثال: /Powerline/api.php → (خالی، صفحه اصلی)
+        $scriptName = $_SERVER['SCRIPT_NAME'] ?? '';  // مثلاً /Powerline/api.php
 
         if (!empty($scriptName) && strpos($path, $scriptName) === 0) {
             // حذف کل مسیر script از ابتدای path

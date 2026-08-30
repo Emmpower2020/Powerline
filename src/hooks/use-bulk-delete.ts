@@ -92,7 +92,7 @@ export function useBulkDelete<T extends { id: number }>(options: {
           setPendingRows(null);
           toast({
             title: "فایل‌های PHP جدید روی هاست آپلود نشده‌اند",
-            description: `قابلیت حذف انبوه ${entityName}‌ها به endpoint «${endpoint}» نیاز دارد — ابتدا پوشه api_powerline را روی هاست آپلود کنید.`,
+            description: `قابلیت حذف انبوه ${entityName}‌ها به endpoint «${endpoint}» نیاز دارد — ابتدا پوشه Powerline را روی هاست آپلود کنید.`,
             variant: "destructive",
           });
           return;

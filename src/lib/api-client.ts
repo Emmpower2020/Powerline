@@ -24,7 +24,7 @@ export class ApiError extends Error {
  */
 function analyzeNetworkError(error: TypeError): string {
   const message = error.message || "";
-  const apiHost = "sabadgame.com";
+  const apiHost = "jibimarket.com";
   const currentHost = typeof window !== "undefined" ? window.location.hostname : "";
 
   // خطای CORS معمول
@@ -32,7 +32,7 @@ function analyzeNetworkError(error: TypeError): string {
     if (currentHost && !currentHost.includes(apiHost)) {
       return `ارتباط با سرور ناموفق بود. احتمالاً به دلیل CORS (مرورگر درخواست از ${currentHost} به ${apiHost} را بلاک کرده).\n\nراه‌حل: در فایل config.php سرور، CORS_ALLOW_ORIGIN را روی '*' تنظیم کنید.`;
     }
-    return "ارتباط با سرور ناموفق بود. لطفاً بررسی کنید:\n۱. آیا اینترنت وصل است؟\n۲. آیا سرور sabadgame.com در دسترس است؟\n۳. آیا فایروال/Tor/VPN روشن است؟";
+    return "ارتباط با سرور ناموفق بود. لطفاً بررسی کنید:\n۱. آیا اینترنت وصل است؟\n۲. آیا سرور jibimarket.com در دسترس است؟\n۳. آیا فایروال/Tor/VPN روشن است؟";
   }
 
   // خطای Mixed Content (HTTP از HTTPS)

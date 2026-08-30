@@ -2,7 +2,7 @@
  * Mock API — فقط برای محیط توسعه و پیش‌نمایش
  *
  * این ماژول داده‌های نمونه برمی‌گرداند تا بتوانیم UI را بدون اتصال به سرور PHP بررسی کنیم.
- * در production فعال نیست — فقط زمانی استفاده می‌شود که سرور اصلی (sabadgame.com) در دسترس نباشد.
+ * در production فعال نیست — فقط زمانی استفاده می‌شود که سرور اصلی (jibimarket.com) در دسترس نباشد.
  *
  * کاربر نمونه:
  *   username: admin
@@ -24,7 +24,7 @@ const MOCK_USER = {
   id: 1,
   username: "admin",
   full_name: "مدیر سیستم",
-  email: "admin@sabadgame.com",
+  email: "admin@jibimarket.com",
   is_active: true,
   roles: ["super_admin"],
   permissions: ["*"],

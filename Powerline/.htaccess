@@ -1,0 +1,41 @@
+# .htaccess — تنظیمات Apache برای API
+#
+# این فایل رو در فولدر Powerline قرار بده.
+
+# فعال‌سازی mod_rewrite
+RewriteEngine On
+
+# اگه درخواست برای فایل یا فولدر واقعی بود، مستقیم پاس بده
+RewriteCond %{REQUEST_FILENAME} -f [OR]
+RewriteCond %{REQUEST_FILENAME} -d
+RewriteRule ^ - [L]
+
+# تبدیل /api/xxx به /api.php/xxx
+RewriteRule ^api/(.*)$ api.php/$1 [QSA,L]
+
+# تبدیل /api به /api.php (بدون slash اضافی)
+RewriteRule ^api$ api.php [QSA,L]
+
+# امنیت: جلوگیری از دسترسی مستقیم به فایل‌های حساس
+<FilesMatch "(^\.|config\.php|\.log$|\.sql$)">
+    Require all denied
+</FilesMatch>
+
+# تنظیمات امنیتی هدرها
+<IfModule mod_headers.c>
+    Header set X-Content-Type-Options "nosniff"
+    Header set X-Frame-Options "SAMEORIGIN"
+    Header set X-XSS-Protection "1; mode=block"
+    Header set Referrer-Policy "strict-origin-when-cross-origin"
+</IfModule>
+
+# تنظیمات CORS (در سطح Apache)
+<IfModule mod_headers.c>
+    Header set Access-Control-Allow-Origin "*"
+    Header set Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS"
+    Header set Access-Control-Allow-Headers "Content-Type, Authorization, X-Requested-With"
+</IfModule>
+
+# پاسخ به درخواست‌های preflight
+RewriteCond %{REQUEST_METHOD} OPTIONS
+RewriteRule ^ - [R=204,L]

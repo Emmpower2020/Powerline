@@ -5,7 +5,7 @@ API پلتفرم مدیریت خطوط انتقال و فوق‌انتقال ب�
 ## 📦 محتویات
 
 ```
-api_powerline/
+Powerline/
 ├── api.php                    ← نقطه ورود اصلی
 ├── config.php                 ← تنظیمات (دیتابیس، JWT، آپلود و...)
 ├── .htaccess                  ← تنظیمات Apache
@@ -34,11 +34,11 @@ api_powerline/
 
 ### قدم ۱) آپلود فایل‌ها
 
-کل فولدر `api_powerline` رو در فولدر `Powerline` روی سرور آپلود کن:
+کل فولدر `Powerline` رو در فولدر `Powerline` روی سرور آپلود کن:
 
 ```
 public_html/Powerline/
-└── api_powerline/   ← این فولدر رو آپلود کن
+└── Powerline/   ← این فولدر رو آپلود کن
 ```
 
 ### قدم ۲) تنظیمات
@@ -48,8 +48,8 @@ public_html/Powerline/
 ```php
 // تنظیمات دیتابیس (الان درسته)
 define('DB_HOST', 'localhost');
-define('DB_NAME', 'sabadga2_Powerline');
-define('DB_USER', 'sabadga2_Powerline');
+define('DB_NAME', 'jibimar1_Powerline');
+define('DB_USER', 'jibimar1_Powerline');
 define('DB_PASS', 'eV6pKL7ahq1AKr06');
 
 // ⚠️ این رو حتماً تغییر بده! (یک رشته ۶۴ کاراکتری تصادفی)
@@ -61,7 +61,7 @@ define('JWT_SECRET', 'Powerline_JWT_Secret_Key_2026_Change_Me_Please_9876543210!
 در مرورگر این آدرس رو باز کن:
 
 ```
-https://sabadgame.com/Powerline/api_powerline/api.php
+https://jibimarket.com/Powerline/Powerline/api.php
 ```
 
 باید یه JSON شبیه این ببینی:
@@ -93,7 +93,7 @@ https://sabadgame.com/Powerline/api_powerline/api.php
 **نمونه ورود:**
 
 ```bash
-curl -X POST https://sabadgame.com/Powerline/api_powerline/api.php/auth/login \
+curl -X POST https://jibimarket.com/Powerline/Powerline/api.php/auth/login \
     -H "Content-Type: application/json" \
     -d '{"username":"admin","password":"admin123"}'
 ```
@@ -109,7 +109,7 @@ curl -X POST https://sabadgame.com/Powerline/api_powerline/api.php/auth/login \
             "id": 1,
             "username": "admin",
             "full_name": "مدیر سیستم",
-            "email": "admin@sabadgame.com"
+            "email": "admin@jibimarket.com"
         },
         "tokens": {
             "access_token": "eyJ...",
@@ -142,7 +142,7 @@ curl -X POST https://sabadgame.com/Powerline/api_powerline/api.php/auth/login \
 **نمونه ایجاد خط:**
 
 ```bash
-curl -X POST https://sabadgame.com/Powerline/api_powerline/api.php/lines \
+curl -X POST https://jibimarket.com/Powerline/Powerline/api.php/lines \
     -H "Authorization: Bearer TOKEN" \
     -H "Content-Type: application/json" \
     -d '{
@@ -246,7 +246,7 @@ API از **JWT (JSON Web Token)** استفاده می‌کنه:
 
 3. **CORS رو محدود کن** — به‌جای `*`، فقط دامنه‌های مجاز رو قرار بده:
    ```php
-   define('CORS_ALLOW_ORIGIN', 'https://sabadgame.com,https://app.sabadgame.com');
+   define('CORS_ALLOW_ORIGIN', 'https://jibimarket.com,https://app.jibimarket.com');
    ```
 
 4. **HTTPS الزامی** — توکن‌ها نباید روی HTTP منتقل بشن.
@@ -259,13 +259,13 @@ API از **JWT (JSON Web Token)** استفاده می‌کنه:
 
 ```bash
 # ورود
-curl -X POST https://sabadgame.com/Powerline/api_powerline/api.php/auth/login \
+curl -X POST https://jibimarket.com/Powerline/Powerline/api.php/auth/login \
     -H "Content-Type: application/json" \
     -d '{"username":"admin","password":"admin123"}'
 
 # با توکن، لیست خطوط
 curl -H "Authorization: Bearer TOKEN" \
-    https://sabadgame.com/Powerline/api_powerline/api.php/lines
+    https://jibimarket.com/Powerline/Powerline/api.php/lines
 ```
 
 ### تست با اسکریپت:
