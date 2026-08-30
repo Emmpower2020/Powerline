@@ -17,7 +17,7 @@
 $DB_HOST = 'localhost';
 $DB_NAME = 'jibimar1_Powerline';
 $DB_USER = 'jibimar1_Powerline';
-$DB_PASS = 'eV6pKL7ahq1AKr06';
+$DB_PASS = 'URmxPYq7nUrvUVRFfdrw';
 
 $EXCEL_FILE = __DIR__ . '/عیوب_استاندارد.xlsx';
 $AUTO_CREATE_CATEGORIES = true;

@@ -12,7 +12,7 @@
 define('DB_HOST', 'localhost');
 define('DB_NAME', 'jibimar1_Powerline');
 define('DB_USER', 'jibimar1_Powerline');
-define('DB_PASS', 'eV6pKL7ahq1AKr06');
+define('DB_PASS', 'URmxPYq7nUrvUVRFfdrw');
 define('DB_CHARSET', 'utf8mb4');
 
 // ============================================================================
