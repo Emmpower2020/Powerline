@@ -138,7 +138,7 @@ class Router
     /**
      * تطبیق مسیر با پارامترها
      */
-    private function matchRoute(string $routePath, string $requestPath): array|false
+    private function matchRoute(string $routePath, string $requestPath)
     {
         $routePath = trim($routePath, '/');
         $routeParts = explode('/', $routePath);
