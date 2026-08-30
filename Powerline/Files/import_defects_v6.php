@@ -15,8 +15,8 @@
 //  تنظیمات دیتابیس
 // ============================================================================
 $DB_HOST = 'localhost';
-$DB_NAME = 'jibimar1_Powerline';
-$DB_USER = 'jibimar1_Powerline';
+$DB_NAME = 'jibimar1_powerline';
+$DB_USER = 'jibimar1_powerline';
 $DB_PASS = 'URmxPYq7nUrvUVRFfdrw';
 
 $EXCEL_FILE = __DIR__ . '/عیوب_استاندارد.xlsx';
