@@ -9,6 +9,7 @@ import { ImportExcelDialog } from "@/components/import-excel-dialog";
 import { IssuesBadge } from "@/components/issues-badge";
 import { LinesStatsBar } from "@/components/lines/lines-stats-bar";
 import { BulkLinesActions } from "@/components/lines/bulk-lines-actions";
+import { GenericBulkActions } from "@/components/generic-bulk-actions";
 import { getLineIssues } from "@/lib/lines-quality";
 import { usePersonnelOptions } from "@/hooks/use-personnel-options";
 import { Badge } from "@/components/ui/badge";
@@ -396,7 +397,10 @@ export function LinesPage() {
         onDuplicate={handleDuplicate}
         onImport={() => setShowImport(true)}
         onLoadAllRows={handleLoadAllRows}
-        toolbarExtra={<BulkLinesActions getSelection={getSelection} onApplied={handleBulkApplied} />}
+        toolbarExtra={(rows) => <div className="flex items-center gap-1">
+          <BulkLinesActions getSelection={getSelection} onApplied={handleBulkApplied} />
+          <GenericBulkActions rows={rows} endpoint={API_ENDPOINTS.lines} entityName="خط" onApplied={handleBulkApplied} canChangeContract />
+        </div>}
         tableRef={tableRef}
         layoutKey="lines"
         defaultSort={[{ key: "voltage_kv", direction: "asc", order: [400, 230, 132, 63] }, { key: "name", direction: "asc" }, { key: "line_code", direction: "asc" }]}

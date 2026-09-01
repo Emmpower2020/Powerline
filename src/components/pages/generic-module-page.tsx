@@ -239,7 +239,7 @@ export function GenericModulePage({ moduleKey, endpoint }: { moduleKey: string; 
       onDelete={deleteRows}
       onImport={() => inputRef.current?.click()}
       onLoadAllRows={async () => data}
-      toolbarExtra={(rows) => <GenericBulkActions rows={rows} endpoint={endpoint} entityName={config.title.replace("ها","")} onApplied={() => setRefreshKey(k => k + 1)} canToggleActive={data.some(r => "is_active" in r)} />}
+      toolbarExtra={(rows) => <GenericBulkActions rows={rows} endpoint={endpoint} entityName={config.title.replace("ها","")} onApplied={() => setRefreshKey(k => k + 1)} canToggleActive={data.some(r => "is_active" in r)} canChangeContract={!!config.editKeys?.includes("contract_id")} />}
     />
     {renderCreate()}
     <EditorDialog open={editor.open} row={editor.row} keys={selectedKeys} title={config.title} mode={editor.mode} endpoint={endpoint} onClose={() => setEditor({open:false,mode:editor.mode,row:null})} onSaved={() => { setEditor({open:false,mode:editor.mode,row:null}); setRefreshKey(k => k + 1); }} />

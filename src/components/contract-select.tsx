@@ -18,15 +18,13 @@ export function ContractSelect({
 }) {
   const { options, loading } = useContractOptions(true);
 
-
   return (
     <SearchableSelect
       value={value}
       onChange={onChange}
       options={options}
       placeholder={loading ? "در حال بارگذاری قراردادها..." : placeholder}
-      searchPlaceholder="جستجوی کد یا عنوان قرارداد..."
-      allowClear
+      searchPlaceholder="جستجوی عنوان قرارداد..."
       disabled={disabled}
       className={className}
     />

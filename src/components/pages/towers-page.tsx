@@ -9,6 +9,7 @@ import { ImportExcelDialog } from "@/components/import-excel-dialog";
 import { IssuesBadge } from "@/components/issues-badge";
 import { TowersStatsBar } from "@/components/towers/towers-stats-bar";
 import { BulkTowersActions } from "@/components/towers/bulk-towers-actions";
+import { GenericBulkActions } from "@/components/generic-bulk-actions";
 import { getTowerIssues } from "@/lib/towers-quality";
 import { usePersonnelOptions } from "@/hooks/use-personnel-options";
 import { useToast } from "@/hooks/use-toast";
@@ -452,7 +453,10 @@ export function TowersPage() {
         onDuplicate={handleDuplicate}
         onImport={() => setShowImport(true)}
         onLoadAllRows={handleLoadAllRows}
-        toolbarExtra={<BulkTowersActions getSelection={getSelection} onApplied={handleBulkApplied} />}
+        toolbarExtra={(rows) => <div className="flex items-center gap-1">
+          <BulkTowersActions getSelection={getSelection} onApplied={handleBulkApplied} />
+          <GenericBulkActions rows={rows} endpoint={API_ENDPOINTS.towers} entityName="دکل" onApplied={handleBulkApplied} canChangeContract />
+        </div>}
         tableRef={tableRef}
         layoutKey="towers"
         defaultSort={[{ key: "voltage_kv", direction: "asc", order: [400, 230, 132, 63] }, { key: "line_name", direction: "asc" }, { key: "line_code", direction: "asc" }, { key: "tower_number", direction: "asc" }]}

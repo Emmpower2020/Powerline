@@ -154,17 +154,24 @@ export function DashboardLayout({ children, currentPage, onNavigate, title, subt
   // v4.3.39: قرارداد پیش‌فرض = آخرین قرارداد فعال؛ انتخاب کاربر تا زمان تغییر/رفرش حفظ می‌شود.
   useEffect(() => {
     if (contractsLoading || !contractRows.length) return;
+    const saved = localStorage.getItem("powerline_selected_contract");
+    const savedExists = saved && contractRows.some((r: any) => String(r.id) === saved);
     const active = contractRows
       .filter((r: any) => r.status === "active")
       .sort((a: any, b: any) => Number(b.id) - Number(a.id))[0];
-    const next = active ? String(active.id) : String(contractRows[0].id);
+    const next = savedExists ? String(saved) : (active ? String(active.id) : String(contractRows[0].id));
     setSelectedContract(next);
     localStorage.setItem("powerline_selected_contract", next);
   }, [contractRows, contractsLoading]);
 
   const onContractChange = (value: string) => {
+    if (!value) return;
     setSelectedContract(value);
-    if (typeof window !== "undefined") localStorage.setItem("powerline_selected_contract", value);
+    if (typeof window !== "undefined") {
+      localStorage.setItem("powerline_selected_contract", value);
+      // همه ماژول‌ها در بارگذاری مجدد، contract_id انتخاب‌شده را به API می‌فرستند.
+      window.location.reload();
+    }
   };
   const visibleNavItems = navItems.filter(item => !item.permission || hasPermission(item.permission));
   const groups: { [key: string]: NavItem[] } = {};

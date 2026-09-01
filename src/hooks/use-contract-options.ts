@@ -40,7 +40,8 @@ export function useContractOptions(enabled = true) {
 
   const options = useMemo<SearchableOption[]>(() => rows.map((r) => ({
     value: String(r.id),
-    label: `${r.contract_code || `#${r.id}`} — ${r.title || "بدون عنوان"}`,
+    label: r.title || `قرارداد #${r.id}`,
+    // عنوان قرارداد اصلی است و نام پیمانکار مانند قبل به‌صورت توضیح کم‌رنگ نمایش داده می‌شود.
     description: r.contractor_name || undefined,
   })), [rows]);
 

@@ -17,6 +17,7 @@ import { DataTable, type DataTableColumn, type DataTableHandle } from "@/compone
 import { ImportExcelDialog } from "@/components/import-excel-dialog";
 import { BulkDeleteDialog } from "@/components/bulk-delete-dialog";
 import { useBulkDelete } from "@/hooks/use-bulk-delete";
+import { GenericBulkActions } from "@/components/generic-bulk-actions";
 import { CreateDefectDialog } from "@/components/defects/create-defect-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { logError } from "@/lib/error-log";
@@ -394,7 +395,7 @@ export function DefectsPage() {
         onCopy={handleCopy}
         onDelete={bulkDelete.requestDelete}
         onImport={() => setShowImport(true)}
-        toolbarExtra={
+        toolbarExtra={(rows) => <div className="flex items-center gap-1">
           <DropdownMenu dir="rtl">
             <DropdownMenuTrigger asChild>
               <Button
@@ -413,7 +414,8 @@ export function DefectsPage() {
               <ItemRow icon={<ShieldAlert className="w-4 h-4 text-red-500" />} label="ریسک ایمنی" onClick={() => startBulk("safety_risk")} />
             </DropdownMenuContent>
           </DropdownMenu>
-        }
+          <GenericBulkActions rows={rows} endpoint={API_ENDPOINTS.defects} entityName="عیب" onApplied={() => setRefreshKey(k => k + 1)} canChangeContract />
+        </div>}
       />
 
       <CreateDefectDialog

@@ -208,7 +208,7 @@ export function CircuitsPage() {
         onCopy={handleCopy}
         onDelete={bulkDelete.requestDelete}
         onImport={() => setShowImport(true)}
-        toolbarExtra={(rows) => <GenericBulkActions rows={rows} endpoint={API_ENDPOINTS.circuits} entityName="مدار" onApplied={() => setRefreshKey(k => k + 1)} />}
+        toolbarExtra={(rows) => <GenericBulkActions rows={rows} endpoint={API_ENDPOINTS.circuits} entityName="مدار" onApplied={() => setRefreshKey(k => k + 1)} canChangeContract />}
       />
 
       {/* دیالوگ ایجاد/ویرایش/کپی مدار */}
