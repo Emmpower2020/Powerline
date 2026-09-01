@@ -165,14 +165,12 @@ export function DashboardLayout({ children, currentPage, onNavigate, title, subt
   }, [contractRows, contractsLoading]);
 
   const onContractChange = (value: string) => {
-    // __unknown__ یعنی فقط رکوردهایی که هنوز قرارداد ندارند.
-    // مقدار خالی همچنان به معنی «بدون Scope / همه قراردادها» است و در هدر استفاده نمی‌شود.
+    // __unknown__ یعنی فقط رکوردهایی که هنوز قرارداد ندارند (contract_id IS NULL).
+    // تغییر قرارداد هرگز navigation انجام نمی‌دهد؛ فقط Scope داده عوض می‌شود.
     setSelectedContract(value);
     if (typeof window !== "undefined") {
       if (value) localStorage.setItem("powerline_selected_contract", value);
       else localStorage.removeItem("powerline_selected_contract");
-      // با تغییر Scope فقط state والد عوض می‌شود؛ DashboardLayout همان صفحه فعلی را نگه می‌دارد
-      // و به‌دلیل key={selectedContract} محتوای همان صفحه با قرارداد جدید دوباره mount می‌شود.
     }
   };
   const visibleNavItems = navItems.filter(item => !item.permission || hasPermission(item.permission));

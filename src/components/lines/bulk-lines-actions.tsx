@@ -153,7 +153,7 @@ export function BulkLinesActions({ getSelection, onApplied }: BulkLinesActionsPr
       case "conductor_type":       patch = { conductor_type: value.trim() }; break;
       case "tower_structure": patch = { tower_structure: value.trim() }; break;
       case "contractor":           patch = { contractor_id: Number(value) }; break;
-      case "contract":             patch = { contract_id: Number(value) }; break;
+      case "contract":             patch = { contract_id: value === "__unknown__" ? null : Number(value) }; break;
       case "voltage": {
         const v = Number(value);
         // فقط ستون واقعی دیتابیس lines استفاده می‌شود: voltage_kv
@@ -220,7 +220,7 @@ export function BulkLinesActions({ getSelection, onApplied }: BulkLinesActionsPr
             {fieldAction === "contract" ? (
               <div className="space-y-2">
                 <Label className="text-right block">قرارداد</Label>
-                <ContractSelect value={value} onChange={setValue} />
+                <ContractSelect value={value} onChange={setValue}  preserveUnknownValue/>
               </div>
             ) : fieldAction === "contractor" ? (
               <div className="space-y-2">

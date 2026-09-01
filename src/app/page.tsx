@@ -59,7 +59,18 @@ const pageInfo: Record<Page, { title: string; subtitle?: string }> = {
 
 export default function Home() {
   const { user, loading } = useAuth();
-  const [currentPage, setCurrentPage] = useState<Page>("dashboard");
+  // صفحه فعلی در session حفظ می‌شود تا تغییر Scope قرارداد یا refresh ناخواسته
+  // باعث برگشت کاربر به پیشخوان نشود.
+  const [currentPage, setCurrentPageState] = useState<Page>(() => {
+    if (typeof window === "undefined") return "dashboard";
+    const saved = sessionStorage.getItem("powerline_current_page") as Page | null;
+    return saved && Object.prototype.hasOwnProperty.call(pageInfo, saved) ? saved : "dashboard";
+  });
+
+  const setCurrentPage = (page: Page) => {
+    setCurrentPageState(page);
+    if (typeof window !== "undefined") sessionStorage.setItem("powerline_current_page", page);
+  };
 
   if (loading) return <div className="min-h-screen flex items-center justify-center"><Loader2 className="w-10 h-10 text-indigo-600 animate-spin" /></div>;
   if (!user) return <LoginForm />;

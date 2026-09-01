@@ -231,7 +231,7 @@ function registerLineRoutes(Router $router): void
             'total_towers', 'tension_towers', 'suspension_towers',
             'plain_terrain', 'semi_mountainous', 'mountainous',
             'commission_year', 'line_supervisor', 'line_expert',
-            'owner_org_id', 'contractor_id', 'status',
+            'owner_org_id', 'contractor_id', 'contract_id', 'status',
         ];
 
         $towerCountRow = $db->fetchOne("SELECT COUNT(*) AS cnt FROM towers WHERE line_id = ? AND status = 'active'", [(int)$id]);
