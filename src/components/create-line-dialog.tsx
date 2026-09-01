@@ -14,6 +14,7 @@ import { useConductors } from "@/hooks/use-conductors";
 import { usePersonnelOptions } from "@/hooks/use-personnel-options";
 import { Loader2, LockKeyhole } from "lucide-react";
 import { useTowerReferences } from "@/hooks/use-tower-references";
+import { ContractSelect } from "@/components/contract-select";
 
 interface FormData {
   line_code: string; dispatch_code: string; name: string; group_name: string;
@@ -22,7 +23,7 @@ interface FormData {
   total_towers: string; tension_towers: string; suspension_towers: string;
   plain_terrain: string; semi_mountainous: string; mountainous: string;
   commission_year: string;
-  line_supervisor: string; line_expert: string; notes: string;
+  line_supervisor: string; line_expert: string; notes: string; contract_id: string;
 }
 
 const empty: FormData = {
@@ -31,7 +32,7 @@ const empty: FormData = {
   conductor_type: "", tower_structure: "", length_km: "", circuit_length_km: "",
   total_towers: "", tension_towers: "", suspension_towers: "",
   plain_terrain: "", semi_mountainous: "", mountainous: "",
-  commission_year: "", line_supervisor: "", line_expert: "", notes: "",
+  commission_year: "", line_supervisor: "", line_expert: "", notes: "", contract_id: "",
 };
 
 
@@ -127,6 +128,7 @@ export function CreateLineDialog({ open, onClose, onCreated, editRow, duplicateF
           line_expert: sourceRow.line_expert || "",
           // v3.5.1: قبلاً همیشه "" بود و ویرایش خط توضیحات ذخیره‌شده را بی‌صدا پاک می‌کرد
           notes: sourceRow.notes || "",
+          contract_id: sourceRow.contract_id != null ? String(sourceRow.contract_id) : "",
         });
         setDispatchCodes(parseDispatch(sourceRow.dispatch_code));
       } else {
@@ -174,6 +176,7 @@ export function CreateLineDialog({ open, onClose, onCreated, editRow, duplicateF
         line_supervisor: form.line_supervisor || null,
         line_expert: form.line_expert || null,
         notes: form.notes || null,
+        contract_id: form.contract_id ? Number(form.contract_id) : null,
       };
 
       if (isEdit && editRow?.id) {
@@ -250,6 +253,7 @@ export function CreateLineDialog({ open, onClose, onCreated, editRow, duplicateF
             </Field>
             <Field label="نام مجموعه خط"><Input value={form.group_name} onChange={e => set("group_name", e.target.value)} className="text-right" /></Field>
             <Field label="نام خط (اجباری)"><Input value={form.name} onChange={e => set("name", e.target.value)} className="text-right" /></Field>
+            <Field label="قرارداد"><ContractSelect value={form.contract_id} onChange={v => set("contract_id", v)} /></Field>
           </div>
 
           {/* سکشن ۲: مشخصات فنی — v3.4.0: گرید منظم ۳ ستونه و ردیف‌های هم‌عرض */}

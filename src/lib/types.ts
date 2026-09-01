@@ -17,6 +17,8 @@ export interface Line {
   owner_org_name: string | null;
   contractor_id: number | null;
   contractor_name: string | null;
+  contract_id: number | null;
+  contract_title: string | null;
   construction_date: string | null;
   commission_date: string | null;
   is_active: boolean;
@@ -32,6 +34,8 @@ export interface Tower {
   line_id: number | null;
   line_code: string | null;
   line_name: string | null;
+  contract_id: number | null;
+  contract_title: string | null;
   tower_code: string;
   tower_number: number | null;
   tower_type: TowerType;
@@ -92,6 +96,8 @@ export interface Defect {
   line_name: string | null;
   tower_id: number | null;
   tower_code: string | null;
+  contract_id: number | null;
+  contract_title: string | null;
   tower_type: TowerType | null;
   discovered_by_name: string | null;
   discovered_at: string;
@@ -140,6 +146,8 @@ export interface Inspection {
   line_name: string | null;
   tower_id: number | null;
   tower_code: string | null;
+  contract_id: number | null;
+  contract_title: string | null;
   inspector_name: string | null;
   inspection_date: string;
   start_time: string | null;

@@ -136,9 +136,10 @@ function registerTowerRoutes(Router $router): void
 
         $total = $db->count('towers t', $where, $params);
 
-        $sql = "SELECT t.*, l.line_code, l.name AS line_name, l.voltage_kv
+        $sql = "SELECT t.*, l.line_code, l.name AS line_name, l.voltage_kv, ct.title AS contract_title
                 FROM towers t
                 LEFT JOIN `lines` l ON l.id = t.line_id
+                LEFT JOIN contracts ct ON ct.id = t.contract_id
                 WHERE $where
                 ORDER BY t.id DESC
                 LIMIT $pageSize OFFSET $offset";
@@ -159,9 +160,10 @@ function registerTowerRoutes(Router $router): void
 
         $db = Database::getInstance();
         $row = $db->fetchOne(
-            "SELECT t.*, l.line_code, l.name AS line_name, l.voltage_kv
+            "SELECT t.*, l.line_code, l.name AS line_name, l.voltage_kv, ct.title AS contract_title
              FROM towers t
              LEFT JOIN `lines` l ON l.id = t.line_id
+             LEFT JOIN contracts ct ON ct.id = t.contract_id
              WHERE t.id = ?",
             [(int) $id]
         );
@@ -232,9 +234,9 @@ function registerTowerRoutes(Router $router): void
         // سرپرست خط: اگر ارسال نشده بود از خط متناظر ارث می‌رسد
         $supervisor = $body['line_supervisor'] ?? ($line['line_supervisor'] ?? null);
 
-        $columns = ['line_id','tower_code','tower_number'];
+        $columns = ['line_id','contract_id','tower_code','tower_number'];
         $values = ['?','?','?'];
-        $params = [$lineId, $towerCode, $body['tower_number']];
+        $params = [$lineId, !empty($body['contract_id']) ? (int)$body['contract_id'] : null, $towerCode, $body['tower_number']];
         $columns[]='tower_structure'; $values[]='?'; $params[]=$body['tower_structure'];
         $columns[]='tower_type'; $values[]='?'; $params[]=$body['tower_type'];
         $columns[]=$towerCodeColumn; $values[]='?'; $params[]=$body['tower_type_code'] ?? null;
@@ -288,7 +290,7 @@ function registerTowerRoutes(Router $router): void
             'insulator_r1', 'insulator_s1', 'insulator_t1', 'insulator_r2', 'insulator_s2', 'insulator_t2',
             'insulator_count_r1', 'insulator_count_s1', 'insulator_count_t1',
             'insulator_count_r2', 'insulator_count_s2', 'insulator_count_t2',
-            'line_supervisor', 'is_active',
+            'line_supervisor', 'contract_id', 'is_active',
         ];
 
         $updates = [];
@@ -374,7 +376,7 @@ function registerTowerRoutes(Router $router): void
             'tower_structure', 'tower_type', 'tower_type_code',
             'insulator_r1', 'insulator_s1', 'insulator_t1',
             'insulator_r2', 'insulator_s2', 'insulator_t2',
-            'line_supervisor', 'is_active',
+            'line_supervisor', 'contract_id', 'is_active',
         ];
 
         $updates = [];
@@ -580,8 +582,8 @@ function registerTowerRoutes(Router $router): void
             $towerColumns = towerTableColumns($db);
             $towerCodeField = towerCodeColumn($db);
             $insertTower = function (array $d) use ($pdo, $towerColumns, $towerCodeField) {
-                $cols = ['line_id','tower_code','tower_number'];
-                $vals = ['?','?','?']; $params = [$d['line_id'], $d['tower_code'], $d['tower_number']];
+                $cols = ['line_id','contract_id','tower_code','tower_number'];
+                $vals = ['?','?','?','?']; $params = [$d['line_id'], $d['contract_id'] ?? null, $d['tower_code'], $d['tower_number']];
                 if (isset($towerColumns['tower_type'])) { $cols[]='tower_type'; $vals[]='?'; $params[]=$d['tower_type'] ?? null; }
                 $cols[]='tower_structure'; $vals[]='?'; $params[]=$d['tower_structure'] ?? null;
                 $cols[]=$towerCodeField; $vals[]='?'; $params[]=$d['tower_type_code'] ?? null;
@@ -674,7 +676,7 @@ function registerTowerRoutes(Router $router): void
                         }
                         $lineCodesCache[(int) $lineId][] = $code;
                         $insertTower([
-                            'line_id'=>$lineId, 'tower_code'=>$code, 'tower_number'=>$number, 'tower_type'=>$towerType,
+                            'line_id'=>$lineId, 'contract_id'=>($r['contract_id'] ?? null) !== '' ? ($r['contract_id'] ?? null) : null, 'tower_code'=>$code, 'tower_number'=>$number, 'tower_type'=>$towerType,
                             'tower_structure'=>$structure, 'tower_type_code'=>$n('tower_type_code'), 'base_height_a'=>$n('base_height_a'), 'base_height_b'=>$n('base_height_b'),
                             'base_height_c'=>$n('base_height_c'), 'base_height_d'=>$n('base_height_d'),
                             'insulator_r1'=>$n('insulator_r1'), 'insulator_s1'=>$n('insulator_s1'), 'insulator_t1'=>$n('insulator_t1'),
@@ -735,6 +737,8 @@ function formatTowerRow(array $row): array
         // v2.6.0: ولتاژ خط برای رنگ‌بندی نام خط در جدول دکل‌ها
         'voltage_kv'        => isset($row['voltage_kv']) ? (int) $row['voltage_kv'] : null,
         'tower_code'        => $row['tower_code'],
+        'contract_id'       => $row['contract_id'] ? (int) $row['contract_id'] : null,
+        'contract_title'    => $row['contract_title'] ?? null,
         'tower_number'      => $int($row['tower_number']),
         'tower_type'        => $row['tower_type'] ?? null,
         'tower_structure'   => $row['tower_structure'] ?? null,

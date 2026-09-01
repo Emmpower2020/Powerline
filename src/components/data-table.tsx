@@ -489,9 +489,12 @@ function DataTableInner<T extends { id: number }>({
 
   // همه جدول‌ها قابلیت انتخاب ردیف دارند؛ عملیات وابسته به callbackهای صفحه فعال می‌شوند.
   const hasSelection = true;
-  const selCount = selectedRows.size;
+  // Selection is intentionally allowed to persist across pages for bulk operations.
+  // Edit/duplicate, however, must only evaluate rows that are currently visible after search/filter.
+  // This prevents a stale selection from another page/filter from blocking a single-row edit.
+  const visibleSelectedRows = paginated.filter(r => selectedRows.has(r.id));
+  const selCount = visibleSelectedRows.length;
 
-  // Edit handler — if 0 selected: do nothing; if 1 selected: call onEdit; if >1: alert
   const handleEditClick = () => {
     if (selCount === 0) {
       // optional: parent can pass onEdit and decide what to do — we just skip silently
@@ -504,17 +507,15 @@ function DataTableInner<T extends { id: number }>({
       });
       return;
     }
-    // exactly 1 — find the row
-    const id = Array.from(selectedRows)[0];
-    const row = data.find(r => r.id === id);
+    // exactly 1 visible row — find it directly from the filtered data set
+    const row = visibleSelectedRows[0];
     if (row && onEdit) onEdit(row);
   };
 
   // Duplicate handler — same single-selection rule as edit
   const handleDuplicateClick = () => {
     if (selCount === 0 || selCount > 1) return;
-    const id = Array.from(selectedRows)[0];
-    const row = data.find(r => r.id === id);
+    const row = visibleSelectedRows[0];
     if (row && onDuplicate) onDuplicate(row);
   };
 

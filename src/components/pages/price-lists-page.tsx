@@ -23,6 +23,7 @@ import { JalaliDatePicker } from "@/components/jalali-date-picker";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, Plus, ListChecks, FileSpreadsheet } from "lucide-react";
 import { GenericBulkActions } from "@/components/generic-bulk-actions";
+import { ContractSelect } from "@/components/contract-select";
 
 /**
  * صفحه فهرست بها — v2.8.1
@@ -39,6 +40,8 @@ import { GenericBulkActions } from "@/components/generic-bulk-actions";
 
 interface PriceList {
   id: number;
+  contract_id?: number | null;
+  contract_title?: string | null;
   name: string;
   version: string | null;
   effective_date: string;
@@ -54,6 +57,7 @@ interface PriceListItem {
   unit_price: number;
   category: string | null;
   is_active: number;
+  contract_title?: string | null;
 }
 
 const asArray = (r: unknown): any[] => (Array.isArray(r) ? r : ((r as any)?.data || []));
@@ -100,15 +104,16 @@ export function PriceListsPage() {
       setItemsLoading(true);
       try {
         const r = await apiClient.get<unknown>(API_ENDPOINTS.priceListItems, { list_id: Number(selectedListId) });
-        setItems(asArray(r));
+        setItems(asArray(r).map(item => ({ ...item, contract_title: selectedList?.contract_title || null })));
       } catch (err) {
         console.error("خطا در بارگذاری اقلام:", err);
       } finally { setItemsLoading(false); }
     };
     load();
-  }, [selectedListId, refreshKey]);
+  }, [selectedListId, refreshKey, selectedList?.contract_title]);
 
   const columns: DataTableColumn<PriceListItem>[] = [
+    { key: "contract_title", header: "قرارداد", sortable: true, filterable: true, wrap: true },
     { key: "code", header: "کد", sortable: true, filterable: true, align: "left" },
     { key: "title", header: "شرح", sortable: true, filterable: true, wrap: true },
     { key: "unit", header: "واحد", sortable: true, filterable: true },
@@ -255,7 +260,7 @@ export function PriceListsPage() {
           data={items}
           columns={columns}
           loading={itemsLoading}
-          searchKeys={["code", "title", "category"]}
+          searchKeys={["contract_title", "code", "title", "category"]}
           title="اقلام فهرست بها"
           layoutKey="price-list-items"
           onAdd={() => setShowCreateItem(true)}
@@ -316,7 +321,7 @@ export function PriceListsPage() {
 function CreatePriceListDialog({ open, onClose, onCreated }: { open: boolean; onClose: () => void; onCreated: () => void }) {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [form, setForm] = useState({ name: "", version: "", effective_date: "" });
+  const [form, setForm] = useState({ name: "", version: "", effective_date: "", contract_id: "" });
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -327,8 +332,9 @@ function CreatePriceListDialog({ open, onClose, onCreated }: { open: boolean; on
         name: form.name.trim(),
         version: form.version.trim() || null,
         effective_date: form.effective_date || undefined,
+        contract_id: form.contract_id ? Number(form.contract_id) : null,
       });
-      setForm({ name: "", version: "", effective_date: "" });
+      setForm({ name: "", version: "", effective_date: "", contract_id: "" });
       onCreated();
     } catch (err) {
       setError(err instanceof Error ? err.message : "خطا در ایجاد فهرست");
@@ -346,6 +352,10 @@ function CreatePriceListDialog({ open, onClose, onCreated }: { open: boolean; on
           <div className="space-y-2">
             <Label className="text-right block">نام فهرست (اجباری)</Label>
             <Input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder="مثلاً: فهرست بها ۱۴۰۵" className="text-right" autoFocus />
+          </div>
+          <div className="space-y-2">
+            <Label className="text-right block">قرارداد</Label>
+            <ContractSelect value={form.contract_id} onChange={v => setForm({ ...form, contract_id: v })} />
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="space-y-2">

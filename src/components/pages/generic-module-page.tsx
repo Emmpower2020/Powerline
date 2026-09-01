@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Loader2, Plus, Upload as UploadIcon } from "lucide-react";
+import { ContractSelect } from "@/components/contract-select";
 import { DataTable, type DataTableColumn } from "@/components/data-table";
 import { CreateContractDialog, CreateSafetyDialog, CreatePersonnelDialog, CreateContractorDialog, CreateEquipmentDialog } from "@/components/create-dialogs";
 import type { PaginatedResponse } from "@/lib/types";
@@ -34,21 +35,24 @@ const configs: Record<string, GenericConfig> = {
   ]},
   invoices: { title: "صورت‌وضعیت‌ها", editKeys: ["contract_id","contractor_id","period_start","period_end","total_amount"], importKeys: ["contract_id","contractor_id","period_start","period_end","total_amount"], columns: [
     { key: "invoice_code", header: "کد", sortable: true, filterable: true, align: "left" },
+    { key: "contract_title", header: "قرارداد", sortable: true, filterable: true, wrap: true },
     { key: "contractor_name", header: "پیمانکار", sortable: true, filterable: true },
     { key: "period_start", header: "از", type: "date" }, { key: "period_end", header: "تا", type: "date" },
     { key: "final_amount", header: "مبلغ نهایی", sortable: true, type: "number" },
     { key: "status", header: "وضعیت", type: "badge", badgeLabels: { draft: "پیش‌نویس", submitted: "ارسال", approved: "تأیید", paid: "پرداخت", rejected: "رد" }, badgeColors: { draft: "bg-slate-100 text-slate-700", submitted: "bg-blue-100 text-blue-700", approved: "bg-indigo-100 text-indigo-700", paid: "bg-green-100 text-green-700", rejected: "bg-red-100 text-red-700" } },
   ]},
-  "safety-incidents": { title: "حوادث ایمنی", create: "safety", editKeys: ["title","incident_type","severity","description","location_desc","occurred_at","status"], importKeys: ["title","incident_type","severity","description","location_desc","occurred_at"], columns: [
+  "safety-incidents": { title: "حوادث ایمنی", create: "safety", editKeys: ["contract_id","title","incident_type","severity","description","location_desc","occurred_at","status"], importKeys: ["contract_id","title","incident_type","severity","description","location_desc","occurred_at"], columns: [
     { key: "incident_code", header: "کد", sortable: true, filterable: true, align: "left" },
+    { key: "contract_title", header: "قرارداد", sortable: true, filterable: true, wrap: true },
     { key: "title", header: "عنوان", sortable: true, filterable: true },
     { key: "incident_type", header: "نوع", type: "badge", badgeLabels: { accident: "حادثه", near_miss: "Near Miss", unsafe_act: "ناایمن", unsafe_condition: "شرایط ناایمن", environmental: "محیط زیست" }, badgeColors: { accident: "bg-red-100 text-red-700", near_miss: "bg-amber-100 text-amber-700", unsafe_act: "bg-orange-100 text-orange-700" } },
     { key: "severity", header: "شدت", type: "badge", badgeLabels: { none: "بدون آسیب", minor: "جزئی", moderate: "متوسط", serious: "جدی", fatal: "مرگبار" }, badgeColors: { none: "bg-slate-100 text-slate-500", minor: "bg-yellow-100 text-yellow-700", moderate: "bg-orange-100 text-orange-700", serious: "bg-red-100 text-red-700" } },
     { key: "occurred_at", header: "تاریخ", type: "date" },
     { key: "status", header: "وضعیت", type: "badge", badgeLabels: { reported: "گزارش شده", under_investigation: "در حال بررسی", resolved: "حل شده", closed: "بسته شده" }, badgeColors: { reported: "bg-blue-100 text-blue-700", resolved: "bg-green-100 text-green-700", closed: "bg-slate-100 text-slate-500" } },
   ]},
-  "line-incidents": { title: "حوادث خطوط", create: "safety", editKeys: ["title","incident_type","severity","description","location_desc","occurred_at","line_id","tower_id","status"], importKeys: ["title","incident_type","severity","description","location_desc","occurred_at","line_id","tower_id"], columns: [
+  "line-incidents": { title: "حوادث خطوط", create: "safety", editKeys: ["contract_id","title","incident_type","severity","description","location_desc","occurred_at","line_id","tower_id","status"], importKeys: ["contract_id","title","incident_type","severity","description","location_desc","occurred_at","line_id","tower_id"], columns: [
     { key: "incident_code", header: "کد", sortable: true, filterable: true, align: "left" },
+    { key: "contract_title", header: "قرارداد", sortable: true, filterable: true, wrap: true },
     { key: "line_code", header: "خط", sortable: true, filterable: true },
     { key: "tower_code", header: "دکل", sortable: true, filterable: true },
     { key: "title", header: "عنوان", sortable: true, filterable: true },
@@ -57,8 +61,9 @@ const configs: Record<string, GenericConfig> = {
     { key: "occurred_at", header: "تاریخ", type: "date", sortable: true },
     { key: "status", header: "وضعیت", type: "badge", badgeLabels: { reported: "گزارش شده", under_investigation: "در حال بررسی", resolved: "حل شده", closed: "بسته شده" }, badgeColors: { reported: "bg-blue-100 text-blue-700", resolved: "bg-green-100 text-green-700", closed: "bg-slate-100 text-slate-500" } },
   ]},
-  personnel: { title: "پرسنل", create: "personnel", editKeys: ["first_name","last_name","personnel_type","position","phone","mobile","email"], importKeys: ["first_name","last_name","personnel_type","position","phone","mobile","email"], columns: [
+  personnel: { title: "پرسنل", create: "personnel", editKeys: ["contract_id","first_name","last_name","personnel_type","position","phone","mobile","email"], importKeys: ["contract_id","first_name","last_name","personnel_type","position","phone","mobile","email"], columns: [
     { key: "personnel_code", header: "کد", sortable: true, filterable: true, align: "left" },
+    { key: "contract_title", header: "قرارداد", sortable: true, filterable: true, wrap: true },
     { key: "first_name", header: "نام", sortable: true, filterable: true },
     { key: "last_name", header: "نام خانوادگی", sortable: true, filterable: true },
     { key: "personnel_type", header: "نوع", type: "badge", badgeLabels: { employee: "کارمند", contractor: "پیمانکار", operator: "اپراتور", guard: "نگهبان", manager: "مدیر", line_expert: "کارشناس خط", safety_expert: "کارشناس ایمنی", crew_supervisor: "سرپرست", lineman: "سیمبان", driver: "راننده" }, badgeColors: { employee: "bg-blue-100 text-blue-700", contractor: "bg-amber-100 text-amber-700", operator: "bg-purple-100 text-purple-700" } },
@@ -72,8 +77,9 @@ const configs: Record<string, GenericConfig> = {
     { key: "phone", header: "تلفن", align: "left" }, { key: "mobile", header: "موبایل", align: "left" },
     { key: "is_active", header: "وضعیت", type: "boolean" },
   ]},
-  equipment: { title: "تجهیزات", create: "equipment", editKeys: ["serial_number","manufacturer","model","install_date","warranty_expiry","is_active"], importKeys: ["serial_number","manufacturer","model","install_date","warranty_expiry"], columns: [
+  equipment: { title: "تجهیزات", create: "equipment", editKeys: ["contract_id","serial_number","manufacturer","model","install_date","warranty_expiry","is_active"], importKeys: ["contract_id","serial_number","manufacturer","model","install_date","warranty_expiry"], columns: [
     { key: "serial_number", header: "سریال", sortable: true, filterable: true, align: "left" },
+    { key: "contract_title", header: "قرارداد", sortable: true, filterable: true, wrap: true },
     { key: "manufacturer", header: "سازنده", sortable: true, filterable: true },
     { key: "model", header: "مدل" }, { key: "class_name", header: "گروه" },
     { key: "tower_code", header: "دکل" }, { key: "is_active", header: "وضعیت", type: "boolean" },
@@ -130,8 +136,10 @@ function EditorDialog({
       <form onSubmit={save}>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[60vh] overflow-y-auto p-1">
           {keys.map(k => <div key={k} className="space-y-1">
-            <label className="text-sm text-slate-600">{k}</label>
-            {k === "notes" || k === "description" || k === "address" ? <Textarea value={form[k] || ""} onChange={e => setForm({...form,[k]:e.target.value})} /> : <Input value={form[k] || ""} onChange={e => setForm({...form,[k]:e.target.value})} dir={/(_id|amount|phone|mobile)/.test(k) ? "ltr" : "rtl"} />}
+            <label className="text-sm text-slate-600">{k === "contract_id" ? "قرارداد" : k}</label>
+            {k === "contract_id" ? <ContractSelect value={form[k] || ""} onChange={v => setForm({...form, [k]: v})} />
+              : k === "notes" || k === "description" || k === "address" ? <Textarea value={form[k] || ""} onChange={e => setForm({...form,[k]:e.target.value})} />
+              : <Input value={form[k] || ""} onChange={e => setForm({...form,[k]:e.target.value})} dir={/(_id|amount|phone|mobile)/.test(k) ? "ltr" : "rtl"} />}
           </div>)}
         </div>
         {error && <p className="mt-3 text-sm text-red-600 whitespace-pre-line">{error}</p>}

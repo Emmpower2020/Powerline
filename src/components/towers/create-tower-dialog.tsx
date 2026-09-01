@@ -20,7 +20,7 @@ export const INSULATOR_TYPES = ["سرامیکی", "شیشه‌ای", "سیلیک
 const TOWER_TYPES = ["کششی", "آویزی"] as const;
 
 interface FormData {
-  line_id: string; tower_number: string; line_supervisor: string;
+  line_id: string; contract_id: string; tower_number: string; line_supervisor: string;
   tower_structure: string; tower_type: string; tower_type_code: string;
   base_height_a: string; base_height_b: string; base_height_c: string; base_height_d: string;
   insulator_r1: string; insulator_s1: string; insulator_t1: string;
@@ -31,7 +31,7 @@ interface FormData {
 }
 
 const empty: FormData = {
-  line_id: "", tower_number: "", line_supervisor: "",
+  line_id: "", contract_id: "", tower_number: "", line_supervisor: "",
   tower_structure: "", tower_type: "", tower_type_code: "",
   base_height_a: "", base_height_b: "", base_height_c: "", base_height_d: "",
   insulator_r1: "", insulator_s1: "", insulator_t1: "",
@@ -130,6 +130,7 @@ export function CreateTowerDialog({ open, onClose, onCreated, editRow, duplicate
         const s = (v: any) => (v === null || v === undefined ? "" : String(v));
         setForm({
           line_id: s(sourceRow.line_id),
+          contract_id: sourceRow?.contract_id != null ? String(sourceRow.contract_id) : "",
           // در حالت کپی، شماره دخل خالی تا کد جدید تولید شود
           tower_number: isEdit ? s(sourceRow.tower_number) : "",
           line_supervisor: s(sourceRow.line_supervisor),
@@ -175,6 +176,7 @@ export function CreateTowerDialog({ open, onClose, onCreated, editRow, duplicate
       const str = (v: string) => (v === "" ? null : v);
       const payload: Record<string, unknown> = {
         line_id: form.line_id ? Number(form.line_id) : null,
+        contract_id: form.contract_id ? Number(form.contract_id) : null,
         tower_code: autoCode,
         tower_number: num(form.tower_number),
         tower_structure: form.tower_structure,

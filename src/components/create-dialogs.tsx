@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/select";
 import { Loader2 } from "lucide-react";
 import { JalaliDatePicker } from "@/components/jalali-date-picker";
+import { ContractSelect } from "@/components/contract-select";
 
 // قرارداد
 export function CreateContractDialog({ open, onClose, onCreated }: { open: boolean; onClose: () => void; onCreated: () => void }) {
@@ -61,13 +62,13 @@ export function CreateContractDialog({ open, onClose, onCreated }: { open: boole
 export function CreateSafetyDialog({ open, onClose, onCreated }: { open: boolean; onClose: () => void; onCreated: () => void }) {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [form, setForm] = useState({ title: "", incident_type: "near_miss", severity: "none", description: "", location_desc: "", occurred_at: "" });
+  const [form, setForm] = useState({ title: "", incident_type: "near_miss", severity: "none", description: "", location_desc: "", occurred_at: "", contract_id: "" });
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.title) { setError("عنوان الزامی است"); return; }
     setSubmitting(true); setError(null);
-    try { await apiClient.post(API_ENDPOINTS.safetyIncidents, { title: form.title, incident_type: form.incident_type, severity: form.severity, description: form.description || null, location_desc: form.location_desc || null, occurred_at: form.occurred_at || null }); setForm({ title: "", incident_type: "near_miss", severity: "none", description: "", location_desc: "", occurred_at: "" }); onCreated(); } catch (err) { setError(err instanceof Error ? err.message : "خطا"); } finally { setSubmitting(false); }
+    try { await apiClient.post(API_ENDPOINTS.safetyIncidents, { title: form.title, incident_type: form.incident_type, severity: form.severity, description: form.description || null, location_desc: form.location_desc || null, occurred_at: form.occurred_at || null, contract_id: form.contract_id ? Number(form.contract_id) : null }); setForm({ title: "", incident_type: "near_miss", severity: "none", description: "", location_desc: "", occurred_at: "", contract_id: "" }); onCreated(); } catch (err) { setError(err instanceof Error ? err.message : "خطا"); } finally { setSubmitting(false); }
   };
 
   return (
@@ -77,6 +78,7 @@ export function CreateSafetyDialog({ open, onClose, onCreated }: { open: boolean
         <Field label="نوع حادثه"><Select value={form.incident_type} onValueChange={v => setForm({ ...form, incident_type: v })}><SelectTrigger className="w-full"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="accident">حادثه</SelectItem><SelectItem value="near_miss">Near Miss</SelectItem><SelectItem value="unsafe_act">عمل ناایمن</SelectItem></SelectContent></Select></Field>
         <Field label="شدت"><Select value={form.severity} onValueChange={v => setForm({ ...form, severity: v })}><SelectTrigger className="w-full"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="none">بدون آسیب</SelectItem><SelectItem value="minor">جزئی</SelectItem><SelectItem value="serious">جدی</SelectItem></SelectContent></Select></Field>
       </div>
+      <Field label="قرارداد"><ContractSelect value={form.contract_id} onChange={v => setForm({ ...form, contract_id: v })} /></Field>
       <Field label="تاریخ و زمان"><JalaliDatePicker value={form.occurred_at} onChange={v => setForm({ ...form, occurred_at: v })} type="datetime" /></Field>
       <Field label="محل"><Input value={form.location_desc} onChange={e => setForm({ ...form, location_desc: e.target.value })} className="text-right" /></Field>
       <Field label="توضیحات"><Textarea value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} rows={3} className="text-right" /></Field>
@@ -88,13 +90,13 @@ export function CreateSafetyDialog({ open, onClose, onCreated }: { open: boolean
 export function CreatePersonnelDialog({ open, onClose, onCreated }: { open: boolean; onClose: () => void; onCreated: () => void }) {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [form, setForm] = useState({ first_name: "", last_name: "", personnel_type: "employee", position: "", phone: "", mobile: "", email: "", hire_date: "" });
+  const [form, setForm] = useState({ first_name: "", last_name: "", personnel_type: "employee", position: "", phone: "", mobile: "", email: "", hire_date: "", contract_id: "" });
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.first_name) { setError("نام الزامی است"); return; }
     setSubmitting(true); setError(null);
-    try { await apiClient.post(API_ENDPOINTS.personnel, { first_name: form.first_name, last_name: form.last_name, personnel_type: form.personnel_type, position: form.position || null, phone: form.phone || null, mobile: form.mobile || null, email: form.email || null, hire_date: form.hire_date || null }); setForm({ first_name: "", last_name: "", personnel_type: "employee", position: "", phone: "", mobile: "", email: "", hire_date: "" }); onCreated(); } catch (err) { setError(err instanceof Error ? err.message : "خطا"); } finally { setSubmitting(false); }
+    try { await apiClient.post(API_ENDPOINTS.personnel, { first_name: form.first_name, last_name: form.last_name, personnel_type: form.personnel_type, position: form.position || null, phone: form.phone || null, mobile: form.mobile || null, email: form.email || null, hire_date: form.hire_date || null, contract_id: form.contract_id ? Number(form.contract_id) : null }); setForm({ first_name: "", last_name: "", personnel_type: "employee", position: "", phone: "", mobile: "", email: "", hire_date: "", contract_id: "" }); onCreated(); } catch (err) { setError(err instanceof Error ? err.message : "خطا"); } finally { setSubmitting(false); }
   };
 
   return (
@@ -155,7 +157,7 @@ export function CreateEquipmentDialog({ open, onClose, onCreated }: { open: bool
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [classes, setClasses] = useState<any[]>([]);
-  const [form, setForm] = useState({ equipment_class_id: "", serial_number: "", manufacturer: "", model: "", install_date: "" });
+  const [form, setForm] = useState({ equipment_class_id: "", serial_number: "", manufacturer: "", model: "", install_date: "", contract_id: "" });
 
   // v2.8.1: fetch با useEffect انجام می‌شود — قبلاً به‌اشتباه useState بود که فقط یک‌بار در mount اجرا می‌شد
   // equipment-classes پاسخ آرایه ساده برمی‌گرداند
@@ -171,11 +173,12 @@ export function CreateEquipmentDialog({ open, onClose, onCreated }: { open: bool
     e.preventDefault();
     if (!form.equipment_class_id) { setError("گروه تجهیز الزامی است"); return; }
     setSubmitting(true); setError(null);
-    try { await apiClient.post(API_ENDPOINTS.equipment, { equipment_class_id: Number(form.equipment_class_id), serial_number: form.serial_number || null, manufacturer: form.manufacturer || null, model: form.model || null, install_date: form.install_date || null }); setForm({ equipment_class_id: "", serial_number: "", manufacturer: "", model: "", install_date: "" }); onCreated(); } catch (err) { setError(err instanceof Error ? err.message : "خطا"); } finally { setSubmitting(false); }
+    try { await apiClient.post(API_ENDPOINTS.equipment, { equipment_class_id: Number(form.equipment_class_id), serial_number: form.serial_number || null, manufacturer: form.manufacturer || null, model: form.model || null, install_date: form.install_date || null, contract_id: form.contract_id ? Number(form.contract_id) : null }); setForm({ equipment_class_id: "", serial_number: "", manufacturer: "", model: "", install_date: "", contract_id: "" }); onCreated(); } catch (err) { setError(err instanceof Error ? err.message : "خطا"); } finally { setSubmitting(false); }
   };
 
   return (
     <Shell open={open} onClose={onClose} title="ثبت تجهیز جدید" submitting={submitting} error={error} onSubmit={submit}>
+      <Field label="قرارداد"><ContractSelect value={form.contract_id} onChange={v => setForm({ ...form, contract_id: v })} /></Field>
       <Field label="گروه تجهیز (اجباری)"><Select value={form.equipment_class_id} onValueChange={v => setForm({ ...form, equipment_class_id: v })}><SelectTrigger className="w-full"><SelectValue placeholder="انتخاب..." /></SelectTrigger><SelectContent className="max-h-60">{classes.map(c => <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>)}</SelectContent></Select></Field>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <Field label="شماره سریال"><Input value={form.serial_number} onChange={e => setForm({ ...form, serial_number: e.target.value })} dir="ltr" className="text-left" /></Field>
@@ -193,13 +196,13 @@ export function CreateEquipmentDialog({ open, onClose, onCreated }: { open: bool
 export function CreateInspectionDialog({ open, onClose, onCreated }: { open: boolean; onClose: () => void; onCreated: () => void }) {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [form, setForm] = useState({ inspection_date: "", priority: "routine", weather: "", notes: "" });
+  const [form, setForm] = useState({ inspection_date: "", priority: "routine", weather: "", notes: "", contract_id: "" });
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.inspection_date) { setError("تاریخ بازدید الزامی است"); return; }
     setSubmitting(true); setError(null);
-    try { await apiClient.post(API_ENDPOINTS.inspections, { inspection_date: form.inspection_date, priority: form.priority, weather: form.weather || null, notes: form.notes || null }); setForm({ inspection_date: "", priority: "routine", weather: "", notes: "" }); onCreated(); } catch (err) { setError(err instanceof Error ? err.message : "خطا"); } finally { setSubmitting(false); }
+    try { await apiClient.post(API_ENDPOINTS.inspections, { inspection_date: form.inspection_date, priority: form.priority, weather: form.weather || null, notes: form.notes || null, contract_id: form.contract_id ? Number(form.contract_id) : null }); setForm({ inspection_date: "", priority: "routine", weather: "", notes: "", contract_id: "" }); onCreated(); } catch (err) { setError(err instanceof Error ? err.message : "خطا"); } finally { setSubmitting(false); }
   };
 
   return (
@@ -208,6 +211,7 @@ export function CreateInspectionDialog({ open, onClose, onCreated }: { open: boo
         <Field label="تاریخ بازدید (اجباری)"><JalaliDatePicker value={form.inspection_date} onChange={v => setForm({ ...form, inspection_date: v })} /></Field>
         <Field label="اولویت"><Select value={form.priority} onValueChange={v => setForm({ ...form, priority: v })}><SelectTrigger className="w-full"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="routine">معمول</SelectItem><SelectItem value="emergency">اضطراری</SelectItem></SelectContent></Select></Field>
       </div>
+      <Field label="قرارداد"><ContractSelect value={form.contract_id} onChange={v => setForm({ ...form, contract_id: v })} /></Field>
       <Field label="وضعیت هوا"><Input value={form.weather} onChange={e => setForm({ ...form, weather: e.target.value })} className="text-right" /></Field>
       <Field label="یادداشت"><Textarea value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} rows={3} className="text-right" /></Field>
     </Shell>
@@ -219,7 +223,7 @@ export function CreateWorkOrderDialog({ open, onClose, onCreated }: { open: bool
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [crews, setCrews] = useState<any[]>([]);
-  const [form, setForm] = useState({ title: "", description: "", priority: "medium", planned_start: "", planned_end: "", crew_id: "", outage_required: false });
+  const [form, setForm] = useState({ title: "", description: "", priority: "medium", planned_start: "", planned_end: "", crew_id: "", outage_required: false, contract_id: "" });
 
   // v2.8.1: fetch با useEffect انجام می‌شود — قبلاً به‌اشتباه useState بود که فقط یک‌بار در mount اجرا می‌شد
   // crews پاسخ آرایه ساده برمی‌گرداند
@@ -235,7 +239,7 @@ export function CreateWorkOrderDialog({ open, onClose, onCreated }: { open: bool
     e.preventDefault();
     if (!form.title) { setError("عنوان الزامی است"); return; }
     setSubmitting(true); setError(null);
-    try { await apiClient.post(API_ENDPOINTS.workOrders, { title: form.title, description: form.description || null, priority: form.priority, planned_start: form.planned_start || null, planned_end: form.planned_end || null, crew_id: form.crew_id ? Number(form.crew_id) : null, outage_required: form.outage_required }); setForm({ title: "", description: "", priority: "medium", planned_start: "", planned_end: "", crew_id: "", outage_required: false }); onCreated(); } catch (err) { setError(err instanceof Error ? err.message : "خطا"); } finally { setSubmitting(false); }
+    try { await apiClient.post(API_ENDPOINTS.workOrders, { title: form.title, description: form.description || null, priority: form.priority, planned_start: form.planned_start || null, planned_end: form.planned_end || null, crew_id: form.crew_id ? Number(form.crew_id) : null, outage_required: form.outage_required, contract_id: form.contract_id ? Number(form.contract_id) : null }); setForm({ title: "", description: "", priority: "medium", planned_start: "", planned_end: "", crew_id: "", outage_required: false, contract_id: "" }); onCreated(); } catch (err) { setError(err instanceof Error ? err.message : "خطا"); } finally { setSubmitting(false); }
   };
 
   return (
@@ -246,7 +250,8 @@ export function CreateWorkOrderDialog({ open, onClose, onCreated }: { open: bool
         <Field label="اکیپ"><Select value={form.crew_id} onValueChange={v => setForm({ ...form, crew_id: v })}><SelectTrigger className="w-full"><SelectValue placeholder="انتخاب..." /></SelectTrigger><SelectContent className="max-h-60">{crews.map(c => <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>)}</SelectContent></Select></Field>
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <Field label="شروع پلن"><JalaliDatePicker value={form.planned_start} onChange={v => setForm({ ...form, planned_start: v })} type="datetime" /></Field>
+        <Field label="قرارداد"><ContractSelect value={form.contract_id} onChange={v => setForm({ ...form, contract_id: v })} /></Field>
+      <Field label="شروع پلن"><JalaliDatePicker value={form.planned_start} onChange={v => setForm({ ...form, planned_start: v })} type="datetime" /></Field>
         <Field label="پایان پلن"><JalaliDatePicker value={form.planned_end} onChange={v => setForm({ ...form, planned_end: v })} type="datetime" /></Field>
       </div>
       <Field label="توضیحات"><Textarea value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} rows={3} className="text-right" /></Field>

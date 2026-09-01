@@ -11,6 +11,7 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
 import { SearchableSelect } from "@/components/searchable-select";
+import { ContractSelect } from "@/components/contract-select";
 import { DataTable, type DataTableColumn, type DataTableHandle } from "@/components/data-table";
 import { ImportExcelDialog } from "@/components/import-excel-dialog";
 import { BulkDeleteDialog } from "@/components/bulk-delete-dialog";
@@ -341,7 +342,7 @@ function PersonnelDialog({ open, editRow, duplicateFrom, onClose, onSaved }: {
   const [form, setForm] = useState({
     first_name: "", last_name: "", national_id: "", father_name: "",
     personnel_type: "", position: "", mobile: "", phone: "",
-    supervisor_name: "", collaboration_start: "",
+    supervisor_name: "", collaboration_start: "", contract_id: "",
   });
 
   // v3.1.0: حالت کپی — از ردیف مبدأ پیش‌پر می‌شود ولی کد ملی خالی است (رکورد جدید)
@@ -361,6 +362,7 @@ function PersonnelDialog({ open, editRow, duplicateFrom, onClose, onSaved }: {
         phone: sourceRow?.phone || "",
         supervisor_name: sourceRow?.supervisor_name || "",
         collaboration_start: sourceRow?.collaboration_start || "",
+        contract_id: sourceRow?.contract_id != null ? String(sourceRow.contract_id) : "",
       });
       // اگر نوع خالی بود ولی position فارسی معتبر داشت، خودکار map شود
       if (!sourceRow?.personnel_type && sourceRow?.position) {
@@ -393,6 +395,7 @@ function PersonnelDialog({ open, editRow, duplicateFrom, onClose, onSaved }: {
         phone: form.phone.trim() || null,
         supervisor_name: form.supervisor_name.trim() || null,
         collaboration_start: form.collaboration_start.trim() || null,
+        contract_id: form.contract_id ? Number(form.contract_id) : null,
       };
       if (editRow) {
         await apiClient.put(`${API_ENDPOINTS.personnel}/${editRow.id}`, payload);
@@ -449,6 +452,10 @@ function PersonnelDialog({ open, editRow, duplicateFrom, onClose, onSaved }: {
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="space-y-2">
+              <Label className="text-right block">قرارداد</Label>
+              <ContractSelect value={form.contract_id} onChange={v => setForm({ ...form, contract_id: v })} />
+            </div>
             <div className="space-y-2">
               <Label className="text-right block">نوع پرسنل (اجباری)</Label>
               <SearchableSelect

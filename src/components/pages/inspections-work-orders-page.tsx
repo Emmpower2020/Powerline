@@ -32,10 +32,11 @@ export function InspectionsPage() {
     setRefreshKey(k => k + 1);
   };
   const handleDuplicate = async (row: Inspection) => {
-    try { await apiClient.post(API_ENDPOINTS.inspections, { inspection_date: row.inspection_date, priority: row.priority, weather: row.weather || null, notes: row.notes || null, line_id: row.line_id || null, tower_id: row.tower_id || null }); setRefreshKey(k => k + 1); } catch (e) { console.error(e); }
+    try { await apiClient.post(API_ENDPOINTS.inspections, { inspection_date: row.inspection_date, priority: row.priority, weather: row.weather || null, notes: row.notes || null, line_id: row.line_id || null, tower_id: row.tower_id || null, contract_id: row.contract_id || null }); setRefreshKey(k => k + 1); } catch (e) { console.error(e); }
   };
 
   const columns: DataTableColumn<Inspection>[] = [
+    { key: "contract_title", header: "قرارداد", sortable: true, filterable: true, wrap: true },
     { key: "inspection_code", header: "کد", sortable: true, filterable: true, align: "left" },
     { key: "line_code", header: "خط", sortable: true, filterable: true },
     { key: "tower_code", header: "دکل" },
@@ -80,10 +81,11 @@ export function WorkOrdersPage() {
     setRefreshKey(k => k + 1);
   };
   const handleDuplicate = async (row: WorkOrder) => {
-    try { await apiClient.post(API_ENDPOINTS.workOrders, { title: row.title, description: row.description || null, priority: row.priority, planned_start: row.planned_start || null, planned_end: row.planned_end || null, crew_id: row.crew_id || null, outage_required: !!row.outage_required }); setRefreshKey(k => k + 1); } catch (e) { console.error(e); }
+    try { await apiClient.post(API_ENDPOINTS.workOrders, { title: row.title, description: row.description || null, priority: row.priority, planned_start: row.planned_start || null, planned_end: row.planned_end || null, crew_id: row.crew_id || null, outage_required: !!row.outage_required, contract_id: row.contract_id || null }); setRefreshKey(k => k + 1); } catch (e) { console.error(e); }
   };
 
   const columns: DataTableColumn<WorkOrder>[] = [
+    { key: "contract_title", header: "قرارداد", sortable: true, filterable: true, wrap: true },
     { key: "wo_code", header: "کد", sortable: true, filterable: true, align: "left" },
     { key: "title", header: "عنوان", sortable: true, filterable: true },
     { key: "priority", header: "اولویت", type: "badge", badgeLabels: priorityLabels, badgeColors: { critical: "bg-red-100 text-red-700", high: "bg-orange-100 text-orange-700", medium: "bg-amber-100 text-amber-700", low: "bg-slate-100 text-slate-700" } },

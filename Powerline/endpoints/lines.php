@@ -52,12 +52,13 @@ function registerLineRoutes(Router $router): void
         $lineColumns = [];
         foreach ($db->fetchAll("SHOW COLUMNS FROM `lines`") as $cr) if (isset($cr['Field'])) $lineColumns[(string)$cr['Field']] = true;
         $resolvedStructure = isset($lineColumns['tower_structure']) ? 'l.tower_structure' : 'NULL';
-        $sql = "SELECT l.*, o.name AS owner_org_name, c.name AS contractor_name,
+        $sql = "SELECT l.*, o.name AS owner_org_name, c.name AS contractor_name, ct.title AS contract_title,
                        (SELECT COUNT(*) FROM towers tt WHERE tt.line_id = l.id AND tt.is_active = 1) AS tower_count,
                        $resolvedStructure AS resolved_tower_structure
                 FROM `lines` l
                 LEFT JOIN organization o ON o.id = l.owner_org_id
                 LEFT JOIN contractors c ON c.id = l.contractor_id
+                LEFT JOIN contracts ct ON ct.id = l.contract_id
                 WHERE $where
                 ORDER BY l.id DESC
                 LIMIT $pageSize OFFSET $offset";
@@ -82,12 +83,13 @@ function registerLineRoutes(Router $router): void
         foreach ($db->fetchAll("SHOW COLUMNS FROM `lines`") as $cr) if (isset($cr['Field'])) $lineColumns[(string)$cr['Field']] = true;
         $resolvedStructure = isset($lineColumns['tower_structure']) ? 'l.tower_structure' : 'NULL';
         $row = $db->fetchOne(
-            "SELECT l.*, o.name AS owner_org_name, c.name AS contractor_name,
+            "SELECT l.*, o.name AS owner_org_name, c.name AS contractor_name, ct.title AS contract_title,
                     (SELECT COUNT(*) FROM towers tt WHERE tt.line_id = l.id AND tt.is_active = 1) AS tower_count,
                     $resolvedStructure AS resolved_tower_structure
              FROM `lines` l
              LEFT JOIN organization o ON o.id = l.owner_org_id
              LEFT JOIN contractors c ON c.id = l.contractor_id
+             LEFT JOIN contracts ct ON ct.id = l.contract_id
              WHERE l.id = ?",
             [(int) $id]
         );
@@ -150,7 +152,7 @@ function registerLineRoutes(Router $router): void
             'circuit_count','bundle_count','conductor_type','tower_structure',
             'length_km','circuit_length_km','total_towers','tension_towers','suspension_towers',
             'plain_terrain','semi_mountainous','mountainous',
-            'commission_year','line_supervisor','line_expert','owner_org_id','contractor_id',
+            'commission_year','line_supervisor','line_expert','owner_org_id','contractor_id','contract_id',
             'geom','is_active'
         ];
 
@@ -350,7 +352,7 @@ function registerLineRoutes(Router $router): void
             'circuit_count', 'bundle_count', 'conductor_type', 'tower_structure',
             'length_km', 'circuit_length_km', 'total_towers', 'tension_towers', 'suspension_towers',
             'plain_terrain', 'semi_mountainous', 'mountainous', 'commission_year',
-            'line_supervisor', 'line_expert', 'owner_org_id', 'contractor_id', 'is_active',
+            'line_supervisor', 'line_expert', 'owner_org_id', 'contractor_id', 'contract_id', 'is_active',
         ];
         $inserted = 0; $failed = 0; $firstError = ''; $failIndexes = [];
         $statuses = [];
@@ -488,6 +490,8 @@ function formatLineRow(array $row): array
     return [
         'id'                 => (int) $row['id'],
         'line_code'          => $row['line_code'],
+        'contract_id'        => $row['contract_id'] ? (int)$row['contract_id'] : null,
+        'contract_title'     => $row['contract_title'] ?? null,
         'dispatch_code'      => $row['dispatch_code'] ?? null,
         'name'               => $row['name'],
         'group_name'         => $row['group_name'] ?? null,

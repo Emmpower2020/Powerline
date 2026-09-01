@@ -157,6 +157,7 @@ CREATE TABLE IF NOT EXISTS `personnel` (
     `id`               BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     `organization_id`  BIGINT UNSIGNED NOT NULL,
     `user_id`          BIGINT UNSIGNED NULL,                       -- اگه به کاربر سیستم متصل باشه
+    `contract_id`      BIGINT UNSIGNED NULL,                       -- قرارداد
     `personnel_code`   VARCHAR(50) NOT NULL UNIQUE,
     `first_name`       VARCHAR(100) NOT NULL,
     `last_name`        VARCHAR(100) NOT NULL,
@@ -268,6 +269,7 @@ CREATE TABLE IF NOT EXISTS `lines` (
     `dest_substation_id`   BIGINT UNSIGNED NULL,                    -- پست مقصد
     `owner_org_id`    BIGINT UNSIGNED NULL,
     `contractor_id`   BIGINT UNSIGNED NULL,                        -- پیمانکار نگهداری
+    `contract_id`     BIGINT UNSIGNED NULL,                        -- قرارداد
     `geom`            LINESTRING NOT NULL,                            -- هندسه خط (GIS) - هنگام INSERT مقدار خالی بدید: ST_GeomFromText('LINESTRING EMPTY()')
     `construction_date` DATE NULL,
     `commission_date` DATE NULL,
@@ -288,6 +290,7 @@ CREATE TABLE IF NOT EXISTS `lines` (
 CREATE TABLE IF NOT EXISTS `towers` (
     `id`              BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     `line_id`         BIGINT UNSIGNED NOT NULL,
+    `contract_id`     BIGINT UNSIGNED NULL,                        -- قرارداد
     `tower_code`      VARCHAR(50) NOT NULL,                        -- کد دکل
     `tower_number`    INT NULL,                                     -- شماره دکل
     `tower_type`      VARCHAR(20) NOT NULL,                              -- نوع دکل: کششی / آویزی
@@ -363,6 +366,7 @@ CREATE TABLE IF NOT EXISTS `equipment` (
     `equipment_class_id` INT UNSIGNED NOT NULL,
     `tower_id`         BIGINT UNSIGNED NULL,
     `line_id`          BIGINT UNSIGNED NULL,
+    `contract_id`      BIGINT UNSIGNED NULL,                       -- قرارداد
     `serial_number`    VARCHAR(100) NULL,
     `manufacturer`     VARCHAR(200) NULL,
     `model`            VARCHAR(200) NULL,
@@ -424,6 +428,7 @@ CREATE TABLE IF NOT EXISTS `inspections` (
     `inspection_code` VARCHAR(50) NOT NULL UNIQUE,
     `line_id`         BIGINT UNSIGNED NULL,
     `tower_id`        BIGINT UNSIGNED NULL,
+    `contract_id`     BIGINT UNSIGNED NULL,                        -- قرارداد
     `template_id`     BIGINT UNSIGNED NULL,
     `inspector_id`    BIGINT UNSIGNED NOT NULL,                    -- personnel.id
     `crew_id`         BIGINT UNSIGNED NULL,
@@ -525,6 +530,7 @@ CREATE TABLE IF NOT EXISTS `defects` (
     `defect_definition_id` BIGINT UNSIGNED NULL,
     `line_id`           BIGINT UNSIGNED NULL,
     `tower_id`          BIGINT UNSIGNED NULL,
+    `contract_id`      BIGINT UNSIGNED NULL,                       -- قرارداد
     `equipment_id`      BIGINT UNSIGNED NULL,
     `title`             VARCHAR(500) NOT NULL,
     `description`       TEXT NULL,
@@ -605,6 +611,7 @@ CREATE TABLE IF NOT EXISTS `work_orders` (
     `tower_id`        BIGINT UNSIGNED NULL,
     `crew_id`         BIGINT UNSIGNED NULL,
     `contractor_id`   BIGINT UNSIGNED NULL,
+    `contract_id`      BIGINT UNSIGNED NULL,                       -- قرارداد
     `title`           VARCHAR(500) NOT NULL,
     `description`     TEXT NULL,
     `priority`        ENUM('low','medium','high','critical') NOT NULL DEFAULT 'medium',
@@ -702,6 +709,7 @@ CREATE TABLE IF NOT EXISTS `price_lists` (
     `name`           VARCHAR(200) NOT NULL,
     `version`        VARCHAR(50) NULL,
     `effective_date` DATE NOT NULL,
+    `contract_id`     BIGINT UNSIGNED NULL,                       -- قرارداد
     `is_active`      TINYINT(1) NOT NULL DEFAULT 1,
     `created_at`     TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -767,6 +775,7 @@ CREATE TABLE IF NOT EXISTS `safety_incidents` (
     `line_id`           BIGINT UNSIGNED NULL,
     `tower_id`          BIGINT UNSIGNED NULL,
     `work_order_id`     BIGINT UNSIGNED NULL,
+    `contract_id`       BIGINT UNSIGNED NULL,                       -- قرارداد
     `involved_personnel` JSON NULL,                                 -- آرایه‌ای از personnel.id
     `reporter_id`       BIGINT UNSIGNED NOT NULL,
     `status`            ENUM('reported','under_investigation','resolved','closed') NOT NULL DEFAULT 'reported',
@@ -1154,3 +1163,24 @@ CREATE TABLE IF NOT EXISTS `tower_type_codes` (
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
   PRIMARY KEY (`id`), UNIQUE KEY `uq_tower_type_codes_code` (`code`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+
+-- ارتباط دامنه با قراردادها (4.3.38)
+CREATE INDEX idx_lines_contract ON `lines` (`contract_id`);
+ALTER TABLE `lines` ADD CONSTRAINT fk_lines_contract FOREIGN KEY (`contract_id`) REFERENCES `contracts`(`id`) ON DELETE SET NULL ON UPDATE CASCADE;
+CREATE INDEX idx_towers_contract ON `towers` (`contract_id`);
+ALTER TABLE `towers` ADD CONSTRAINT fk_towers_contract FOREIGN KEY (`contract_id`) REFERENCES `contracts`(`id`) ON DELETE SET NULL ON UPDATE CASCADE;
+CREATE INDEX idx_personnel_contract ON `personnel` (`contract_id`);
+ALTER TABLE `personnel` ADD CONSTRAINT fk_personnel_contract FOREIGN KEY (`contract_id`) REFERENCES `contracts`(`id`) ON DELETE SET NULL ON UPDATE CASCADE;
+CREATE INDEX idx_equipment_contract ON `equipment` (`contract_id`);
+ALTER TABLE `equipment` ADD CONSTRAINT fk_equipment_contract FOREIGN KEY (`contract_id`) REFERENCES `contracts`(`id`) ON DELETE SET NULL ON UPDATE CASCADE;
+CREATE INDEX idx_inspections_contract ON `inspections` (`contract_id`);
+ALTER TABLE `inspections` ADD CONSTRAINT fk_inspections_contract FOREIGN KEY (`contract_id`) REFERENCES `contracts`(`id`) ON DELETE SET NULL ON UPDATE CASCADE;
+CREATE INDEX idx_defects_contract ON `defects` (`contract_id`);
+ALTER TABLE `defects` ADD CONSTRAINT fk_defects_contract FOREIGN KEY (`contract_id`) REFERENCES `contracts`(`id`) ON DELETE SET NULL ON UPDATE CASCADE;
+CREATE INDEX idx_work_orders_contract ON `work_orders` (`contract_id`);
+ALTER TABLE `work_orders` ADD CONSTRAINT fk_work_orders_contract FOREIGN KEY (`contract_id`) REFERENCES `contracts`(`id`) ON DELETE SET NULL ON UPDATE CASCADE;
+CREATE INDEX idx_safety_incidents_contract ON `safety_incidents` (`contract_id`);
+ALTER TABLE `safety_incidents` ADD CONSTRAINT fk_safety_incidents_contract FOREIGN KEY (`contract_id`) REFERENCES `contracts`(`id`) ON DELETE SET NULL ON UPDATE CASCADE;
+CREATE INDEX idx_price_lists_contract ON `price_lists` (`contract_id`);
+ALTER TABLE `price_lists` ADD CONSTRAINT fk_price_lists_contract FOREIGN KEY (`contract_id`) REFERENCES `contracts`(`id`) ON DELETE SET NULL ON UPDATE CASCADE;

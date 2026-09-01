@@ -221,6 +221,7 @@ export function TowersPage() {
   const handleImportRow = useCallback(async (row: Record<string, unknown>, mode: "insert" | "update", existingId?: number) => {
     const allowedFields = [
       "line_id", "tower_code", "tower_number", "tower_structure",
+      "contract_id",
       "tower_type", "tower_type_code",
       "base_height_a", "base_height_b", "base_height_c", "base_height_d",
       "insulator_r1", "insulator_s1", "insulator_t1", "insulator_r2", "insulator_s2", "insulator_t2",
@@ -235,7 +236,7 @@ export function TowersPage() {
         if (v === null || v === undefined || v === "") {
           payload[key] = null;
         } else if (["tower_number", "insulator_count_r1", "insulator_count_s1", "insulator_count_t1",
-                    "insulator_count_r2", "insulator_count_s2", "insulator_count_t2", "line_id"].includes(key)) {
+                    "insulator_count_r2", "insulator_count_s2", "insulator_count_t2", "line_id", "contract_id"].includes(key)) {
           const n = Number(v);
           payload[key] = isNaN(n) ? null : n;
         } else if (["base_height_a", "base_height_b", "base_height_c", "base_height_d",
@@ -371,6 +372,7 @@ export function TowersPage() {
   // ستون‌ها بر اساس ساختار اکسل رسمی (v2.1.0) — نام‌ها همان واژگان خود شماست
   const columns: DataTableColumn<any>[] = [
     { key: "tower_code", header: "کد دکل", sortable: true, filterable: true, align: "right" },
+    { key: "contract_title", header: "قرارداد", sortable: true, filterable: true, wrap: true, align: "right" },
     { key: "tower_number", header: "شماره دکل", sortable: true, filterable: true, type: "number", align: "right" },
     // v2.8.0: ستون «ولتاژ» اضافه شد — از JOIN با lines و پیش‌فرض قبل از نام خط
     {
@@ -440,7 +442,7 @@ export function TowersPage() {
         data={filteredData}
         columns={columns}
         loading={loading}
-        searchKeys={["tower_code", "line_code", "line_name", "tower_structure", "tower_type", "tower_type_code", "line_supervisor", "voltage_kv"]}
+        searchKeys={["tower_code", "line_code", "line_name", "tower_structure", "tower_type", "tower_type_code", "line_supervisor", "voltage_kv", "contract_title"]}
         title="دکل‌ها"
         onAdd={() => { setEditRow(null); setDuplicateFrom(null); setShowCreate(true); }}
         onRefresh={() => setRefreshKey(k => k + 1)}

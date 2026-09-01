@@ -156,7 +156,7 @@ export function LinesPage() {
       "total_towers", "tension_towers", "suspension_towers",
       "plain_terrain", "semi_mountainous", "mountainous",
       "commission_year", "line_supervisor", "line_expert",
-      "owner_org_id", "contractor_id", "is_active",
+      "owner_org_id", "contractor_id", "contract_id", "is_active",
     ];
     const payload: Record<string, unknown> = {};
     for (const key of allowedFields) {
@@ -166,7 +166,7 @@ export function LinesPage() {
           payload[key] = null;
         } else if (["circuit_count", "bundle_count", "total_towers", "tension_towers", "suspension_towers",
                     "plain_terrain", "semi_mountainous", "mountainous", "commission_year",
-                    "owner_org_id", "contractor_id"].includes(key)) {
+                    "owner_org_id", "contractor_id", "contract_id"].includes(key)) {
           // تبدیل به عدد
           const n = Number(v);
           payload[key] = isNaN(n) ? null : n;

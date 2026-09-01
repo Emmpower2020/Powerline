@@ -39,10 +39,11 @@ function registerDefectRoutes(Router $router): void
         $stmt->execute($params);
         $total = (int) $stmt->fetchColumn();
 
-        $sql = "SELECT d.*, l.line_code, l.name AS line_name, t.tower_code, t.tower_type,
+        $sql = "SELECT d.*, c.title AS contract_title, l.line_code, l.name AS line_name, t.tower_code, t.tower_type,
                        p.first_name AS discoverer_first, p.last_name AS discoverer_last,
                        dd.title AS definition_title, dc.name AS category_name
                 FROM defects d
+                LEFT JOIN contracts c ON c.id = d.contract_id
                 LEFT JOIN `lines` l ON l.id = d.line_id
                 LEFT JOIN towers t ON t.id = d.tower_id
                 LEFT JOIN personnel p ON p.id = d.discovered_by
@@ -65,10 +66,11 @@ function registerDefectRoutes(Router $router): void
 
         $db = Database::getInstance();
         $row = $db->fetchOne(
-            "SELECT d.*, l.line_code, l.name AS line_name, t.tower_code, t.tower_type,
+            "SELECT d.*, c.title AS contract_title, l.line_code, l.name AS line_name, t.tower_code, t.tower_type,
                     p.first_name AS discoverer_first, p.last_name AS discoverer_last,
                     dd.title AS definition_title, dc.name AS category_name
              FROM defects d
+             LEFT JOIN contracts c ON c.id = d.contract_id
              LEFT JOIN `lines` l ON l.id = d.line_id
              LEFT JOIN towers t ON t.id = d.tower_id
              LEFT JOIN personnel p ON p.id = d.discovered_by
@@ -139,7 +141,7 @@ function registerDefectRoutes(Router $router): void
 
             // درج عیب با PDO مستقیم
             $sql = "INSERT INTO defects
-                    (defect_code, defect_definition_id, line_id, tower_id, equipment_id,
+                    (defect_code, defect_definition_id, line_id, tower_id, contract_id, equipment_id,
                      title, description, defect_type, severity, priority, safety_risk,
                      status, discovered_by, gps_lat, gps_lng, location_desc, notes, created_at)
                     VALUES
@@ -151,6 +153,7 @@ function registerDefectRoutes(Router $router): void
                 $body['defect_definition_id'] ?? null,
                 $lineId,
                 $towerId,
+                $body['contract_id'] ?? null,
                 $body['equipment_id'] ?? null,
                 $body['title'],
                 $body['description'] ?? null,
@@ -198,7 +201,7 @@ function registerDefectRoutes(Router $router): void
         $existing = $db->fetchOne("SELECT id, status FROM defects WHERE id = ?", [(int) $id]);
         if (!$existing) Response::error(404, 'عیب پیدا نشد');
 
-        $allowedFields = ['title', 'description', 'defect_type', 'severity', 'priority', 'safety_risk', 'gps_lat', 'gps_lng', 'location_desc', 'notes'];
+        $allowedFields = ['title', 'description', 'defect_type', 'severity', 'priority', 'safety_risk', 'contract_id', 'gps_lat', 'gps_lng', 'location_desc', 'notes'];
         $updates = []; $params = [];
         foreach ($allowedFields as $field) {
             if (array_key_exists($field, $body)) { $updates[] = "`$field` = ?"; $params[] = $body[$field]; }
@@ -459,6 +462,7 @@ function formatDefectRow(array $row): array
         'defect_definition_id' => $row['defect_definition_id'] !== null ? (int) $row['defect_definition_id'] : null,
         'line_id' => $row['line_id'] ? (int) $row['line_id'] : null, 'line_code' => $row['line_code'] ?? null,
         'line_name' => $row['line_name'] ?? null, 'tower_id' => $row['tower_id'] ? (int) $row['tower_id'] : null,
+        'contract_id' => $row['contract_id'] ? (int) $row['contract_id'] : null, 'contract_title' => $row['contract_title'] ?? null,
         'tower_code' => $row['tower_code'] ?? null, 'tower_type' => $row['tower_type'] ?? null,
         'discovered_by_name' => trim(($row['discoverer_first'] ?? '') . ' ' . ($row['discoverer_last'] ?? '')),
         'discovered_at' => $row['discovered_at'],

@@ -49,11 +49,12 @@ function registerInspectionRoutes(Router $router): void
         $stmt->execute($params);
         $total = (int) $stmt->fetchColumn();
 
-        $sql = "SELECT i.*, l.line_code, l.name AS line_name, t.tower_code,
+        $sql = "SELECT i.*, c.title AS contract_title, l.line_code, l.name AS line_name, t.tower_code,
                        p.first_name AS inspector_first, p.last_name AS inspector_last
                 FROM inspections i
                 LEFT JOIN `lines` l ON l.id = i.line_id
                 LEFT JOIN towers t ON t.id = i.tower_id
+                LEFT JOIN contracts c ON c.id = i.contract_id
                 LEFT JOIN personnel p ON p.id = i.inspector_id
                 WHERE $where
                 ORDER BY i.id DESC
@@ -72,11 +73,12 @@ function registerInspectionRoutes(Router $router): void
 
         $db = Database::getInstance();
         $row = $db->fetchOne(
-            "SELECT i.*, l.line_code, l.name AS line_name, t.tower_code,
+            "SELECT i.*, c.title AS contract_title, l.line_code, l.name AS line_name, t.tower_code,
                     p.first_name AS inspector_first, p.last_name AS inspector_last
              FROM inspections i
              LEFT JOIN `lines` l ON l.id = i.line_id
              LEFT JOIN towers t ON t.id = i.tower_id
+             LEFT JOIN contracts c ON c.id = i.contract_id
              LEFT JOIN personnel p ON p.id = i.inspector_id
              WHERE i.id = ?",
             [(int) $id]
@@ -104,7 +106,7 @@ function registerInspectionRoutes(Router $router): void
         $inspectionCode = Helpers::generateCode('INS', 6);
 
         $sql = "INSERT INTO inspections
-                (inspection_code, line_id, tower_id, template_id, inspector_id, crew_id,
+                (inspection_code, line_id, tower_id, contract_id, template_id, inspector_id, crew_id,
                  inspection_date, start_time, end_time, gps_lat, gps_lng,
                  status, priority, weather, notes, created_at)
                 VALUES
@@ -114,6 +116,7 @@ function registerInspectionRoutes(Router $router): void
             $inspectionCode,
             $body['line_id'] ?? null,
             $body['tower_id'] ?? null,
+            $body['contract_id'] ?? null,
             $body['template_id'] ?? null,
             $body['inspector_id'] ?? 1,
             $body['crew_id'] ?? null,
@@ -138,7 +141,7 @@ function registerInspectionRoutes(Router $router): void
         Auth::authenticate();
         Auth::requirePermissionSoft('inspections.update');
         $body = Helpers::getJsonBody();
-        $fields = ['inspection_date','priority','weather','notes','line_id','tower_id','inspector_id','crew_id','status'];
+        $fields = ['inspection_date','priority','weather','notes','line_id','tower_id','contract_id','inspector_id','crew_id','status'];
         $updates = []; $params = [];
         foreach ($fields as $f) { if (array_key_exists($f, $body)) { $updates[] = "`$f` = ?"; $params[] = $body[$f]; } }
         if (!$updates) Response::error(400, 'هیچ فیلدی ارسال نشده');
@@ -191,6 +194,8 @@ function formatInspectionRow(array $row): array
     return [
         'id'                => (int) $row['id'],
         'inspection_code'   => $row['inspection_code'],
+        'contract_id'      => $row['contract_id'] ? (int)$row['contract_id'] : null,
+        'contract_title'   => $row['contract_title'] ?? null,
         'line_id'           => $row['line_id'] ? (int) $row['line_id'] : null,
         'line_code'         => $row['line_code'] ?? null,
         'line_name'         => $row['line_name'] ?? null,

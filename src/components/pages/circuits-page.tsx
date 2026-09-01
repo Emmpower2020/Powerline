@@ -17,6 +17,7 @@ import { BulkDeleteDialog } from "@/components/bulk-delete-dialog";
 import { useBulkDelete } from "@/hooks/use-bulk-delete";
 import { useToast } from "@/hooks/use-toast";
 import { GenericBulkActions } from "@/components/generic-bulk-actions";
+import { ContractSelect } from "@/components/contract-select";
 import { logError } from "@/lib/error-log";
 import { Loader2, Zap } from "lucide-react";
 
@@ -38,6 +39,8 @@ interface Circuit {
   line_id: number | null;
   line_code?: string | null;
   line_name?: string | null;
+  contract_id?: number | null;
+  contract_title?: string | null;
   created_at?: string | null;
 }
 
@@ -192,7 +195,7 @@ export function CircuitsPage() {
         data={data}
         columns={columns}
         loading={loading}
-        searchKeys={["dispatch_code", "name"]}
+        searchKeys={["dispatch_code", "name", "contract_title"]}
         title="مدارها (کدهای دیسپاچینگ)"
         layoutKey="circuits"
         defaultSort={[{ key: "voltage", direction: "asc", order: [400, 230, 132, 63] }, { key: "name", direction: "asc" }, { key: "dispatch_code", direction: "asc" }]}
@@ -306,7 +309,7 @@ function CircuitDialog({ open, editRow, duplicateFrom, existingCodes, onClose, o
 }) {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [form, setForm] = useState({ dispatch_code: "", name: "", voltage: "" });
+  const [form, setForm] = useState({ dispatch_code: "", name: "", voltage: "", contract_id: "" });
 
   const sourceRow = editRow || duplicateFrom;
   const isDuplicate = !editRow && !!duplicateFrom;
@@ -319,6 +322,7 @@ function CircuitDialog({ open, editRow, duplicateFrom, existingCodes, onClose, o
         dispatch_code: isDuplicate ? "" : (sourceRow?.dispatch_code || ""),
         name: sourceRow?.name || "",
         voltage: sourceRow?.voltage != null ? String(sourceRow.voltage) : "",
+        contract_id: sourceRow?.contract_id != null ? String(sourceRow.contract_id) : "",
       });
     }
   }, [open, sourceRow, isDuplicate]);
@@ -338,6 +342,7 @@ function CircuitDialog({ open, editRow, duplicateFrom, existingCodes, onClose, o
         dispatch_code: code,
         name: form.name.trim() || null,
         voltage: Number(form.voltage),
+        contract_id: form.contract_id ? Number(form.contract_id) : null,
       };
       if (editRow) {
         await apiClient.put(`${API_ENDPOINTS.circuits}/${editRow.id}`, payload);
@@ -385,6 +390,10 @@ function CircuitDialog({ open, editRow, duplicateFrom, existingCodes, onClose, o
                 placeholder="انتخاب ولتاژ..."
               />
             </div>
+          </div>
+          <div className="space-y-2">
+            <Label className="text-right block">قرارداد</Label>
+            <ContractSelect value={form.contract_id} onChange={v => setForm({ ...form, contract_id: v })} />
           </div>
           <div className="space-y-2">
             <Label className="text-right block">نام مدار</Label>

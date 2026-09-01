@@ -61,13 +61,15 @@ function registerWorkOrderRoutes(Router $router): void
                        t.tower_code,
                        d.defect_code AS related_defect_code,
                        cr.name AS crew_name,
-                       ct.name AS contractor_name
+                       ct.name AS contractor_name,
+                       c.title AS contract_title
                 FROM work_orders wo
                 LEFT JOIN `lines` l ON l.id = wo.line_id
                 LEFT JOIN towers t ON t.id = wo.tower_id
                 LEFT JOIN defects d ON d.id = wo.defect_id
                 LEFT JOIN crews cr ON cr.id = wo.crew_id
                 LEFT JOIN contractors ct ON ct.id = wo.contractor_id
+                LEFT JOIN contracts c ON c.id = wo.contract_id
                 WHERE $where
                 ORDER BY wo.id DESC
                 LIMIT $pageSize OFFSET $offset";
@@ -90,13 +92,15 @@ function registerWorkOrderRoutes(Router $router): void
                     t.tower_code,
                     d.defect_code AS related_defect_code,
                     cr.name AS crew_name,
-                    ct.name AS contractor_name
+                    ct.name AS contractor_name,
+                    c.title AS contract_title
              FROM work_orders wo
              LEFT JOIN `lines` l ON l.id = wo.line_id
              LEFT JOIN towers t ON t.id = wo.tower_id
              LEFT JOIN defects d ON d.id = wo.defect_id
              LEFT JOIN crews cr ON cr.id = wo.crew_id
              LEFT JOIN contractors ct ON ct.id = wo.contractor_id
+             LEFT JOIN contracts c ON c.id = wo.contract_id
              WHERE wo.id = ?",
             [(int) $id]
         );
@@ -123,7 +127,7 @@ function registerWorkOrderRoutes(Router $router): void
         $woCode = Helpers::generateCode('WO', 6);
 
         $sql = "INSERT INTO work_orders
-                (wo_code, defect_id, line_id, tower_id, crew_id, contractor_id,
+                (wo_code, defect_id, line_id, tower_id, crew_id, contractor_id, contract_id,
                  title, description, priority, status, planned_start, planned_end,
                  outage_required, created_by, created_at)
                 VALUES
@@ -136,6 +140,7 @@ function registerWorkOrderRoutes(Router $router): void
             $body['tower_id'] ?? null,
             $body['crew_id'] ?? null,
             $body['contractor_id'] ?? null,
+            $body['contract_id'] ?? null,
             $body['title'],
             $body['description'] ?? null,
             $body['priority'] ?? 'medium',
@@ -156,7 +161,7 @@ function registerWorkOrderRoutes(Router $router): void
         Auth::authenticate();
         Auth::requirePermissionSoft('maintenance.update');
         $body = Helpers::getJsonBody();
-        $fields = ['title','description','priority','planned_start','planned_end','crew_id','contractor_id','outage_required','status'];
+        $fields = ['title','description','priority','planned_start','planned_end','crew_id','contractor_id','contract_id','outage_required','status'];
         $updates = []; $params = [];
         foreach ($fields as $f) { if (array_key_exists($f, $body)) { $updates[] = "`$f` = ?"; $params[] = $body[$f]; } }
         if (!$updates) Response::error(400, 'هیچ فیلدی ارسال نشده');
@@ -297,6 +302,8 @@ function formatWorkOrderRow(array $row): array
         'crew_name'         => $row['crew_name'] ?? null,
         'contractor_id'     => $row['contractor_id'] ? (int) $row['contractor_id'] : null,
         'contractor_name'   => $row['contractor_name'] ?? null,
+        'contract_id'       => $row['contract_id'] ? (int)$row['contract_id'] : null,
+        'contract_title'    => $row['contract_title'] ?? null,
         'planned_start'     => $row['planned_start'],
         'planned_end'       => $row['planned_end'],
         'actual_start'      => $row['actual_start'],
