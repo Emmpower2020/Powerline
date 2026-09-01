@@ -171,8 +171,8 @@ export function DashboardLayout({ children, currentPage, onNavigate, title, subt
     if (typeof window !== "undefined") {
       if (value) localStorage.setItem("powerline_selected_contract", value);
       else localStorage.removeItem("powerline_selected_contract");
-      // همه ماژول‌ها در بارگذاری مجدد، contract_id انتخاب‌شده را به API می‌فرستند.
-      window.location.reload();
+      // با تغییر Scope فقط state والد عوض می‌شود؛ DashboardLayout همان صفحه فعلی را نگه می‌دارد
+      // و به‌دلیل key={selectedContract} محتوای همان صفحه با قرارداد جدید دوباره mount می‌شود.
     }
   };
   const visibleNavItems = navItems.filter(item => !item.permission || hasPermission(item.permission));

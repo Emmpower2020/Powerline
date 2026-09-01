@@ -119,6 +119,8 @@ function DataTableInner<T extends { id: number }>({
   const [hiddenColumns, setHiddenColumns] = useState<Set<string>>(
     () => savedLayout?.hidden ? new Set(savedLayout.hidden) : new Set(columns.filter(c => c.hidden).map(c => c.key))
   );
+  const hasSavedLayout = !!savedLayout;
+  const userCustomizedLayoutRef = useRef(hasSavedLayout);
   const [appliedFilters, setAppliedFilters] = useState<Record<string, { search: string; selectedValues: Set<string> }>>({});
   const [pendingFilters, setPendingFilters] = useState<Record<string, PendingFilter>>({});
   const [openFilterCol, setOpenFilterCol] = useState<string | null>(null);
@@ -140,28 +142,19 @@ function DataTableInner<T extends { id: number }>({
   const columnMenuRef = useRef<HTMLDivElement>(null);
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
 
-  // v2.4.3: ذخیرهٔ خودکار چیدمان برای همین کاربر — با هر تغییر ترتیب/مخفی‌سازی
-  useEffect(() => {
+  // فقط بعد از اقدام صریح کاربر چیدمان را ذخیره می‌کنیم؛ ترتیب پیش‌فرض از دیتابیس می‌آید.
+  const persistUserLayout = useCallback((nextHidden: Set<string>, nextOrder: string[]) => {
     if (!layoutKey || typeof window === "undefined") return;
+    userCustomizedLayoutRef.current = true;
     try {
       const userRaw = localStorage.getItem("powerline_user");
       const userId = userRaw ? (JSON.parse(userRaw)?.id ?? "guest") : "guest";
       localStorage.setItem(
         `powerline_dt_layout_${userId}_${layoutKey}`,
-        JSON.stringify({ hidden: Array.from(hiddenColumns), order: columnOrder })
+        JSON.stringify({ hidden: Array.from(nextHidden), order: nextOrder })
       );
     } catch { /* حافظه در دسترس نیست — بی‌صدا رد شود */ }
-  }, [layoutKey, hiddenColumns, columnOrder]);
-
-  // sync columnOrder when columns prop changes
-  useEffect(() => {
-    setColumnOrder(prevOrder => {
-      const newKeys = columns.map(c => c.key);
-      const existing = prevOrder.filter(k => newKeys.includes(k));
-      const added = newKeys.filter(k => !prevOrder.includes(k));
-      return [...existing, ...added];
-    });
-  }, [columns]);
+  }, [layoutKey]);
 
   // close column menu on outside click
   useEffect(() => {
@@ -201,6 +194,30 @@ function DataTableInner<T extends { id: number }>({
       const next = [...existing, ...added];
       return next.length === prev.length && next.every((v, i) => v === prev[i]) ? prev : next;
     });
+  }, [effectiveColumns]);
+
+  // در نبود شخصی‌سازی، ترتیب ستون‌ها از ترتیب فیلدهای رکورد API می‌آید؛
+  // چون SELECT * ترتیب واقعی ستون‌های جدول دیتابیس را حفظ می‌کند.
+  useEffect(() => {
+    if (userCustomizedLayoutRef.current || !data.length) return;
+    const dbKeys = Object.keys(data[0] as Record<string, unknown>);
+    const knownKeys = new Set(effectiveColumns.map(c => c.key));
+    const dbOrder = dbKeys.filter(k => knownKeys.has(k));
+    const remaining = effectiveColumns.map(c => c.key).filter(k => !dbOrder.includes(k));
+    const next = [...dbOrder, ...remaining];
+    setColumnOrder(prev => next.length === prev.length && next.every((v, i) => v === prev[i]) ? prev : next);
+  }, [data, effectiveColumns]);
+
+  // ستون‌های جدیدی که در schema/API اضافه شوند نیز بدون برهم‌زدن شخصی‌سازی کاربر وارد می‌شوند.
+  useEffect(() => {
+    if (userCustomizedLayoutRef.current) {
+      setColumnOrder(prev => {
+        const newKeys = effectiveColumns.map(c => c.key);
+        const existing = prev.filter(k => newKeys.includes(k));
+        const added = newKeys.filter(k => !prev.includes(k));
+        return [...existing, ...added];
+      });
+    }
   }, [effectiveColumns]);
 
   // Compute visible columns respecting order + hidden
@@ -321,8 +338,22 @@ function DataTableInner<T extends { id: number }>({
       else { setSortDir("none"); setSortKey(null); }
     } else { setSortKey(key); setSortDir("asc"); }
   };
-  const toggleColumnVisibility = (key: string) => { const n = new Set(hiddenColumns); if (n.has(key)) n.delete(key); else n.add(key); setHiddenColumns(n); };
-  const moveColumn = (key: string, dir: "up" | "down") => setColumnOrder(prev => { const idx = prev.indexOf(key); if (idx === -1) return prev; const n = [...prev]; const s = dir === "up" ? idx - 1 : idx + 1; if (s < 0 || s >= n.length) return prev; [n[idx], n[s]] = [n[s], n[idx]]; return n; });
+  const toggleColumnVisibility = (key: string) => {
+    const n = new Set(hiddenColumns);
+    if (n.has(key)) n.delete(key); else n.add(key);
+    setHiddenColumns(n);
+    persistUserLayout(n, columnOrder);
+  };
+  const moveColumn = (key: string, dir: "up" | "down") => {
+    setColumnOrder(prev => {
+      const idx = prev.indexOf(key); if (idx === -1) return prev;
+      const n = [...prev]; const target = dir === "up" ? idx - 1 : idx + 1;
+      if (target < 0 || target >= n.length) return prev;
+      [n[idx], n[target]] = [n[target], n[idx]];
+      persistUserLayout(hiddenColumns, n);
+      return n;
+    });
+  };
   const toggleRowSelection = (id: number) => setSelectedRows(prev => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n; });
   // v2.3.0: انتخاب/لغو انتخاب فقط برای صفحه فعلی — انتخاب‌های صفحات دیگر حفظ می‌شود
   const pageIds = paginated.map(r => r.id);
@@ -628,7 +659,13 @@ function DataTableInner<T extends { id: number }>({
                 <div className="px-3 py-2 text-[11px] text-slate-400 border-b border-slate-100 dark:border-slate-800">ستون را با کشیدن و رها کردن به بالا یا پایین جابه‌جا کنید.</div>
                 <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={(e: DragEndEvent) => {
                   const { active, over } = e; if (!over || active.id === over.id) return;
-                  setColumnOrder(items => { const oi = items.indexOf(String(active.id)); const ni = items.indexOf(String(over.id)); return oi < 0 || ni < 0 ? items : arrayMove(items, oi, ni); });
+                  setColumnOrder(items => {
+                    const oi = items.indexOf(String(active.id)); const ni = items.indexOf(String(over.id));
+                    if (oi < 0 || ni < 0) return items;
+                    const next = arrayMove(items, oi, ni);
+                    persistUserLayout(hiddenColumns, next);
+                    return next;
+                  });
                 }}>
                   <SortableContext items={columnOrder} strategy={verticalListSortingStrategy}>
                     <div className="max-h-[70vh] overflow-y-auto p-1 scrollbar-thin">

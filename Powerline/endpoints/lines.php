@@ -29,13 +29,11 @@ function registerLineRoutes(Router $router): void
         $where = '1=1';
         $params = [];
 
-        // فیلتر status: پیش‌فرض فقط فعال‌ها نمایش داده می‌شوند
-        // کاربر می‌تواند با ?status=all همه را ببیند یا با ?status = 'inactive' غیرفعال‌ها را
+        // فیلتر status اختیاری است؛ در حالت عادی همه وضعیت‌ها نمایش داده می‌شوند
+        // تا رکوردهای غیرفعال نیز برای فعال‌سازی مجدد در دسترس باشند.
         if ($isActive !== null && $isActive !== '' && $isActive !== 'all') {
             $where .= ' AND l.status = ?';
             $params[] = ((string)$isActive === '0' || (string)$isActive === 'inactive') ? 'inactive' : 'active';
-        } elseif ($isActive === null || $isActive === '') {
-            $where .= " AND l.status = 'active'";
         }
 
         if ($contractId === 0) { $where .= ' AND l.contract_id IS NULL'; } elseif ($contractId !== null) { $where .= ' AND l.contract_id = ?'; $params[] = $contractId; }
