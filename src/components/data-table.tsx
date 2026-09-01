@@ -106,6 +106,18 @@ function DataTableInner<T extends { id: number }>({
   const [sortDir, setSortDir] = useState<SortState>("none");
   const [hasUserSorted, setHasUserSorted] = useState(false);
   const [page, setPage] = useState(1);
+  // اندازه صفحه قابل تنظیم برای همه جدول‌ها و ذخیره‌شده به تفکیک کاربر/جدول
+  const [pageSizeState, setPageSizeState] = useState<number>(() => {
+    if (typeof window === "undefined") return pageSize;
+    try {
+      const userRaw = localStorage.getItem("powerline_user");
+      const userId = userRaw ? (JSON.parse(userRaw)?.id ?? "guest") : "guest";
+      const raw = layoutKey ? localStorage.getItem(`powerline_dt_page_size_${userId}_${layoutKey}`) : null;
+      const n = raw ? Number(raw) : NaN;
+      return [10, 15, 25, 50, 100, 200].includes(n) ? n : pageSize;
+    } catch { return pageSize; }
+  });
+  const activePageSize = pageSizeState;
   // v2.4.3: چیدمان ستون‌ها (ترتیب + مخفی) از حافظهٔ اختصاصی همین کاربر بازیابی می‌شود
   const savedLayout = useMemo(() => {
     if (!layoutKey || typeof window === "undefined") return null;
@@ -327,8 +339,25 @@ function DataTableInner<T extends { id: number }>({
     return result;
   }, [data, search, searchKeys, appliedFilters, sortKey, sortDir]);
 
-  const totalPages = Math.ceil(filtered.length / pageSize);
-  const paginated = filtered.slice((page - 1) * pageSize, page * pageSize);
+  const totalPages = Math.max(1, Math.ceil(filtered.length / activePageSize));
+  const paginated = filtered.slice((page - 1) * activePageSize, page * activePageSize);
+
+  // با تغییر فیلتر/تعداد آیتم در صفحه، صفحه فعلی باید معتبر بماند.
+  useEffect(() => {
+    setPage(p => Math.min(Math.max(1, p), totalPages));
+  }, [totalPages]);
+
+  const changePageSize = (size: number) => {
+    setPageSizeState(size);
+    setPage(1);
+    if (layoutKey && typeof window !== "undefined") {
+      try {
+        const userRaw = localStorage.getItem("powerline_user");
+        const userId = userRaw ? (JSON.parse(userRaw)?.id ?? "guest") : "guest";
+        localStorage.setItem(`powerline_dt_page_size_${userId}_${layoutKey}`, String(size));
+      } catch { /* ignore storage errors */ }
+    }
+  };
 
   const toggleSort = (key: string) => {
     setHasUserSorted(true);
@@ -355,19 +384,15 @@ function DataTableInner<T extends { id: number }>({
     });
   };
   const toggleRowSelection = (id: number) => setSelectedRows(prev => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n; });
-  // v2.3.0: انتخاب/لغو انتخاب فقط برای صفحه فعلی — انتخاب‌های صفحات دیگر حفظ می‌شود
-  const pageIds = paginated.map(r => r.id);
-  const allPageSelected = pageIds.length > 0 && pageIds.every(id => selectedRows.has(id));
-  const somePageSelected = pageIds.some(id => selectedRows.has(id));
+  // انتخاب همه = تمام رکوردهای قابل مشاهده پس از فیلتر، نه فقط صفحه فعلی.
+  // به این ترتیب با رفتن به صفحات بعدی، همه رکوردهای انتخاب‌شده همچنان انتخاب می‌مانند.
+  const filteredIds = filtered.map(r => r.id);
+  const allFilteredSelected = filteredIds.length > 0 && filteredIds.every(id => selectedRows.has(id));
+  const someFilteredSelected = filteredIds.some(id => selectedRows.has(id));
   const toggleSelectAll = () => {
     const next = new Set(selectedRows);
-    const filteredIds = filtered.map(r => r.id);
-    const allFilteredSelected = filteredIds.length > 0 && filteredIds.every(id => selectedRows.has(id));
-    if (allFilteredSelected) {
-      filteredIds.forEach(id => next.delete(id));
-    } else {
-      filteredIds.forEach(id => next.add(id));
-    }
+    if (allFilteredSelected) filteredIds.forEach(id => next.delete(id));
+    else filteredIds.forEach(id => next.add(id));
     setSelectedRows(next);
   };
   const getSortIcon = (key: string) => { if (sortKey !== key || sortDir === "none") return <ChevronsUpDown className="w-3 h-3 opacity-40" />; return sortDir === "asc" ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />; };
@@ -737,11 +762,11 @@ function DataTableInner<T extends { id: number }>({
                   >
                     <input
                       type="checkbox"
-                      checked={allPageSelected}
-                      ref={(el) => { if (el) el.indeterminate = !allPageSelected && somePageSelected; }}
+                      checked={allFilteredSelected}
+                      ref={(el) => { if (el) el.indeterminate = !allFilteredSelected && someFilteredSelected; }}
                       onChange={toggleSelectAll}
                       className="w-4 h-4 cursor-pointer"
-                      title="انتخاب/لغو انتخاب ردیف‌های همین صفحه (انتخاب‌های صفحات دیگر حفظ می‌شود)"
+                      title="انتخاب/لغو انتخاب تمام ردیف‌های قابل مشاهده در همه صفحات"
                     />
                   </th>
                 )}
@@ -910,25 +935,46 @@ function DataTableInner<T extends { id: number }>({
         </div>
       </div>
 
-      {/* Pagination — v2.7.1: دکمه‌ها وسط، متن «نمایش X تا Y از Z» سمت راست */}
-      <div className="flex items-center justify-between text-sm gap-2">
-        <span className="text-slate-500 nums-fa text-xs">
-          {filtered.length > 0
-            ? `نمایش ${((page - 1) * pageSize + 1).toLocaleString("fa-IR")} تا ${Math.min(page * pageSize, filtered.length).toLocaleString("fa-IR")} از ${filtered.length.toLocaleString("fa-IR")}`
-            : "بدون رکورد"}
-        </span>
-        {totalPages > 1 && (
-          <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage(p => p - 1)}>
+      {/* Pagination — مشترک برای تمام جدول‌ها: اول، قبلی، شماره صفحه، بعدی، آخر + تعداد آیتم در صفحه */}
+      <div className="flex flex-wrap items-center justify-between text-sm gap-3">
+        <div className="flex items-center gap-3">
+          <span className="text-slate-500 nums-fa text-xs">
+            {filtered.length > 0
+              ? `نمایش ${((page - 1) * activePageSize + 1).toLocaleString("fa-IR")} تا ${Math.min(page * activePageSize, filtered.length).toLocaleString("fa-IR")} از ${filtered.length.toLocaleString("fa-IR")}`
+              : "بدون رکورد"}
+          </span>
+          <label className="flex items-center gap-2 text-xs text-slate-500 whitespace-nowrap">
+            <span>نمایش در هر صفحه</span>
+            <select
+              value={activePageSize}
+              onChange={(e) => changePageSize(Number(e.target.value))}
+              className="h-8 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-2 text-xs nums-fa outline-none focus:ring-2 focus:ring-indigo-500/30"
+              aria-label="تعداد آیتم در هر صفحه"
+            >
+              {[10, 15, 25, 50, 100, 200].map(size => (
+                <option key={size} value={size}>{size.toLocaleString("fa-IR")}</option>
+              ))}
+            </select>
+          </label>
+        </div>
+        {filtered.length > 0 && (
+          <div className="flex items-center gap-1.5">
+            <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage(1)} title="صفحه اول">
+              اول
+            </Button>
+            <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage(p => Math.max(1, p - 1))} title="صفحه قبلی">
               <ChevronRight className="w-4 h-4 ml-1" />
               قبلی
             </Button>
-            <span className="px-3 py-1.5 rounded-md bg-slate-100 dark:bg-slate-800 nums-fa text-slate-700 dark:text-slate-200 font-medium text-xs">
+            <span className="px-3 py-1.5 min-w-[80px] text-center rounded-md bg-slate-100 dark:bg-slate-800 nums-fa text-slate-700 dark:text-slate-200 font-medium text-xs">
               {page.toLocaleString("fa-IR")} / {totalPages.toLocaleString("fa-IR")}
             </span>
-            <Button variant="outline" size="sm" disabled={page >= totalPages} onClick={() => setPage(p => p + 1)}>
+            <Button variant="outline" size="sm" disabled={page >= totalPages} onClick={() => setPage(p => Math.min(totalPages, p + 1))} title="صفحه بعدی">
               بعدی
               <ChevronLeft className="w-4 h-4 mr-1" />
+            </Button>
+            <Button variant="outline" size="sm" disabled={page >= totalPages} onClick={() => setPage(totalPages)} title="صفحه آخر">
+              آخر
             </Button>
           </div>
         )}
