@@ -38,7 +38,7 @@ function registerLineRoutes(Router $router): void
             $where .= " AND l.status = 'active'";
         }
 
-        if ($contractId !== null) { $where .= ' AND l.contract_id = ?'; $params[] = $contractId; }
+        if ($contractId === 0) { $where .= ' AND l.contract_id IS NULL'; } elseif ($contractId !== null) { $where .= ' AND l.contract_id = ?'; $params[] = $contractId; }
 
         if (!empty($search)) {
             $where .= ' AND (l.line_code LIKE ? OR l.name LIKE ? OR l.conductor_type LIKE ?)';
@@ -474,7 +474,7 @@ function registerLineRoutes(Router $router): void
         $contractId = Helpers::getContractId();
         $where = "line_id = ? AND status = 'active'";
         $params = [(int) $id];
-        if ($contractId !== null) { $where .= ' AND contract_id = ?'; $params[] = $contractId; }
+        if ($contractId === 0) { $where .= ' AND contract_id IS NULL'; } elseif ($contractId !== null) { $where .= ' AND contract_id = ?'; $params[] = $contractId; }
         $rows = $db->fetchAll(
             "SELECT * FROM towers WHERE $where ORDER BY tower_number",
             $params

@@ -155,7 +155,7 @@ export function DashboardLayout({ children, currentPage, onNavigate, title, subt
   useEffect(() => {
     if (contractsLoading || !contractRows.length) return;
     const saved = localStorage.getItem("powerline_selected_contract");
-    const savedExists = saved && contractRows.some((r: any) => String(r.id) === saved);
+    const savedExists = saved === "__unknown__" || !!saved && contractRows.some((r: any) => String(r.id) === saved);
     const active = contractRows
       .filter((r: any) => r.status === "active")
       .sort((a: any, b: any) => Number(b.id) - Number(a.id))[0];
@@ -165,10 +165,12 @@ export function DashboardLayout({ children, currentPage, onNavigate, title, subt
   }, [contractRows, contractsLoading]);
 
   const onContractChange = (value: string) => {
-    if (!value) return;
+    // __unknown__ یعنی فقط رکوردهایی که هنوز قرارداد ندارند.
+    // مقدار خالی همچنان به معنی «بدون Scope / همه قراردادها» است و در هدر استفاده نمی‌شود.
     setSelectedContract(value);
     if (typeof window !== "undefined") {
-      localStorage.setItem("powerline_selected_contract", value);
+      if (value) localStorage.setItem("powerline_selected_contract", value);
+      else localStorage.removeItem("powerline_selected_contract");
       // همه ماژول‌ها در بارگذاری مجدد، contract_id انتخاب‌شده را به API می‌فرستند.
       window.location.reload();
     }
@@ -242,7 +244,7 @@ export function DashboardLayout({ children, currentPage, onNavigate, title, subt
             <DataStatusBadge />
             <div className="hidden lg:flex items-center gap-2 min-w-[260px] max-w-[360px]">
               <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 whitespace-nowrap">قرارداد جاری</span>
-              <ContractSelect value={selectedContract} onChange={onContractChange} disabled={contractsLoading} className="min-w-0 flex-1" />
+              <ContractSelect value={selectedContract} onChange={onContractChange} disabled={contractsLoading} className="min-w-0 flex-1" preserveUnknownValue />
             </div>
             {/* v2.8.0: اطلاعات کاربر با آیکون UserCog زیبا‌تر */}
             <DropdownMenu>

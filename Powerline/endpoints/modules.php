@@ -234,7 +234,7 @@ function registerModuleRoutes(Router $router): void
         $search = Helpers::getSearch(); $status = Helpers::query('status');
         $contractId = Helpers::getContractId();
         $where = '1=1'; $params = [];
-        if ($contractId !== null) { $where .= ' AND i.contract_id = ?'; $params[] = $contractId; }
+        if ($contractId === 0) { $where .= ' AND i.contract_id IS NULL'; } elseif ($contractId !== null) { $where .= ' AND i.contract_id = ?'; $params[] = $contractId; }
         if (!empty($search)) { $where .= ' AND (i.invoice_code LIKE ? OR c.title LIKE ?)'; $sp = "%$search%"; $params[] = $sp; $params[] = $sp; }
         if ($status) { $where .= ' AND i.status = ?'; $params[] = $status; }
         $countStmt = $pdo->prepare("SELECT COUNT(*) FROM invoices i LEFT JOIN contracts c ON c.id = i.contract_id WHERE $where"); $countStmt->execute($params); $total = (int)$countStmt->fetchColumn();
@@ -280,7 +280,7 @@ function registerModuleRoutes(Router $router): void
         $search = Helpers::getSearch(); $type = Helpers::query('incident_type');
         $contractId = Helpers::getContractId();
         $where = '1=1'; $params = [];
-        if ($contractId !== null) { $where .= ' AND s.contract_id = ?'; $params[] = $contractId; }
+        if ($contractId === 0) { $where .= ' AND s.contract_id IS NULL'; } elseif ($contractId !== null) { $where .= ' AND s.contract_id = ?'; $params[] = $contractId; }
         if (!empty($search)) { $where .= ' AND (s.incident_code LIKE ? OR s.title LIKE ?)'; $sp = "%$search%"; $params[] = $sp; $params[] = $sp; }
         if ($type) { $where .= ' AND s.incident_type = ?'; $params[] = $type; }
         $countStmt = $pdo->prepare("SELECT COUNT(*) FROM safety_incidents s WHERE $where"); $countStmt->execute($params); $total = (int)$countStmt->fetchColumn();
@@ -332,7 +332,7 @@ function registerModuleRoutes(Router $router): void
         $type = Helpers::query('personnel_type');
         $contractId = Helpers::getContractId();
         $where = '1=1'; $params = [];
-        if ($contractId !== null) { $where .= ' AND p.contract_id = ?'; $params[] = $contractId; }
+        if ($contractId === 0) { $where .= ' AND p.contract_id IS NULL'; } elseif ($contractId !== null) { $where .= ' AND p.contract_id = ?'; $params[] = $contractId; }
         if (!empty($search)) { $where .= ' AND (p.personnel_code LIKE ? OR p.first_name LIKE ? OR p.last_name LIKE ? OR p.position LIKE ? OR p.national_id LIKE ?)'; $sp = "%$search%"; $params[] = $sp; $params[] = $sp; $params[] = $sp; $params[] = $sp; $params[] = $sp; }
         if (!empty($type)) { $where .= ' AND p.personnel_type = ?'; $params[] = $type; }
         $countStmt = $pdo->prepare("SELECT COUNT(*) FROM personnel p WHERE $where"); $countStmt->execute($params); $total = (int)$countStmt->fetchColumn();
@@ -735,7 +735,7 @@ function registerModuleRoutes(Router $router): void
         $voltage = Helpers::queryInt('voltage');
         $contractId = Helpers::getContractId();
         $where = '1=1'; $params = [];
-        if ($contractId !== null) { $where .= ' AND c.contract_id = ?'; $params[] = $contractId; }
+        if ($contractId === 0) { $where .= ' AND c.contract_id IS NULL'; } elseif ($contractId !== null) { $where .= ' AND c.contract_id = ?'; $params[] = $contractId; }
         if (!empty($search)) { $where .= ' AND (c.dispatch_code LIKE ? OR c.name LIKE ?)'; $sp = "%$search%"; $params[] = $sp; $params[] = $sp; }
         if (!empty($voltage)) { $where .= ' AND c.voltage = ?'; $params[] = $voltage; }
         $stmt = $pdo->prepare("SELECT c.*, l.line_code, l.name AS line_name, ct.title AS contract_title FROM circuits c LEFT JOIN `lines` l ON l.id = c.line_id LEFT JOIN contracts ct ON ct.id = c.contract_id WHERE $where ORDER BY c.voltage DESC, c.dispatch_code LIMIT 1000");
@@ -994,7 +994,7 @@ function registerModuleRoutes(Router $router): void
         $search = Helpers::getSearch();
         $contractId = Helpers::getContractId();
         $where = '1=1'; $params = [];
-        if ($contractId !== null) { $where .= ' AND e.contract_id = ?'; $params[] = $contractId; }
+        if ($contractId === 0) { $where .= ' AND e.contract_id IS NULL'; } elseif ($contractId !== null) { $where .= ' AND e.contract_id = ?'; $params[] = $contractId; }
         if (!empty($search)) { $where .= ' AND (e.serial_number LIKE ? OR e.manufacturer LIKE ?)'; $sp = "%$search%"; $params[] = $sp; $params[] = $sp; }
         $countStmt = $pdo->prepare("SELECT COUNT(*) FROM equipment e WHERE $where"); $countStmt->execute($params); $total = (int)$countStmt->fetchColumn();
         $stmt = $pdo->prepare("SELECT e.*, ec.name AS class_name, t.tower_code, c.title AS contract_title FROM equipment e LEFT JOIN equipment_classes ec ON ec.id = e.equipment_class_id LEFT JOIN towers t ON t.id = e.tower_id LEFT JOIN contracts c ON c.id = e.contract_id WHERE $where ORDER BY e.id DESC LIMIT $pageSize OFFSET $offset");
@@ -1053,7 +1053,7 @@ function registerModuleRoutes(Router $router): void
         $pdo = Database::getInstance()->getConnection();
         $contractId = Helpers::getContractId();
         $where = '1=1'; $params = [];
-        if ($contractId !== null) { $where .= ' AND pl.contract_id = ?'; $params[] = $contractId; }
+        if ($contractId === 0) { $where .= ' AND pl.contract_id IS NULL'; } elseif ($contractId !== null) { $where .= ' AND pl.contract_id = ?'; $params[] = $contractId; }
         $stmt = $pdo->prepare("SELECT pl.*, c.title AS contract_title FROM price_lists pl LEFT JOIN contracts c ON c.id = pl.contract_id WHERE $where ORDER BY pl.id DESC");
         $stmt->execute($params);
         Response::success($stmt->fetchAll());

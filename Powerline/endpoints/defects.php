@@ -25,7 +25,7 @@ function registerDefectRoutes(Router $router): void
         $where = '1=1';
         $params = [];
 
-        if ($contractId !== null) { $where .= ' AND d.contract_id = ?'; $params[] = $contractId; }
+        if ($contractId === 0) { $where .= ' AND d.contract_id IS NULL'; } elseif ($contractId !== null) { $where .= ' AND d.contract_id = ?'; $params[] = $contractId; }
 
         if (!empty($search)) {
             $where .= ' AND (d.defect_code LIKE ? OR d.title LIKE ? OR d.description LIKE ?)';

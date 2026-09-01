@@ -76,11 +76,15 @@ function registerTowerRoutes(Router $router): void
              FROM towers t
              LEFT JOIN `lines` l ON l.id = t.line_id
              WHERE t.status = 'active'
-               AND (? IS NULL OR t.contract_id = ?)
+               AND (
+                    ? IS NULL
+                    OR (? = 0 AND t.contract_id IS NULL)
+                    OR (? > 0 AND t.contract_id = ?)
+               )
                AND ST_Distance_Sphere(t.geom, ST_GeomFromText('POINT($lng $lat)', 4326)) <= ?
              ORDER BY distance_meters ASC
              LIMIT 50",
-            [$contractId, $contractId, $radius]
+            [$contractId, $contractId, $contractId, $contractId, $radius]
         );
 
         $data = array_map(function ($row) {
@@ -110,7 +114,7 @@ function registerTowerRoutes(Router $router): void
         $where = '1=1';
         $params = [];
 
-        if ($contractId !== null) { $where .= ' AND t.contract_id = ?'; $params[] = $contractId; }
+        if ($contractId === 0) { $where .= ' AND t.contract_id IS NULL'; } elseif ($contractId !== null) { $where .= ' AND t.contract_id = ?'; $params[] = $contractId; }
 
         if (!empty($search)) {
             $where .= ' AND (t.tower_code LIKE ? OR CAST(t.tower_number AS CHAR) LIKE ? OR t.tower_structure LIKE ? OR t.tower_type LIKE ? OR t.line_supervisor LIKE ?)';

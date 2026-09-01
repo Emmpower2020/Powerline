@@ -30,7 +30,7 @@ export interface SearchableOption {
 
 export function SearchableSelect({
   value, onChange, options, placeholder = "انتخاب...", searchPlaceholder = "جستجو...",
-  emptyText = "موردی یافت نشد", disabled = false, allowClear = false, className, align = "start",
+  emptyText = "موردی یافت نشد", disabled = false, allowClear = false, className, align = "start", preserveUnknownValue = false,
 }: {
   value: string;
   onChange: (value: string) => void;
@@ -43,6 +43,8 @@ export function SearchableSelect({
   allowClear?: boolean;
   className?: string;
   align?: "start" | "center" | "end";
+  /** اگر true باشد مقدار ویژه نامشخص به‌صورت __unknown__ حفظ می‌شود. */
+  preserveUnknownValue?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -52,7 +54,9 @@ export function SearchableSelect({
     { value: UNKNOWN_VALUE, label: "نامشخص" },
     ...options.filter(o => o.value !== UNKNOWN_VALUE),
   ], [options]);
-  const selected = value ? (options.find(o => o.value === value) || null) : null;
+  const selected = value === UNKNOWN_VALUE
+    ? (displayOptions.find(o => o.value === UNKNOWN_VALUE) || null)
+    : (value ? (options.find(o => o.value === value) || null) : null);
 
   // گروه‌بندی گزینه‌ها (اختیاری)
   const grouped = useMemo(() => {
@@ -115,7 +119,11 @@ export function SearchableSelect({
                       key={opt.value}
                       value={`${opt.label} ${opt.value} ${opt.description || ""}`}
                       onSelect={() => {
-                        onChange(opt.value === UNKNOWN_VALUE ? "" : (opt.value === value ? "" : opt.value));
+                        if (opt.value === UNKNOWN_VALUE) {
+                          onChange(preserveUnknownValue ? UNKNOWN_VALUE : "");
+                        } else {
+                          onChange(opt.value === value ? "" : opt.value);
+                        }
                         setOpen(false);
                         setQuery("");
                       }}
@@ -164,6 +172,8 @@ export function SearchableMultiSelect({
   confirmLabel?: string;
   className?: string;
   align?: "start" | "center" | "end";
+  /** اگر true باشد مقدار ویژه نامشخص به‌صورت __unknown__ حفظ می‌شود. */
+  preserveUnknownValue?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");

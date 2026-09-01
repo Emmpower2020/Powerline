@@ -127,7 +127,10 @@ class ApiClient {
       "price-lists", "invoices", "dashboard/stats", "dashboard/recent-defects",
     ].some((name) => endpoint === name || endpoint.startsWith(`${name}/`));
     const scopedParams = contractScoped && typeof window !== "undefined"
-      ? { ...(params || {}), contract_id: params?.contract_id ?? (localStorage.getItem("powerline_selected_contract") || undefined) }
+      ? { ...(params || {}), contract_id: params?.contract_id ?? (() => {
+          const selected = localStorage.getItem("powerline_selected_contract");
+          return selected === "__unknown__" ? 0 : (selected || undefined);
+        })() }
       : params;
     const url = this.buildUrl(endpoint, scopedParams);
 

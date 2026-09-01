@@ -24,7 +24,7 @@ function registerWorkOrderRoutes(Router $router): void
         $where = '1=1';
         $params = [];
 
-        if ($contractId !== null) { $where .= ' AND wo.contract_id = ?'; $params[] = $contractId; }
+        if ($contractId === 0) { $where .= ' AND wo.contract_id IS NULL'; } elseif ($contractId !== null) { $where .= ' AND wo.contract_id = ?'; $params[] = $contractId; }
 
         if (!empty($search)) {
             $where .= ' AND (wo.wo_code LIKE ? OR wo.title LIKE ? OR wo.description LIKE ?)';

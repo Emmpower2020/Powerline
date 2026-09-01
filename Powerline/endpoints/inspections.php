@@ -23,7 +23,7 @@ function registerInspectionRoutes(Router $router): void
         $where = '1=1';
         $params = [];
 
-        if ($contractId !== null) { $where .= ' AND i.contract_id = ?'; $params[] = $contractId; }
+        if ($contractId === 0) { $where .= ' AND i.contract_id IS NULL'; } elseif ($contractId !== null) { $where .= ' AND i.contract_id = ?'; $params[] = $contractId; }
 
         if (!empty($search)) {
             $where .= ' AND (i.inspection_code LIKE ? OR i.notes LIKE ?)';

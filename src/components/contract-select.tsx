@@ -9,12 +9,14 @@ export function ContractSelect({
   disabled = false,
   placeholder = "انتخاب قرارداد...",
   className,
+  preserveUnknownValue = false,
 }: {
   value: string;
   onChange: (value: string) => void;
   disabled?: boolean;
   placeholder?: string;
   className?: string;
+  preserveUnknownValue?: boolean;
 }) {
   const { options, loading } = useContractOptions(true);
 
@@ -27,6 +29,7 @@ export function ContractSelect({
       searchPlaceholder="جستجوی عنوان قرارداد..."
       disabled={disabled}
       className={className}
+      preserveUnknownValue={preserveUnknownValue}
     />
   );
 }

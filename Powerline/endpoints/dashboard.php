@@ -14,12 +14,16 @@ function registerDashboardRoutes(Router $router): void
 
         // قرارداد جاری (Scope انتخاب‌شده در هدر)
         $contractId = Helpers::getContractId();
-        $lineScope = $contractId !== null ? ' AND contract_id = ' . (int)$contractId : '';
-        $towerScope = $contractId !== null ? ' AND contract_id = ' . (int)$contractId : '';
-        $defectScope = $contractId !== null ? ' AND contract_id = ' . (int)$contractId : '';
-        $inspectionScope = $contractId !== null ? ' AND contract_id = ' . (int)$contractId : '';
-        $workOrderScope = $contractId !== null ? ' AND contract_id = ' . (int)$contractId : '';
-        $safetyScope = $contractId !== null ? ' AND contract_id = ' . (int)$contractId : '';
+        $contractScope = static function (string $column) use ($contractId): string {
+            if ($contractId === 0) return ' AND ' . $column . ' IS NULL';
+            return $contractId !== null ? ' AND ' . $column . ' = ' . (int)$contractId : '';
+        };
+        $lineScope = $contractScope('contract_id');
+        $towerScope = $contractScope('contract_id');
+        $defectScope = $contractScope('contract_id');
+        $inspectionScope = $contractScope('contract_id');
+        $workOrderScope = $contractScope('contract_id');
+        $safetyScope = $contractScope('contract_id');
 
         // آمار کلی
         $stats = [
@@ -127,7 +131,7 @@ function registerDashboardRoutes(Router $router): void
 
         $db = Database::getInstance();
         $contractId = Helpers::getContractId();
-        $defectScope = $contractId !== null ? ' AND d.contract_id = ' . (int)$contractId : '';
+        $defectScope = $contractId === 0 ? ' AND d.contract_id IS NULL' : ($contractId !== null ? ' AND d.contract_id = ' . (int)$contractId : '');
         $limit = min(50, max(1, (int) Helpers::query('limit', 10)));
 
         $rows = $db->fetchAll(
