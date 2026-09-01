@@ -7,7 +7,7 @@ import { INSULATOR_TYPES } from "@/components/towers/create-tower-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Loader2, ListChecks, Power, PowerOff, Building2, Radio, Layers, Cable, UserCog, Link2 as Link2Icon } from "lucide-react";
+import { FileText, Loader2, ListChecks, Power, PowerOff, Building2, Radio, Layers, Cable, UserCog, Link2 as Link2Icon } from "lucide-react";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { SearchableSelect } from "@/components/searchable-select";
+import { ContractSelect } from "@/components/contract-select";
 import { usePersonnelOptions } from "@/hooks/use-personnel-options";
 import { useTowerReferences } from "@/hooks/use-tower-references";
 import { useToast } from "@/hooks/use-toast";
@@ -29,7 +30,7 @@ interface BulkTowersActionsProps {
 
 type FieldAction =
   | "tower_structure" | "tower_type" | "tower_type_code"
-  | "insulator_all" | "line_supervisor" | "line_id";
+  | "insulator_all" | "line_supervisor" | "line_id" | "contract";
 
 const TOWER_TYPES = ["کششی", "آویزی"];
 
@@ -40,6 +41,7 @@ const actionMeta: Record<FieldAction, { title: string; label: string; placeholde
     insulator_all:        { title: "تغییر گروهی نوع مقره (هر ۶ فاز)", label: "نوع مقره" },
   line_supervisor:      { title: "تغییر گروهی سرپرست خط", label: "نام سرپرست خط", placeholder: "مثلاً: یادگار میری" },
   line_id:              { title: "اتصال گروهی دکل‌ها به خط", label: "خط" },
+  contract:             { title: "تغییر گروهی قرارداد", label: "قرارداد" },
 };
 
 /**
@@ -149,7 +151,7 @@ export function BulkTowersActions({ getSelection, onApplied }: BulkTowersActions
   const confirmField = async () => {
     if (!fieldAction) return;
     const isText = ["line_supervisor"].includes(fieldAction);
-    const isSelect = ["tower_type", "insulator_all", "line_id"].includes(fieldAction);
+    const isSelect = ["tower_type", "insulator_all", "line_id", "contract"].includes(fieldAction);
 
     if (isText && !value.trim()) {
       toast({ title: "مقدار را وارد کنید" });
@@ -167,6 +169,7 @@ export function BulkTowersActions({ getSelection, onApplied }: BulkTowersActions
       case "tower_type":           patch = { tower_type: value }; break;
       case "line_supervisor":      patch = { line_supervisor: value.trim() }; break;
       case "line_id":              patch = { line_id: Number(value) }; break;
+      case "contract":             patch = { contract_id: Number(value) }; break;
       case "insulator_all":
         // یک نوع مقره روی هر ۶ فاز/مدار اعمال می‌شود
         patch = {
@@ -203,11 +206,11 @@ export function BulkTowersActions({ getSelection, onApplied }: BulkTowersActions
           <DropdownMenuSeparator />
           <ItemRow icon={<Power className="w-4 h-4 text-emerald-600" />} label="فعال کردن" onClick={() => {
             if (!requireSelection()) return;
-            applyPatch(getSelection(), { is_active: true }, "دکل‌ها فعال شدند");
+            applyPatch(getSelection(), { status: "active" }, "دکل‌ها فعال شدند");
           }} />
           <ItemRow icon={<PowerOff className="w-4 h-4 text-slate-500" />} label="غیرفعال کردن" onClick={() => {
             if (!requireSelection()) return;
-            applyPatch(getSelection(), { is_active: false }, "دکل‌ها غیرفعال شدند");
+            applyPatch(getSelection(), { status: "inactive" }, "دکل‌ها غیرفعال شدند");
           }} />
           <DropdownMenuSeparator />
           <ItemRow icon={<Building2 className="w-4 h-4 text-slate-600" />} label="ساختار دکل" onClick={() => startFieldAction("tower_structure")} />
@@ -217,6 +220,7 @@ export function BulkTowersActions({ getSelection, onApplied }: BulkTowersActions
           <DropdownMenuSeparator />
           <ItemRow icon={<UserCog className="w-4 h-4 text-indigo-600" />} label="سرپرست خط" onClick={() => startFieldAction("line_supervisor")} />
           <ItemRow icon={<Link2Icon className="w-4 h-4 text-emerald-600" />} label="اتصال به خط" onClick={() => startFieldAction("line_id")} />
+          <ItemRow icon={<FileText className="w-4 h-4 text-indigo-600" />} label="قرارداد" onClick={() => startFieldAction("contract")} />
         </DropdownMenuContent>
       </DropdownMenu>
 
@@ -252,7 +256,12 @@ export function BulkTowersActions({ getSelection, onApplied }: BulkTowersActions
               این مقدار روی <span className="font-bold text-indigo-600 nums-fa">{rows.length.toLocaleString("fa-IR")}</span> دکل انتخاب‌شده اعمال می‌شود.
             </p>
 
-            {fieldAction === "line_id" ? (
+            {fieldAction === "contract" ? (
+              <div className="space-y-2">
+                <Label className="text-right block">قرارداد</Label>
+                <ContractSelect value={value} onChange={setValue} />
+              </div>
+            ) : fieldAction === "line_id" ? (
               <div className="space-y-2">
                 <Label className="text-right block">{actionMeta.line_id.label}</Label>
                 {linesLoaded ? (

@@ -21,7 +21,7 @@ export interface Line {
   contract_title: string | null;
   construction_date: string | null;
   commission_date: string | null;
-  is_active: boolean;
+  status: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -60,7 +60,7 @@ export interface Tower {
   gps_lat: number | null;
   gps_lng: number | null;
   line_supervisor: string | null;
-  is_active: boolean;
+  status: boolean;
   created_at: string;
   updated_at: string;
   distance_meters?: number;
@@ -114,7 +114,7 @@ export interface DefectCategory {
   name: string;
   applies_to: "tower" | "line" | "equipment" | "all";
   tower_type: TowerType | "all";
-  is_active: boolean;
+  status: boolean;
   defect_count: number;
 }
 
@@ -127,7 +127,7 @@ export interface DefectDefinition {
   default_priority: DefectPriority;
   default_severity: DefectSeverity;
   safety_risk: "none" | "low" | "medium" | "high";
-  is_active: boolean;
+  status: boolean;
 }
 
 export type InspectionStatus =

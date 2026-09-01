@@ -7,6 +7,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Loader2, Plus, Upload as UploadIcon } from "lucide-react";
 import { ContractSelect } from "@/components/contract-select";
 import { DataTable, type DataTableColumn } from "@/components/data-table";
@@ -22,6 +23,7 @@ type GenericConfig = {
   create?: "contract" | "safety" | "personnel" | "contractor" | "equipment";
   editKeys?: string[];
   importKeys?: string[];
+  activityStatus?: boolean;
 };
 
 const configs: Record<string, GenericConfig> = {
@@ -61,7 +63,7 @@ const configs: Record<string, GenericConfig> = {
     { key: "occurred_at", header: "تاریخ", type: "date", sortable: true },
     { key: "status", header: "وضعیت", type: "badge", badgeLabels: { reported: "گزارش شده", under_investigation: "در حال بررسی", resolved: "حل شده", closed: "بسته شده" }, badgeColors: { reported: "bg-blue-100 text-blue-700", resolved: "bg-green-100 text-green-700", closed: "bg-slate-100 text-slate-500" } },
   ]},
-  personnel: { title: "پرسنل", create: "personnel", editKeys: ["contract_id","first_name","last_name","personnel_type","position","phone","mobile","email"], importKeys: ["contract_id","first_name","last_name","personnel_type","position","phone","mobile","email"], columns: [
+  personnel: { title: "پرسنل", create: "personnel", activityStatus: true, editKeys: ["contract_id","first_name","last_name","personnel_type","position","phone","mobile","email","status"], importKeys: ["contract_id","first_name","last_name","personnel_type","position","phone","mobile","email","status"], columns: [
     { key: "personnel_code", header: "کد", sortable: true, filterable: true, align: "left" },
     { key: "contract_title", header: "قرارداد", sortable: true, filterable: true, wrap: true },
     { key: "first_name", header: "نام", sortable: true, filterable: true },
@@ -70,19 +72,24 @@ const configs: Record<string, GenericConfig> = {
     { key: "position", header: "سمت", sortable: true, filterable: true },
     { key: "mobile", header: "موبایل", align: "left" },
   ]},
-  contractors: { title: "پیمانکاران", create: "contractor", editKeys: ["name","contact_person","phone","mobile","email","address","bank_account","is_active"], importKeys: ["name","contact_person","phone","mobile","email","address","bank_account"], columns: [
-    { key: "contractor_code", header: "کد", sortable: true, filterable: true, align: "left" },
-    { key: "name", header: "نام", sortable: true, filterable: true },
-    { key: "contact_person", header: "مسئول", sortable: true, filterable: true },
-    { key: "phone", header: "تلفن", align: "left" }, { key: "mobile", header: "موبایل", align: "left" },
-    { key: "is_active", header: "وضعیت", type: "boolean" },
+  contractors: { title: "پیمانکاران", create: "contractor", activityStatus: true, editKeys: ["contractor_code","contractor_name","ceo_name","contractor_phone","mobile","address","status"], importKeys: ["contractor_code","contractor_name","ceo_name","contractor_phone","mobile","address","status"], columns: [
+    { key: "id", header: "ID", sortable: true, filterable: true, align: "left" },
+    { key: "contractor_code", header: "کد پیمانکار", sortable: true, filterable: true, align: "left" },
+    { key: "contractor_name", header: "نام پیمانکار", sortable: true, filterable: true, wrap: true },
+    { key: "ceo_name", header: "مدیرعامل", sortable: true, filterable: true },
+    { key: "contractor_phone", header: "تلفن", align: "left" },
+    { key: "mobile", header: "موبایل", align: "left" },
+    { key: "address", header: "آدرس", wrap: true },
+    { key: "status", header: "وضعیت", type: "status" },
+    { key: "created_at", header: "ایجاد", type: "date" },
+    { key: "updated_at", header: "آخرین ویرایش", type: "date" },
   ]},
-  equipment: { title: "تجهیزات", create: "equipment", editKeys: ["contract_id","serial_number","manufacturer","model","install_date","warranty_expiry","is_active"], importKeys: ["contract_id","serial_number","manufacturer","model","install_date","warranty_expiry"], columns: [
+  equipment: { title: "تجهیزات", create: "equipment", activityStatus: true, editKeys: ["contract_id","serial_number","manufacturer","model","install_date","warranty_expiry","status"], importKeys: ["contract_id","serial_number","manufacturer","model","install_date","warranty_expiry"], columns: [
     { key: "serial_number", header: "سریال", sortable: true, filterable: true, align: "left" },
     { key: "contract_title", header: "قرارداد", sortable: true, filterable: true, wrap: true },
     { key: "manufacturer", header: "سازنده", sortable: true, filterable: true },
     { key: "model", header: "مدل" }, { key: "class_name", header: "گروه" },
-    { key: "tower_code", header: "دکل" }, { key: "is_active", header: "وضعیت", type: "boolean" },
+    { key: "tower_code", header: "دکل" }, { key: "status", header: "وضعیت", type: "status" },
   ]},
   "audit-log": { title: "لاگ ممیزی", columns: [
     { key: "username", header: "کاربر", sortable: true, filterable: true },
@@ -93,15 +100,16 @@ const configs: Record<string, GenericConfig> = {
     { key: "created_at", header: "زمان", type: "date" },
   ]},
   organization: { title: "سازمان", columns: [
+    { key: "id", header: "ID", sortable: true, filterable: true, align: "left" },
     { key: "code", header: "کد", align: "left" }, { key: "name", header: "نام", sortable: true, filterable: true },
     { key: "org_type", header: "نوع", type: "badge", badgeLabels: { company: "شرکت", region: "منطقه", management: "مدیریت", unit: "واحد" }, badgeColors: { company: "bg-indigo-100 text-indigo-700", region: "bg-blue-100 text-blue-700", management: "bg-purple-100 text-purple-700", unit: "bg-slate-100 text-slate-700" } },
-    { key: "phone", header: "تلفن", align: "left" },
+    { key: "contractor_phone", header: "تلفن", align: "left" }, { key: "status", header: "وضعیت", type: "status" },
   ]},
 };
 
 function EditorDialog({
-  open, row, keys, title, mode, endpoint, onClose, onSaved,
-}: { open: boolean; row: GenericItem | null; keys: string[]; title: string; mode: "edit" | "create"; endpoint: string; onClose: () => void; onSaved: () => void }) {
+  open, row, keys, title, mode, endpoint, onClose, onSaved, activityStatus,
+}: { open: boolean; row: GenericItem | null; keys: string[]; title: string; mode: "edit" | "create"; endpoint: string; onClose: () => void; onSaved: () => void; activityStatus?: boolean }) {
   const [form, setForm] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -120,7 +128,8 @@ function EditorDialog({
       keys.forEach(k => {
         const v = form[k] ?? "";
         if (["amount","total_amount","contract_id","contractor_id","line_id","tower_id"].includes(k)) payload[k] = v === "" ? null : Number(v);
-        else if (k === "is_active" || k === "outage_required") payload[k] = v === "1" || v === "true" || v === "بله";
+        else if (k === "status") payload[k] = activityStatus ? (v || "active") : (v === "" ? null : v);
+        else if (k === "outage_required") payload[k] = v === "1" || v === "true" || v === "بله";
         else payload[k] = v === "" ? null : v;
       });
       if (mode === "edit" && row) await apiClient.put(`${endpoint}/${row.id}`, payload);
@@ -136,8 +145,18 @@ function EditorDialog({
       <form onSubmit={save}>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[60vh] overflow-y-auto p-1">
           {keys.map(k => <div key={k} className="space-y-1">
-            <label className="text-sm text-slate-600">{k === "contract_id" ? "قرارداد" : k}</label>
+            <label className="text-sm text-slate-600">{
+              k === "contract_id" ? "قرارداد" :
+              k === "status" ? "وضعیت" :
+              k === "contractor_code" ? "کد پیمانکار" :
+              k === "contractor_name" ? "نام پیمانکار" :
+              k === "ceo_name" ? "مدیرعامل" :
+              k === "contractor_phone" ? "تلفن" :
+              k === "mobile" ? "موبایل" :
+              k === "address" ? "آدرس" : k
+            }</label>
             {k === "contract_id" ? <ContractSelect value={form[k] || ""} onChange={v => setForm({...form, [k]: v})} />
+              : k === "status" && activityStatus ? <Select value={form[k] || "active"} onValueChange={v => setForm({...form, [k]: v})}><SelectTrigger className="w-full"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="active">فعال</SelectItem><SelectItem value="inactive">غیرفعال</SelectItem></SelectContent></Select>
               : k === "notes" || k === "description" || k === "address" ? <Textarea value={form[k] || ""} onChange={e => setForm({...form,[k]:e.target.value})} />
               : <Input value={form[k] || ""} onChange={e => setForm({...form,[k]:e.target.value})} dir={/(_id|amount|phone|mobile)/.test(k) ? "ltr" : "rtl"} />}
           </div>)}
@@ -239,9 +258,9 @@ export function GenericModulePage({ moduleKey, endpoint }: { moduleKey: string; 
       onDelete={deleteRows}
       onImport={() => inputRef.current?.click()}
       onLoadAllRows={async () => data}
-      toolbarExtra={(rows) => <GenericBulkActions rows={rows} endpoint={endpoint} entityName={config.title.replace("ها","")} onApplied={() => setRefreshKey(k => k + 1)} canToggleActive={data.some(r => "is_active" in r)} canChangeContract={!!config.editKeys?.includes("contract_id")} />}
+      toolbarExtra={(rows) => <GenericBulkActions rows={rows} endpoint={endpoint} entityName={config.title.replace("ها","")} onApplied={() => setRefreshKey(k => k + 1)} canToggleStatus={!!config.activityStatus} canChangeContract={!!config.editKeys?.includes("contract_id")} />}
     />
     {renderCreate()}
-    <EditorDialog open={editor.open} row={editor.row} keys={selectedKeys} title={config.title} mode={editor.mode} endpoint={endpoint} onClose={() => setEditor({open:false,mode:editor.mode,row:null})} onSaved={() => { setEditor({open:false,mode:editor.mode,row:null}); setRefreshKey(k => k + 1); }} />
+    <EditorDialog open={editor.open} row={editor.row} keys={selectedKeys} title={config.title} mode={editor.mode} endpoint={endpoint} activityStatus={!!config.activityStatus} onClose={() => setEditor({open:false,mode:editor.mode,row:null})} onSaved={() => { setEditor({open:false,mode:editor.mode,row:null}); setRefreshKey(k => k + 1); }} />
   </div>;
 }

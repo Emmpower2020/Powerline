@@ -6,7 +6,7 @@ import { API_ENDPOINTS } from "@/lib/api-config";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Loader2, ListChecks, Power, PowerOff, UserCog, Layers, Zap, Cable, Building2 } from "lucide-react";
+import { Loader2, ListChecks, Power, PowerOff, UserCog, Layers, Zap, Cable, Building2, FileText } from "lucide-react";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
@@ -20,6 +20,7 @@ import { useConductors } from "@/hooks/use-conductors";
 import { usePersonnelOptions } from "@/hooks/use-personnel-options";
 import { useToast } from "@/hooks/use-toast";
 import { useTowerReferences } from "@/hooks/use-tower-references";
+import { ContractSelect } from "@/components/contract-select";
 
 interface BulkLinesActionsProps {
   /** ردیف‌های انتخاب‌شده — در لحظهٔ کلیک از جدول خوانده می‌شود */
@@ -30,7 +31,7 @@ interface BulkLinesActionsProps {
 
 /** اعمالی که با دیالوگ مقدار انجام می‌شوند */
 type FieldAction =
-  | "supervisor" | "expert" | "contractor"
+  | "supervisor" | "expert" | "contractor" | "contract"
   | "voltage" | "conductor_type" | "tower_structure";
 
 const VOLTAGE_OPTIONS = [63, 132, 230, 400];
@@ -39,6 +40,7 @@ const actionMeta: Record<FieldAction, { title: string; label: string; placeholde
   supervisor:          { title: "تغییر گروهی سرپرست خط", label: "نام سرپرست خط", placeholder: "مثلاً: یادگار میری" },
   expert:              { title: "تغییر گروهی کارشناس خط", label: "نام کارشناس خط", placeholder: "مثلاً: وحید سلیمانی" },
   contractor:          { title: "تغییر گروهی پیمانکار", label: "پیمانکار" },
+  contract:            { title: "تغییر گروهی قرارداد", label: "قرارداد" },
   voltage:             { title: "تغییر گروهی ولتاژ", label: "ولتاژ (kV)" },
   conductor_type:      { title: "تغییر گروهی نوع سیم", label: "نوع سیم", placeholder: "مثلاً: لینکس (Lynx)" },
   tower_structure:{ title: "تغییر گروهی نوع سازه دکل", label: "نوع سازه دکل", placeholder: "مثلاً: مشبک فلزی" },
@@ -65,7 +67,7 @@ export function BulkLinesActions({ getSelection, onApplied }: BulkLinesActionsPr
   // لیست پیمانکارها فقط وقتی لازم شد بارگذاری می‌شود
   useEffect(() => {
     if (fieldAction === "contractor" && !contractorsLoaded) {
-      apiClient.get<any>(API_ENDPOINTS.contractors, { page: 1, page_size: 100, is_active: 1 })
+      apiClient.get<any>(API_ENDPOINTS.contractors, { page: 1, page_size: 100, status: "active" })
         .then((res: any) => {
           setContractors(res?.data || []);
           setContractorsLoaded(true);
@@ -127,7 +129,7 @@ export function BulkLinesActions({ getSelection, onApplied }: BulkLinesActionsPr
   const confirmField = async () => {
     if (!fieldAction) return;
     const isText = ["supervisor", "expert"].includes(fieldAction); // v3.4.1+: نوع سیم/سازه کمبوباکس شدند (سیم از جدول conductors — v3.5.0)
-    const isSelect = ["contractor", "voltage"].includes(fieldAction);
+    const isSelect = ["contractor", "contract", "voltage"].includes(fieldAction);
 
     if (isText && !value.trim()) {
       toast({ title: "مقدار را وارد کنید" });
@@ -145,6 +147,7 @@ export function BulkLinesActions({ getSelection, onApplied }: BulkLinesActionsPr
       case "conductor_type":       patch = { conductor_type: value.trim() }; break;
       case "tower_structure": patch = { tower_structure: value.trim() }; break;
       case "contractor":           patch = { contractor_id: Number(value) }; break;
+      case "contract":             patch = { contract_id: Number(value) }; break;
       case "voltage": {
         const v = Number(value);
         // فقط ستون واقعی دیتابیس lines استفاده می‌شود: voltage_kv
@@ -177,11 +180,11 @@ export function BulkLinesActions({ getSelection, onApplied }: BulkLinesActionsPr
           <DropdownMenuSeparator />
           <ItemRow icon={<Power className="w-4 h-4 text-emerald-600" />} label="فعال کردن" onClick={() => {
             if (!requireSelection()) return;
-            applyPatch(getSelection(), { is_active: true }, "خطوط فعال شدند");
+            applyPatch(getSelection(), { status: "active" }, "خطوط فعال شدند");
           }} />
           <ItemRow icon={<PowerOff className="w-4 h-4 text-slate-500" />} label="غیرفعال کردن" onClick={() => {
             if (!requireSelection()) return;
-            applyPatch(getSelection(), { is_active: false }, "خطوط غیرفعال شدند");
+            applyPatch(getSelection(), { status: "inactive" }, "خطوط غیرفعال شدند");
           }} />
           <DropdownMenuSeparator />
           <ItemRow icon={<Zap className="w-4 h-4 text-amber-500" />} label="ولتاژ" onClick={() => startFieldAction("voltage")} />
@@ -191,6 +194,7 @@ export function BulkLinesActions({ getSelection, onApplied }: BulkLinesActionsPr
           <ItemRow icon={<UserCog className="w-4 h-4 text-indigo-600" />} label="سرپرست خط" onClick={() => startFieldAction("supervisor")} />
           <ItemRow icon={<UserCog className="w-4 h-4 text-indigo-600" />} label="کارشناس خط" onClick={() => startFieldAction("expert")} />
           <ItemRow icon={<UserCog className="w-4 h-4 text-indigo-600" />} label="پیمانکار" onClick={() => startFieldAction("contractor")} />
+          <ItemRow icon={<FileText className="w-4 h-4 text-indigo-600" />} label="قرارداد" onClick={() => startFieldAction("contract")} />
         </DropdownMenuContent>
       </DropdownMenu>
 
@@ -207,7 +211,12 @@ export function BulkLinesActions({ getSelection, onApplied }: BulkLinesActionsPr
               این مقدار روی <span className="font-bold text-indigo-600 nums-fa">{rows.length.toLocaleString("fa-IR")}</span> خط انتخاب‌شده اعمال می‌شود.
             </p>
 
-            {fieldAction === "contractor" ? (
+            {fieldAction === "contract" ? (
+              <div className="space-y-2">
+                <Label className="text-right block">قرارداد</Label>
+                <ContractSelect value={value} onChange={setValue} />
+              </div>
+            ) : fieldAction === "contractor" ? (
               <div className="space-y-2">
                 <Label className="text-right block">{actionMeta.contractor.label}</Label>
                 {contractorsLoaded ? (
@@ -215,7 +224,7 @@ export function BulkLinesActions({ getSelection, onApplied }: BulkLinesActionsPr
                     <SelectTrigger className="w-full bg-white"><SelectValue placeholder="انتخاب پیمانکار..." /></SelectTrigger>
                     <SelectContent>
                       {contractors.map((c: any) => (
-                        <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>
+                        <SelectItem key={c.id} value={String(c.id)}>{c.contractor_name}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>

@@ -198,7 +198,7 @@ function linePopupHtml(line: Line): string {
         ${row("مسئول خط", esc(extendedLine.line_supervisor))}
         ${row("کارشناس خط", esc(extendedLine.line_expert))}
         ${row("پیمانکار", esc(line.contractor_name))}
-        ${row("وضعیت", line.is_active ? "فعال" : "غیرفعال")}
+        ${row("وضعیت", line.status === "active" ? "فعال" : "غیرفعال")}
       </div>
     </div>`;
 }

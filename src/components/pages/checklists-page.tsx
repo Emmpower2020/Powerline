@@ -35,7 +35,7 @@ interface ChecklistTemplate {
   name: string;
   description: string | null;
   applies_to: "line" | "tower" | "equipment" | "all";
-  is_active: number;
+  status: string;
   created_at: string;
 }
 
@@ -73,7 +73,7 @@ export function ChecklistsPage() {
         all: "bg-slate-100 text-slate-700",
       },
     },
-    { key: "is_active", header: "فعال", type: "boolean" },
+    { key: "status", header: "وضعیت", type: "status" },
     { key: "created_at", header: "تاریخ ایجاد", type: "date" },
   ];
 
@@ -110,7 +110,7 @@ export function ChecklistsPage() {
           layoutKey="checklist-templates"
           onAdd={() => setShowCreate(true)}
           onRefresh={() => setRefreshKey(k => k + 1)}
-          toolbarExtra={(rows) => <GenericBulkActions rows={rows} endpoint={API_ENDPOINTS.checklistTemplates} entityName="چک‌لیست" onApplied={() => setRefreshKey(k => k + 1)} canToggleActive />}
+          toolbarExtra={(rows) => <GenericBulkActions rows={rows} endpoint={API_ENDPOINTS.checklistTemplates} entityName="چک‌لیست" onApplied={() => setRefreshKey(k => k + 1)} canToggleStatus />}
         />
       )}
 

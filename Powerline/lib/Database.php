@@ -147,11 +147,11 @@ class Database
     }
 
     /**
-     * حذف رکورد (soft delete: is_active = 0)
+     * حذف رکورد (soft delete: status = 'inactive')
      */
     public function softDelete(string $table, string $where, array $params = []): int
     {
-        $sql = "UPDATE `$table` SET `is_active` = 0 WHERE $where";
+        $sql = "UPDATE `$table` SET `status` = 0 WHERE $where";
         $stmt = $this->pdo->prepare($sql);
         $stmt->execute($params);
         return $stmt->rowCount();

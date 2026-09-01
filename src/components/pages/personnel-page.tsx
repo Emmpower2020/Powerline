@@ -47,7 +47,7 @@ interface Person {
   email?: string | null;
   supervisor_name?: string | null;
   collaboration_start?: string | null;
-  is_active?: number | boolean;
+  status?: string;
 }
 
 const PERSONNEL_TYPES: { value: string; label: string; color: string; icon: React.ReactNode; iconClass: string; cardClass: string }[] = [
@@ -136,7 +136,7 @@ export function PersonnelPage() {
     { key: "mobile", header: "موبایل", align: "right" },
     { key: "supervisor_name", header: "سرپرست", filterable: true, align: "right" },
     { key: "collaboration_start", header: "شروع همکاری", align: "right" },
-    { key: "is_active", header: "فعال", type: "boolean", align: "right" },
+    { key: "status", header: "وضعیت", type: "status", align: "right" },
   ];
 
   // v3.1.0: کپی TSV — فقط اعلان (کپی توسط خود جدول انجام می‌شود)
@@ -240,7 +240,7 @@ export function PersonnelPage() {
         onCopy={handleCopy}
         onDelete={bulkDelete.requestDelete}
         onImport={() => setShowImport(true)}
-        toolbarExtra={(rows) => <GenericBulkActions rows={rows} endpoint={API_ENDPOINTS.personnel} entityName="پرسنل" onApplied={() => setRefreshKey(k => k + 1)} canToggleActive />}
+        toolbarExtra={(rows) => <GenericBulkActions rows={rows} endpoint={API_ENDPOINTS.personnel} entityName="پرسنل" onApplied={() => setRefreshKey(k => k + 1)} canToggleStatus />}
       />
 
       <PersonnelDialog

@@ -64,7 +64,7 @@ function registerWorkOrderRoutes(Router $router): void
                        t.tower_code,
                        d.defect_code AS related_defect_code,
                        cr.name AS crew_name,
-                       ct.name AS contractor_name,
+                       ct.contractor_name AS contractor_name,
                        c.title AS contract_title
                 FROM work_orders wo
                 LEFT JOIN `lines` l ON l.id = wo.line_id
@@ -95,7 +95,7 @@ function registerWorkOrderRoutes(Router $router): void
                     t.tower_code,
                     d.defect_code AS related_defect_code,
                     cr.name AS crew_name,
-                    ct.name AS contractor_name,
+                    ct.contractor_name AS contractor_name,
                     c.title AS contract_title
              FROM work_orders wo
              LEFT JOIN `lines` l ON l.id = wo.line_id

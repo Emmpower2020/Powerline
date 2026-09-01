@@ -45,7 +45,7 @@ interface PriceList {
   name: string;
   version: string | null;
   effective_date: string;
-  is_active: number;
+  status: number;
 }
 
 interface PriceListItem {
@@ -56,7 +56,7 @@ interface PriceListItem {
   unit: string | null;
   unit_price: number;
   category: string | null;
-  is_active: number;
+  status: number;
   contract_title?: string | null;
 }
 
@@ -119,7 +119,7 @@ export function PriceListsPage() {
     { key: "unit", header: "واحد", sortable: true, filterable: true },
     { key: "unit_price", header: "بهای واحد (ریال)", sortable: true, type: "number" },
     { key: "category", header: "دسته", sortable: true, filterable: true },
-    { key: "is_active", header: "فعال", type: "boolean" },
+    { key: "status", header: "وضعیت", type: "status" },
   ];
 
   const importInputRef = useRef<HTMLInputElement | null>(null);
@@ -214,8 +214,8 @@ export function PriceListsPage() {
                   <Badge className="bg-slate-100 text-slate-600 hover:bg-slate-100 nums-fa">
                     تاریخ اجرا: {new Date(selectedList.effective_date).toLocaleDateString("fa-IR")}
                   </Badge>
-                  <Badge className={selectedList.is_active ? "bg-green-100 text-green-700 hover:bg-green-100" : "bg-red-100 text-red-700 hover:bg-red-100"}>
-                    {selectedList.is_active ? "فعال" : "غیرفعال"}
+                  <Badge className={selectedList.status === "active" ? "bg-green-100 text-green-700 hover:bg-green-100" : "bg-red-100 text-red-700 hover:bg-red-100"}>
+                    {selectedList.status === "active" ? "فعال" : "غیرفعال"}
                   </Badge>
                   <Badge className="bg-blue-100 text-blue-700 hover:bg-blue-100 nums-fa">
                     {items.length} قلم
@@ -271,7 +271,7 @@ export function PriceListsPage() {
           onCopy={() => {}}
           onImport={() => importInputRef.current?.click()}
           onLoadAllRows={async () => items}
-          toolbarExtra={(rows) => <GenericBulkActions rows={rows} endpoint={API_ENDPOINTS.priceListItems} entityName="قلم" onApplied={() => setRefreshKey(k => k + 1)} canToggleActive />}
+          toolbarExtra={(rows) => <GenericBulkActions rows={rows} endpoint={API_ENDPOINTS.priceListItems} entityName="قلم" onApplied={() => setRefreshKey(k => k + 1)} canToggleStatus />}
         />
       )}
 

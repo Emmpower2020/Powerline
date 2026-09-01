@@ -40,7 +40,7 @@ export function LinesStatsBar({ data, issuesCount, onIssuesClick, issuesFilterAc
       if (row.total_towers != null && !isNaN(Number(row.total_towers))) totalTowers += Number(row.total_towers);
       const v = Number(row.voltage_kv ?? row.voltage);
       if (Number.isFinite(v) && v > 0) byVoltage.set(v, (byVoltage.get(v) || 0) + 1);
-      if (row.is_active) activeCount++;
+      if (row.status === "active") activeCount++;
       if (row.circuit_count != null) totalCircuits += Number(row.circuit_count);
       if (row.tension_towers != null) totalTension += Number(row.tension_towers);
       if (row.suspension_towers != null) totalSuspension += Number(row.suspension_towers);

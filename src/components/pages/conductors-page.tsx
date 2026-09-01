@@ -54,7 +54,7 @@ interface Conductor {
   weight_outer: number | null;
   ultimate_strength: number | null;
   resistance: number | null;
-  is_active: number;
+  status: number;
 }
 
 /** معادل فارسی مقادیر ثابت — نمایش */
@@ -296,7 +296,7 @@ export function ConductorsPage() {
         onCopy={handleCopy}
         onDelete={bulkDelete.requestDelete}
         onImport={() => setShowImport(true)}
-        toolbarExtra={(rows) => <GenericBulkActions rows={rows} endpoint={API_ENDPOINTS.conductors} entityName="سیم" onApplied={() => setRefreshKey(k => k + 1)} canToggleActive />}
+        toolbarExtra={(rows) => <GenericBulkActions rows={rows} endpoint={API_ENDPOINTS.conductors} entityName="سیم" onApplied={() => setRefreshKey(k => k + 1)} canToggleStatus />}
       />
 
       <ConductorDialog

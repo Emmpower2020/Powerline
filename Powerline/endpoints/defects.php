@@ -130,7 +130,7 @@ function registerDefectRoutes(Router $router): void
             $personnelRow = $stmt->fetch();
 
             if (!$personnelRow) {
-                $stmt = $pdo->prepare("INSERT INTO personnel (organization_id, user_id, personnel_code, first_name, last_name, personnel_type, position, is_active, hire_date, created_at) VALUES (?, ?, ?, ?, '', 'employee', 'کاربر', 1, CURDATE(), NOW())");
+                $stmt = $pdo->prepare("INSERT INTO personnel (organization_id, user_id, personnel_code, first_name, last_name, personnel_type, position, status, hire_date, created_at) VALUES (?, ?, ?, ?, '', 'employee', 'کاربر', 'active', CURDATE(), NOW())");
                 $stmt->execute([
                     $user['organization_id'] ?? 1,
                     $user['id'],
@@ -306,7 +306,7 @@ function registerDefectRoutes(Router $router): void
         $stmt->execute([$user['id']]);
         $personnelRow = $stmt->fetch();
         if (!$personnelRow) {
-            $pdo->prepare("INSERT INTO personnel (organization_id, user_id, personnel_code, first_name, last_name, personnel_type, position, is_active, created_at) VALUES (?, ?, ?, ?, '', 'employee', 'کاربر', 1, NOW())")
+            $pdo->prepare("INSERT INTO personnel (organization_id, user_id, personnel_code, first_name, last_name, personnel_type, position, status, created_at) VALUES (?, ?, ?, ?, '', 'employee', 'کاربر', 'active', NOW())")
                 ->execute([$user['organization_id'] ?? 1, $user['id'], 'P-' . $user['id'], $user['full_name'] ?? 'کاربر']);
             $personnelId = (int) $pdo->lastInsertId();
         } else {
@@ -381,10 +381,10 @@ function registerDefectRoutes(Router $router): void
         Auth::authenticate();
         $db = Database::getInstance();
         $pdo = $db->getConnection();
-        $rows = $pdo->query("SELECT dc.*, COUNT(dd.id) AS defect_count FROM defect_categories dc LEFT JOIN defect_definitions dd ON dd.category_id = dc.id WHERE dc.is_active = 1 GROUP BY dc.id ORDER BY dc.id")->fetchAll();
+        $rows = $pdo->query("SELECT dc.*, COUNT(dd.id) AS defect_count FROM defect_categories dc LEFT JOIN defect_definitions dd ON dd.category_id = dc.id WHERE dc.status = 'active' GROUP BY dc.id ORDER BY dc.id")->fetchAll();
         $data = array_map(fn($r) => [
             'id' => (int) $r['id'], 'name' => $r['name'], 'applies_to' => $r['applies_to'],
-            'tower_type' => $r['tower_type'], 'is_active' => (bool) $r['is_active'], 'defect_count' => (int) $r['defect_count'],
+            'tower_type' => $r['tower_type'], 'status' => (string) $r['status'], 'defect_count' => (int) $r['defect_count'],
         ], $rows);
         Response::success($data);
     });
@@ -397,12 +397,12 @@ function registerDefectRoutes(Router $router): void
         $categoryId = Helpers::queryInt('category_id');
         $where = '1=1'; $params = [];
         if ($categoryId) { $where = 'dd.category_id = ?'; $params[] = $categoryId; }
-        $stmt = $pdo->prepare("SELECT dd.id, dd.category_id, dd.defect_code, dd.title, dd.default_priority, dd.default_severity, dd.safety_risk, dd.is_active, dc.name AS category_name FROM defect_definitions dd LEFT JOIN defect_categories dc ON dc.id = dd.category_id WHERE $where ORDER BY dd.category_id, dd.defect_code LIMIT 1000");
+        $stmt = $pdo->prepare("SELECT dd.id, dd.category_id, dd.defect_code, dd.title, dd.default_priority, dd.default_severity, dd.safety_risk, dd.status, dc.name AS category_name FROM defect_definitions dd LEFT JOIN defect_categories dc ON dc.id = dd.category_id WHERE $where ORDER BY dd.category_id, dd.defect_code LIMIT 1000");
         $stmt->execute($params);
         $data = array_map(fn($r) => [
             'id' => (int) $r['id'], 'category_id' => (int) $r['category_id'], 'category_name' => $r['category_name'],
             'defect_code' => (int) $r['defect_code'], 'title' => $r['title'], 'default_priority' => $r['default_priority'],
-            'default_severity' => $r['default_severity'], 'safety_risk' => $r['safety_risk'], 'is_active' => (bool) $r['is_active'],
+            'default_severity' => $r['default_severity'], 'safety_risk' => $r['safety_risk'], 'status' => (string) $r['status'],
         ], $stmt->fetchAll());
         Response::success($data);
     });
@@ -429,7 +429,7 @@ function registerDefectRoutes(Router $router): void
         $countStmt->execute($params);
         $total = (int) $countStmt->fetchColumn();
 
-        $sql = "SELECT u.id, u.username, u.full_name, u.email, u.is_active, u.organization_id,
+        $sql = "SELECT u.id, u.username, u.full_name, u.email, u.status, u.organization_id,
                        u.created_at, u.last_login_at,
                        GROUP_CONCAT(r.display_name SEPARATOR '، ') AS roles
                 FROM users u
@@ -443,7 +443,7 @@ function registerDefectRoutes(Router $router): void
         $stmt->execute($params);
         $data = array_map(fn($r) => [
             'id' => (int) $r['id'], 'username' => $r['username'], 'full_name' => $r['full_name'],
-            'email' => $r['email'], 'is_active' => (bool) $r['is_active'],
+            'email' => $r['email'], 'status' => (string) $r['status'],
             'organization_id' => $r['organization_id'] ? (int) $r['organization_id'] : null,
             'roles' => $r['roles'], 'created_at' => $r['created_at'], 'last_login_at' => $r['last_login_at'],
         ], $stmt->fetchAll());

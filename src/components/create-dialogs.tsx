@@ -36,7 +36,8 @@ export function CreateContractDialog({ open, onClose, onCreated }: { open: boole
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.title) { setError("عنوان الزامی است"); return; }
+    if (!form.title.trim()) { setError("عنوان قرارداد الزامی است"); return; }
+    if (!form.contractor_id) { setError("انتخاب پیمانکار الزامی است"); return; }
     setSubmitting(true); setError(null);
     try { await apiClient.post(API_ENDPOINTS.contracts, { title: form.title, contractor_id: form.contractor_id ? Number(form.contractor_id) : null, contract_type: form.contract_type, start_date: form.start_date || null, end_date: form.end_date || null, amount: form.amount ? Number(form.amount) : 0, notes: form.notes || null }); setForm({ title: "", contractor_id: "", contract_type: "maintenance", start_date: "", end_date: "", amount: "", notes: "" }); onCreated(); } catch (err) { setError(err instanceof Error ? err.message : "خطا"); } finally { setSubmitting(false); }
   };
@@ -45,7 +46,7 @@ export function CreateContractDialog({ open, onClose, onCreated }: { open: boole
     <Shell open={open} onClose={onClose} title="قرارداد جدید" submitting={submitting} error={error} onSubmit={submit}>
       <Field label="عنوان (اجباری)"><Input value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} className="text-right" /></Field>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <Field label="پیمانکار"><Select value={form.contractor_id} onValueChange={v => setForm({ ...form, contractor_id: v })}><SelectTrigger className="w-full"><SelectValue placeholder="انتخاب..." /></SelectTrigger><SelectContent className="max-h-60">{contractors.map(c => <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>)}</SelectContent></Select></Field>
+        <Field label="پیمانکار (اجباری)"><Select value={form.contractor_id} onValueChange={v => setForm({ ...form, contractor_id: v })}><SelectTrigger className="w-full"><SelectValue placeholder="انتخاب..." /></SelectTrigger><SelectContent className="max-h-60">{contractors.map(c => <SelectItem key={c.id} value={String(c.id)}>{c.contractor_name}</SelectItem>)}</SelectContent></Select></Field>
         <Field label="نوع قرارداد"><Select value={form.contract_type} onValueChange={v => setForm({ ...form, contract_type: v })}><SelectTrigger className="w-full"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="maintenance">نگهداری</SelectItem><SelectItem value="construction">ساخت</SelectItem><SelectItem value="inspection">بازدید</SelectItem></SelectContent></Select></Field>
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -114,7 +115,7 @@ export function CreatePersonnelDialog({ open, onClose, onCreated }: { open: bool
         <Field label="سمت"><Input value={form.position} onChange={e => setForm({ ...form, position: e.target.value })} className="text-right" /></Field>
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        <Field label="تلفن"><Input value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} dir="ltr" className="text-left" /></Field>
+        <Field label="تلفن"><Input value={form.contractor_phone} onChange={e => setForm({ ...form, contractor_phone: e.target.value })} dir="ltr" className="text-left" /></Field>
         <Field label="موبایل"><Input value={form.mobile} onChange={e => setForm({ ...form, mobile: e.target.value })} dir="ltr" className="text-left" /></Field>
         <Field label="تاریخ استخدام"><JalaliDatePicker value={form.hire_date} onChange={v => setForm({ ...form, hire_date: v })} /></Field>
       </div>
@@ -127,27 +128,29 @@ export function CreatePersonnelDialog({ open, onClose, onCreated }: { open: bool
 export function CreateContractorDialog({ open, onClose, onCreated }: { open: boolean; onClose: () => void; onCreated: () => void }) {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [form, setForm] = useState({ name: "", contact_person: "", phone: "", mobile: "", email: "", address: "" });
-
+  const [form, setForm] = useState({ contractor_code: "", contractor_name: "", ceo_name: "", contractor_phone: "", mobile: "", address: "", status: "active" });
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.name) { setError("نام پیمانکار الزامی است"); return; }
+    if (!form.contractor_name.trim()) { setError("نام پیمانکار الزامی است"); return; }
     setSubmitting(true); setError(null);
-    try { await apiClient.post(API_ENDPOINTS.contractors, { name: form.name, contact_person: form.contact_person || null, phone: form.phone || null, mobile: form.mobile || null, email: form.email || null, address: form.address || null }); setForm({ name: "", contact_person: "", phone: "", mobile: "", email: "", address: "" }); onCreated(); } catch (err) { setError(err instanceof Error ? err.message : "خطا"); } finally { setSubmitting(false); }
+    try {
+      await apiClient.post(API_ENDPOINTS.contractors, { contractor_code: form.contractor_code.trim() || null, contractor_name: form.contractor_name.trim(), ceo_name: form.ceo_name.trim() || null, contractor_phone: form.contractor_phone.trim() || null, mobile: form.mobile.trim() || null, address: form.address.trim() || null, status: form.status });
+      setForm({ contractor_code: "", contractor_name: "", ceo_name: "", contractor_phone: "", mobile: "", address: "", status: "active" }); onCreated();
+    } catch (err) { setError(err instanceof Error ? err.message : "خطا"); } finally { setSubmitting(false); }
   };
-
   return (
     <Shell open={open} onClose={onClose} title="ثبت پیمانکار جدید" submitting={submitting} error={error} onSubmit={submit}>
-      <Field label="نام پیمانکار (اجباری)"><Input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} className="text-right" /></Field>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <Field label="مسئول"><Input value={form.contact_person} onChange={e => setForm({ ...form, contact_person: e.target.value })} className="text-right" /></Field>
-        <Field label="تلفن"><Input value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} dir="ltr" className="text-left" /></Field>
+        <Field label="کد پیمانکار"><Input value={form.contractor_code} onChange={e => setForm({ ...form, contractor_code: e.target.value })} dir="ltr" className="text-left" /></Field>
+        <Field label="نام پیمانکار (اجباری)"><Input value={form.contractor_name} onChange={e => setForm({ ...form, contractor_name: e.target.value })} className="text-right" /></Field>
       </div>
+      <Field label="مدیرعامل"><Input value={form.ceo_name} onChange={e => setForm({ ...form, ceo_name: e.target.value })} className="text-right" /></Field>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <Field label="تلفن"><Input value={form.contractor_phone} onChange={e => setForm({ ...form, contractor_phone: e.target.value })} dir="ltr" className="text-left" /></Field>
         <Field label="موبایل"><Input value={form.mobile} onChange={e => setForm({ ...form, mobile: e.target.value })} dir="ltr" className="text-left" /></Field>
-        <Field label="ایمیل"><Input type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} dir="ltr" className="text-left" /></Field>
       </div>
       <Field label="آدرس"><Textarea value={form.address} onChange={e => setForm({ ...form, address: e.target.value })} rows={2} className="text-right" /></Field>
+      <Field label="وضعیت"><Select value={form.status} onValueChange={v => setForm({ ...form, status: v })}><SelectTrigger className="w-full"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="active">فعال</SelectItem><SelectItem value="inactive">غیرفعال</SelectItem></SelectContent></Select></Field>
     </Shell>
   );
 }

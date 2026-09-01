@@ -9,7 +9,6 @@ import { ImportExcelDialog } from "@/components/import-excel-dialog";
 import { IssuesBadge } from "@/components/issues-badge";
 import { LinesStatsBar } from "@/components/lines/lines-stats-bar";
 import { BulkLinesActions } from "@/components/lines/bulk-lines-actions";
-import { GenericBulkActions } from "@/components/generic-bulk-actions";
 import { getLineIssues } from "@/lib/lines-quality";
 import { usePersonnelOptions } from "@/hooks/use-personnel-options";
 import { Badge } from "@/components/ui/badge";
@@ -157,7 +156,7 @@ export function LinesPage() {
       "total_towers", "tension_towers", "suspension_towers",
       "plain_terrain", "semi_mountainous", "mountainous",
       "commission_year", "line_supervisor", "line_expert",
-      "owner_org_id", "contractor_id", "contract_id", "is_active",
+      "owner_org_id", "contractor_id", "contract_id", "status",
     ];
     const payload: Record<string, unknown> = {};
     for (const key of allowedFields) {
@@ -175,7 +174,7 @@ export function LinesPage() {
           // تبدیل به عدد اعشاری
           const n = Number(String(v).replace(",", "."));
           payload[key] = isNaN(n) ? null : n;
-        } else if (key === "is_active") {
+        } else if (key === "status") {
           // تبدیل به boolean
           const s = String(v).toLowerCase().trim();
           payload[key] = (s === "1" || s === "true" || s === "بله" || s === "yes");
@@ -350,7 +349,7 @@ export function LinesPage() {
     { key: "line_expert", header: "کارشناس خط", sortable: true, filterable: true, align: "right" },
     { key: "owner_org_name", header: "مالک", sortable: true, filterable: true, hidden: true, align: "right" },
     { key: "contractor_name", header: "پیمانکار", sortable: true, filterable: true, hidden: true, align: "right" },
-    { key: "is_active", header: "فعال", type: "boolean", filterable: true, align: "right" },
+    { key: "status", header: "وضعیت", type: "status", filterable: true, align: "right" },
     // ستون سلامت داده (مورد ۵) — با نگه‌داشتن موس روی علامت، جزئیات خطاها نمایش داده می‌شود
     // فیلتر/سورت با چیپ اختصاصی «دارای خطا» بالای جدول انجام می‌شود
     {
@@ -399,7 +398,6 @@ export function LinesPage() {
         onLoadAllRows={handleLoadAllRows}
         toolbarExtra={(rows) => <div className="flex items-center gap-1">
           <BulkLinesActions getSelection={getSelection} onApplied={handleBulkApplied} />
-          <GenericBulkActions rows={rows} endpoint={API_ENDPOINTS.lines} entityName="خط" onApplied={handleBulkApplied} canChangeContract />
         </div>}
         tableRef={tableRef}
         layoutKey="lines"

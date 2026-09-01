@@ -25,7 +25,7 @@ const MOCK_USER = {
   username: "admin",
   full_name: "مدیر سیستم",
   email: "admin@jibimarket.com",
-  is_active: true,
+  status: "active",
   roles: ["super_admin"],
   permissions: ["*"],
 };
@@ -81,7 +81,7 @@ function generateMockTowers(lineId: number, lineCode: string, count: number, sta
       gps_lat: hasGps ? 35.6892 + (i * 0.001) : null,
       gps_lng: hasGps ? 51.3890 + (i * 0.001) : null,
       line_supervisor: MOCK_LINES.find(l => l.id === lineId)?.line_supervisor || "",
-      is_active: true,
+      status: "active",
     });
   }
   return towers;
@@ -131,99 +131,99 @@ const MOCK_PERSONNEL: any[] = [];
 
 // ─── عیوب استاندارد نمونه (v3.1.0 — نمونه‌ای از عیوب_استاندارد.xlsx؛ نسخه کامل ۴۰۱ مورد در دیتابیس است) ───
 const MOCK_DEFECT_DEFINITIONS: any[] = [
-  { id: 205, category_id: null, category_name: "عیوب بدنه دکل فلزی مشبک مهاری", defect_code: 120, title: "انحراف بازوی دکل", default_priority: "high", default_severity: "major", is_active: true },
-  { id: 206, category_id: null, category_name: "عیوب بدنه دکل فلزی مشبک مهاری", defect_code: 126, title: "انحراف و اعوجاج در پایه های اصلی دکل", default_priority: "high", default_severity: "major", is_active: true },
-  { id: 207, category_id: null, category_name: "عیوب بدنه دکل فلزی مشبک مهاری", defect_code: 128, title: "انحراف و آسیب دیدگی استاب", default_priority: "high", default_severity: "major", is_active: true },
-  { id: 121, category_id: null, category_name: "عیوب بدنه تیر چوبی", defect_code: 119, title: "اتصال نامناسب سیم مهار", default_priority: "high", default_severity: "major", is_active: true },
-  { id: 122, category_id: null, category_name: "عیوب بدنه تیر چوبی", defect_code: 125, title: "انحراف تیر چوبی", default_priority: "high", default_severity: "major", is_active: true },
-  { id: 123, category_id: null, category_name: "عیوب بدنه تیر چوبی", defect_code: 131, title: "آسیب دیدگی اتصالات سیم مهار", default_priority: "high", default_severity: "major", is_active: true },
-  { id: 106, category_id: null, category_name: "عیوب بدنه تیر بتنی", defect_code: 124, title: "انحراف تیر بتنی", default_priority: "high", default_severity: "major", is_active: true },
-  { id: 107, category_id: null, category_name: "عیوب بدنه تیر بتنی", defect_code: 137, title: "آسیب دیدگی کنسول", default_priority: "high", default_severity: "major", is_active: true },
-  { id: 108, category_id: null, category_name: "عیوب بدنه تیر بتنی", defect_code: 144, title: "باز شدن سیم مهار", default_priority: "high", default_severity: "major", is_active: true },
-  { id: 146, category_id: null, category_name: "عیوب بدنه دکل تلسکوپی بتنی", defect_code: 122, title: "انحراف بازوی دکل", default_priority: "high", default_severity: "major", is_active: true },
-  { id: 147, category_id: null, category_name: "عیوب بدنه دکل تلسکوپی بتنی", defect_code: 150, title: "پوکه شدن بتن دکل تلسکوپی بتنی", default_priority: "high", default_severity: "major", is_active: true },
-  { id: 148, category_id: null, category_name: "عیوب بدنه دکل تلسکوپی بتنی", defect_code: 153, title: "پیچ و مهره های شل جوشکاری شده", default_priority: "high", default_severity: "major", is_active: true },
-  { id: 160, category_id: null, category_name: "عیوب بدنه دکل تلسکوپی فلزی", defect_code: 121, title: "انحراف بازوی دکل", default_priority: "high", default_severity: "major", is_active: true },
-  { id: 161, category_id: null, category_name: "عیوب بدنه دکل تلسکوپی فلزی", defect_code: 152, title: "پیچ و مهره های شل جوشکاری شده", default_priority: "high", default_severity: "major", is_active: true },
-  { id: 162, category_id: null, category_name: "عیوب بدنه دکل تلسکوپی فلزی", defect_code: 159, title: "تغییر رنگ دکل", default_priority: "high", default_severity: "major", is_active: true },
-  { id: 292, category_id: null, category_name: "عیوب زنجیر مقره ها", defect_code: 313, title: "از بین رفتن چترک های زنجیره مقره", default_priority: "high", default_severity: "major", is_active: true },
-  { id: 293, category_id: null, category_name: "عیوب زنجیر مقره ها", defect_code: 314, title: "افست در زنجیره مقره", default_priority: "high", default_severity: "major", is_active: true },
-  { id: 294, category_id: null, category_name: "عیوب زنجیر مقره ها", defect_code: 315, title: "انحراف پین مقره", default_priority: "high", default_severity: "major", is_active: true },
-  { id: 358, category_id: null, category_name: "عیوب یراق آلات", defect_code: 320, title: "بادکردگی آرموراد", default_priority: "high", default_severity: "major", is_active: true },
-  { id: 359, category_id: null, category_name: "عیوب یراق آلات", defect_code: 321, title: "باز شدن کرونارینگ", default_priority: "high", default_severity: "major", is_active: true },
-  { id: 360, category_id: null, category_name: "عیوب یراق آلات", defect_code: 322, title: "بیرون زدگی اشپیل مقره", default_priority: "high", default_severity: "major", is_active: true },
-  { id: 273, category_id: null, category_name: "عیوب جمپر", defect_code: 300, title: "استفاده از شترگلویی در محل پرس", default_priority: "high", default_severity: "major", is_active: true },
-  { id: 274, category_id: null, category_name: "عیوب جمپر", defect_code: 301, title: "جمپر با طول سیم کوتاه و تحت فشار", default_priority: "high", default_severity: "major", is_active: true },
-  { id: 275, category_id: null, category_name: "عیوب جمپر", defect_code: 302, title: "جمپر با طول سیم بلند و غیر استاندارد", default_priority: "high", default_severity: "major", is_active: true },
-  { id: 322, category_id: null, category_name: "عیوب فوندانسیون و پایه", defect_code: 272, title: "تخریب بتن سرقالب", default_priority: "high", default_severity: "major", is_active: true },
-  { id: 323, category_id: null, category_name: "عیوب فوندانسیون و پایه", defect_code: 273, title: "تخریب پوشش محافظ بتن", default_priority: "high", default_severity: "major", is_active: true },
-  { id: 324, category_id: null, category_name: "عیوب فوندانسیون و پایه", defect_code: 276, title: "در معرض برخورد ماشین آلات", default_priority: "high", default_severity: "major", is_active: true },
-  { id: 305, category_id: null, category_name: "عیوب سیستم زمین دکل", defect_code: 268, title: "اتصال نامناسب سیم اتصال زمین", default_priority: "high", default_severity: "major", is_active: true },
-  { id: 306, category_id: null, category_name: "عیوب سیستم زمین دکل", defect_code: 269, title: "بازشدن سیم از بدنه دکل", default_priority: "high", default_severity: "major", is_active: true },
-  { id: 307, category_id: null, category_name: "عیوب سیستم زمین دکل", defect_code: 270, title: "بریدگی سیم زمین", default_priority: "high", default_severity: "major", is_active: true },
-  { id: 286, category_id: null, category_name: "عیوب دیوار حفاظتی دکل", defect_code: 274, title: "تخریب دیوار حفاظتی دکل", default_priority: "high", default_severity: "major", is_active: true },
-  { id: 287, category_id: null, category_name: "عیوب دیوار حفاظتی دکل", defect_code: 280, title: "سرقت توری گابیون موجود", default_priority: "high", default_severity: "major", is_active: true },
-  { id: 288, category_id: null, category_name: "عیوب دیوار حفاظتی دکل", defect_code: 284, title: "مسدود شدن مسیر خروج آب از دیوار حفاظتی", default_priority: "high", default_severity: "major", is_active: true },
-  { id: 255, category_id: null, category_name: "عیوب تابلو دکل", defect_code: 101, title: "ارتفاع یا محل نامناسب نصب تابلو", default_priority: "high", default_severity: "major", is_active: true },
-  { id: 256, category_id: null, category_name: "عیوب تابلو دکل", defect_code: 102, title: "زنگ زدگی تابلو خطر", default_priority: "high", default_severity: "major", is_active: true },
-  { id: 257, category_id: null, category_name: "عیوب تابلو دکل", defect_code: 103, title: "زنگ زدگی تابلو شماره", default_priority: "high", default_severity: "major", is_active: true },
-  { id: 340, category_id: null, category_name: "عیوب نقض حریم", defect_code: 381, title: "احداث شبکه انتقال در حریم خط", default_priority: "high", default_severity: "major", is_active: true },
-  { id: 341, category_id: null, category_name: "عیوب نقض حریم", defect_code: 382, title: "احداث شبکه توزیع در حریم خط", default_priority: "high", default_severity: "major", is_active: true },
-  { id: 342, category_id: null, category_name: "عیوب نقض حریم", defect_code: 383, title: "احداث شبکه فوق توزیع در حریم خط", default_priority: "high", default_severity: "major", is_active: true },
-  { id: 247, category_id: null, category_name: "عیوب برقگیر خط", defect_code: 260, title: "از بین رفتن چترک های برقگیر", default_priority: "high", default_severity: "major", is_active: true },
-  { id: 248, category_id: null, category_name: "عیوب برقگیر خط", defect_code: 261, title: "آلوده بودن برقگیر", default_priority: "high", default_severity: "major", is_active: true },
-  { id: 249, category_id: null, category_name: "عیوب برقگیر خط", defect_code: 262, title: "باز شدن اتصالات متصل به برقگیر", default_priority: "high", default_severity: "major", is_active: true },
-  { id: 1, category_id: null, category_name: "عیوب سیم هادی فاز R", defect_code: 392, title: "بادکردگی سیم هادی", default_priority: "high", default_severity: "major", is_active: true },
-  { id: 2, category_id: null, category_name: "عیوب سیم هادی فاز R", defect_code: 399, title: "پارگی سیم هادی", default_priority: "high", default_severity: "major", is_active: true },
-  { id: 3, category_id: null, category_name: "عیوب سیم هادی فاز R", defect_code: 402, title: "پیچش سیم هادی باندل", default_priority: "high", default_severity: "major", is_active: true },
-  { id: 33, category_id: null, category_name: "عیوب سیم هادی فاز S", defect_code: 391, title: "باد کردگی سیم هادی", default_priority: "high", default_severity: "major", is_active: true },
-  { id: 34, category_id: null, category_name: "عیوب سیم هادی فاز S", defect_code: 400, title: "پارگی سیم هادی", default_priority: "high", default_severity: "major", is_active: true },
-  { id: 35, category_id: null, category_name: "عیوب سیم هادی فاز S", defect_code: 403, title: "پیچش سیم هادی باندل", default_priority: "high", default_severity: "major", is_active: true },
-  { id: 65, category_id: null, category_name: "عیوب سیم هادی فاز T", defect_code: 393, title: "بادکردگی سیم هادی", default_priority: "high", default_severity: "major", is_active: true },
-  { id: 66, category_id: null, category_name: "عیوب سیم هادی فاز T", defect_code: 394, title: "بادکردگی سیم هادی", default_priority: "high", default_severity: "major", is_active: true },
-  { id: 67, category_id: null, category_name: "عیوب سیم هادی فاز T", defect_code: 401, title: "پارگی سیم هادی", default_priority: "high", default_severity: "major", is_active: true },
-  { id: 17, category_id: null, category_name: "عیوب یراق آلات هادی فاز R", defect_code: 410, title: "جابجا شدن اسپیسر فازی", default_priority: "high", default_severity: "major", is_active: true },
-  { id: 18, category_id: null, category_name: "عیوب یراق آلات هادی فاز R", defect_code: 413, title: "جابجا شدن دمپر سیم هادی", default_priority: "high", default_severity: "major", is_active: true },
-  { id: 19, category_id: null, category_name: "عیوب یراق آلات هادی فاز R", defect_code: 416, title: "جابجایی گوی هشدار بر روی سیم هادی", default_priority: "high", default_severity: "major", is_active: true },
-  { id: 46, category_id: null, category_name: "عیوب یراق آلات هادی فاز S", defect_code: 386, title: "از بین رفتن رنگ گوی هشدار سیم هادی", default_priority: "high", default_severity: "major", is_active: true },
-  { id: 47, category_id: null, category_name: "عیوب یراق آلات هادی فاز S", defect_code: 389, title: "آسیب دیدگی لاستیک اسپیسر فازی", default_priority: "high", default_severity: "major", is_active: true },
-  { id: 48, category_id: null, category_name: "عیوب یراق آلات هادی فاز S", defect_code: 396, title: "باز شدن اسپیسر فازی", default_priority: "high", default_severity: "major", is_active: true },
-  { id: 79, category_id: null, category_name: "عیوب یراق آلات هادی فاز T", defect_code: 387, title: "از بین رفتن رنگ گوی هشدار سیم هادی", default_priority: "high", default_severity: "major", is_active: true },
-  { id: 80, category_id: null, category_name: "عیوب یراق آلات هادی فاز T", defect_code: 390, title: "آسیب دیدگی لاستیک اسپیسر فازی", default_priority: "high", default_severity: "major", is_active: true },
-  { id: 81, category_id: null, category_name: "عیوب یراق آلات هادی فاز T", defect_code: 397, title: "باز شدن اسپیسر فازی", default_priority: "high", default_severity: "major", is_active: true },
-  { id: 100, category_id: null, category_name: "عیوب اسپیسر بین فازی", defect_code: 384, title: "از بین رفتن چترک اسپیسر بین فازی", default_priority: "high", default_severity: "major", is_active: true },
-  { id: 101, category_id: null, category_name: "عیوب اسپیسر بین فازی", defect_code: 398, title: "باز شدن اسپیسر بین فازی", default_priority: "high", default_severity: "major", is_active: true },
-  { id: 102, category_id: null, category_name: "عیوب اسپیسر بین فازی", defect_code: 405, title: "تخریب راد اسپیسر بین فازی", default_priority: "high", default_severity: "major", is_active: true },
-  { id: 311, category_id: null, category_name: "عیوب سیم محافظ", defect_code: 346, title: "اتصال بدنه غیر استاندارد (انشعاب گرفتن از کلمپ به بدنه دکل)", default_priority: "high", default_severity: "major", is_active: true },
-  { id: 312, category_id: null, category_name: "عیوب سیم محافظ", defect_code: 351, title: "باز شدن اتصال بدنه یا جمپر سیم محافظ با دکل", default_priority: "high", default_severity: "major", is_active: true },
-  { id: 313, category_id: null, category_name: "عیوب سیم محافظ", defect_code: 356, title: "پارگی سیم محافظ", default_priority: "high", default_severity: "major", is_active: true },
-  { id: 378, category_id: null, category_name: "عیوب یراق آلات سیم محافظ", defect_code: 347, title: "اتصال نامناسب لوپ فیبر نوری به بدنه دکل", default_priority: "high", default_severity: "major", is_active: true },
-  { id: 379, category_id: null, category_name: "عیوب یراق آلات سیم محافظ", defect_code: 348, title: "ارتفاع نامناسب محل نصب جوینت باکس", default_priority: "high", default_severity: "major", is_active: true },
-  { id: 380, category_id: null, category_name: "عیوب یراق آلات سیم محافظ", defect_code: 349, title: "از بین رفتن رنگ گوی هشدار سیم محافظ", default_priority: "high", default_severity: "major", is_active: true },
-  { id: 99, category_id: null, category_name: "عیب در جاده دسترسی به محل دکل", defect_code: 292, title: "نیاز به ترمیم جاده دسترسی", default_priority: "high", default_severity: "major", is_active: true },
-  { id: 98, category_id: null, category_name: "عیب در جاده دسترسی به محل دکل", defect_code: 282, title: "فاقد جاده دسترسی", default_priority: "high", default_severity: "major", is_active: true },
-  { id: 173, category_id: null, category_name: "عیوب بدنه دکل فلزی مشبک", defect_code: 123, title: "انحراف بازوی دکل", default_priority: "high", default_severity: "major", is_active: true },
-  { id: 174, category_id: null, category_name: "عیوب بدنه دکل فلزی مشبک", defect_code: 127, title: "انحراف و اعوجاج در پایه های اصلی دکل", default_priority: "high", default_severity: "major", is_active: true },
-  { id: 175, category_id: null, category_name: "عیوب بدنه دکل فلزی مشبک", defect_code: 129, title: "انحراف و آسیب دیدگی استاب", default_priority: "high", default_severity: "major", is_active: true },
+  { id: 205, category_id: null, category_name: "عیوب بدنه دکل فلزی مشبک مهاری", defect_code: 120, title: "انحراف بازوی دکل", default_priority: "high", default_severity: "major", status: "active" },
+  { id: 206, category_id: null, category_name: "عیوب بدنه دکل فلزی مشبک مهاری", defect_code: 126, title: "انحراف و اعوجاج در پایه های اصلی دکل", default_priority: "high", default_severity: "major", status: "active" },
+  { id: 207, category_id: null, category_name: "عیوب بدنه دکل فلزی مشبک مهاری", defect_code: 128, title: "انحراف و آسیب دیدگی استاب", default_priority: "high", default_severity: "major", status: "active" },
+  { id: 121, category_id: null, category_name: "عیوب بدنه تیر چوبی", defect_code: 119, title: "اتصال نامناسب سیم مهار", default_priority: "high", default_severity: "major", status: "active" },
+  { id: 122, category_id: null, category_name: "عیوب بدنه تیر چوبی", defect_code: 125, title: "انحراف تیر چوبی", default_priority: "high", default_severity: "major", status: "active" },
+  { id: 123, category_id: null, category_name: "عیوب بدنه تیر چوبی", defect_code: 131, title: "آسیب دیدگی اتصالات سیم مهار", default_priority: "high", default_severity: "major", status: "active" },
+  { id: 106, category_id: null, category_name: "عیوب بدنه تیر بتنی", defect_code: 124, title: "انحراف تیر بتنی", default_priority: "high", default_severity: "major", status: "active" },
+  { id: 107, category_id: null, category_name: "عیوب بدنه تیر بتنی", defect_code: 137, title: "آسیب دیدگی کنسول", default_priority: "high", default_severity: "major", status: "active" },
+  { id: 108, category_id: null, category_name: "عیوب بدنه تیر بتنی", defect_code: 144, title: "باز شدن سیم مهار", default_priority: "high", default_severity: "major", status: "active" },
+  { id: 146, category_id: null, category_name: "عیوب بدنه دکل تلسکوپی بتنی", defect_code: 122, title: "انحراف بازوی دکل", default_priority: "high", default_severity: "major", status: "active" },
+  { id: 147, category_id: null, category_name: "عیوب بدنه دکل تلسکوپی بتنی", defect_code: 150, title: "پوکه شدن بتن دکل تلسکوپی بتنی", default_priority: "high", default_severity: "major", status: "active" },
+  { id: 148, category_id: null, category_name: "عیوب بدنه دکل تلسکوپی بتنی", defect_code: 153, title: "پیچ و مهره های شل جوشکاری شده", default_priority: "high", default_severity: "major", status: "active" },
+  { id: 160, category_id: null, category_name: "عیوب بدنه دکل تلسکوپی فلزی", defect_code: 121, title: "انحراف بازوی دکل", default_priority: "high", default_severity: "major", status: "active" },
+  { id: 161, category_id: null, category_name: "عیوب بدنه دکل تلسکوپی فلزی", defect_code: 152, title: "پیچ و مهره های شل جوشکاری شده", default_priority: "high", default_severity: "major", status: "active" },
+  { id: 162, category_id: null, category_name: "عیوب بدنه دکل تلسکوپی فلزی", defect_code: 159, title: "تغییر رنگ دکل", default_priority: "high", default_severity: "major", status: "active" },
+  { id: 292, category_id: null, category_name: "عیوب زنجیر مقره ها", defect_code: 313, title: "از بین رفتن چترک های زنجیره مقره", default_priority: "high", default_severity: "major", status: "active" },
+  { id: 293, category_id: null, category_name: "عیوب زنجیر مقره ها", defect_code: 314, title: "افست در زنجیره مقره", default_priority: "high", default_severity: "major", status: "active" },
+  { id: 294, category_id: null, category_name: "عیوب زنجیر مقره ها", defect_code: 315, title: "انحراف پین مقره", default_priority: "high", default_severity: "major", status: "active" },
+  { id: 358, category_id: null, category_name: "عیوب یراق آلات", defect_code: 320, title: "بادکردگی آرموراد", default_priority: "high", default_severity: "major", status: "active" },
+  { id: 359, category_id: null, category_name: "عیوب یراق آلات", defect_code: 321, title: "باز شدن کرونارینگ", default_priority: "high", default_severity: "major", status: "active" },
+  { id: 360, category_id: null, category_name: "عیوب یراق آلات", defect_code: 322, title: "بیرون زدگی اشپیل مقره", default_priority: "high", default_severity: "major", status: "active" },
+  { id: 273, category_id: null, category_name: "عیوب جمپر", defect_code: 300, title: "استفاده از شترگلویی در محل پرس", default_priority: "high", default_severity: "major", status: "active" },
+  { id: 274, category_id: null, category_name: "عیوب جمپر", defect_code: 301, title: "جمپر با طول سیم کوتاه و تحت فشار", default_priority: "high", default_severity: "major", status: "active" },
+  { id: 275, category_id: null, category_name: "عیوب جمپر", defect_code: 302, title: "جمپر با طول سیم بلند و غیر استاندارد", default_priority: "high", default_severity: "major", status: "active" },
+  { id: 322, category_id: null, category_name: "عیوب فوندانسیون و پایه", defect_code: 272, title: "تخریب بتن سرقالب", default_priority: "high", default_severity: "major", status: "active" },
+  { id: 323, category_id: null, category_name: "عیوب فوندانسیون و پایه", defect_code: 273, title: "تخریب پوشش محافظ بتن", default_priority: "high", default_severity: "major", status: "active" },
+  { id: 324, category_id: null, category_name: "عیوب فوندانسیون و پایه", defect_code: 276, title: "در معرض برخورد ماشین آلات", default_priority: "high", default_severity: "major", status: "active" },
+  { id: 305, category_id: null, category_name: "عیوب سیستم زمین دکل", defect_code: 268, title: "اتصال نامناسب سیم اتصال زمین", default_priority: "high", default_severity: "major", status: "active" },
+  { id: 306, category_id: null, category_name: "عیوب سیستم زمین دکل", defect_code: 269, title: "بازشدن سیم از بدنه دکل", default_priority: "high", default_severity: "major", status: "active" },
+  { id: 307, category_id: null, category_name: "عیوب سیستم زمین دکل", defect_code: 270, title: "بریدگی سیم زمین", default_priority: "high", default_severity: "major", status: "active" },
+  { id: 286, category_id: null, category_name: "عیوب دیوار حفاظتی دکل", defect_code: 274, title: "تخریب دیوار حفاظتی دکل", default_priority: "high", default_severity: "major", status: "active" },
+  { id: 287, category_id: null, category_name: "عیوب دیوار حفاظتی دکل", defect_code: 280, title: "سرقت توری گابیون موجود", default_priority: "high", default_severity: "major", status: "active" },
+  { id: 288, category_id: null, category_name: "عیوب دیوار حفاظتی دکل", defect_code: 284, title: "مسدود شدن مسیر خروج آب از دیوار حفاظتی", default_priority: "high", default_severity: "major", status: "active" },
+  { id: 255, category_id: null, category_name: "عیوب تابلو دکل", defect_code: 101, title: "ارتفاع یا محل نامناسب نصب تابلو", default_priority: "high", default_severity: "major", status: "active" },
+  { id: 256, category_id: null, category_name: "عیوب تابلو دکل", defect_code: 102, title: "زنگ زدگی تابلو خطر", default_priority: "high", default_severity: "major", status: "active" },
+  { id: 257, category_id: null, category_name: "عیوب تابلو دکل", defect_code: 103, title: "زنگ زدگی تابلو شماره", default_priority: "high", default_severity: "major", status: "active" },
+  { id: 340, category_id: null, category_name: "عیوب نقض حریم", defect_code: 381, title: "احداث شبکه انتقال در حریم خط", default_priority: "high", default_severity: "major", status: "active" },
+  { id: 341, category_id: null, category_name: "عیوب نقض حریم", defect_code: 382, title: "احداث شبکه توزیع در حریم خط", default_priority: "high", default_severity: "major", status: "active" },
+  { id: 342, category_id: null, category_name: "عیوب نقض حریم", defect_code: 383, title: "احداث شبکه فوق توزیع در حریم خط", default_priority: "high", default_severity: "major", status: "active" },
+  { id: 247, category_id: null, category_name: "عیوب برقگیر خط", defect_code: 260, title: "از بین رفتن چترک های برقگیر", default_priority: "high", default_severity: "major", status: "active" },
+  { id: 248, category_id: null, category_name: "عیوب برقگیر خط", defect_code: 261, title: "آلوده بودن برقگیر", default_priority: "high", default_severity: "major", status: "active" },
+  { id: 249, category_id: null, category_name: "عیوب برقگیر خط", defect_code: 262, title: "باز شدن اتصالات متصل به برقگیر", default_priority: "high", default_severity: "major", status: "active" },
+  { id: 1, category_id: null, category_name: "عیوب سیم هادی فاز R", defect_code: 392, title: "بادکردگی سیم هادی", default_priority: "high", default_severity: "major", status: "active" },
+  { id: 2, category_id: null, category_name: "عیوب سیم هادی فاز R", defect_code: 399, title: "پارگی سیم هادی", default_priority: "high", default_severity: "major", status: "active" },
+  { id: 3, category_id: null, category_name: "عیوب سیم هادی فاز R", defect_code: 402, title: "پیچش سیم هادی باندل", default_priority: "high", default_severity: "major", status: "active" },
+  { id: 33, category_id: null, category_name: "عیوب سیم هادی فاز S", defect_code: 391, title: "باد کردگی سیم هادی", default_priority: "high", default_severity: "major", status: "active" },
+  { id: 34, category_id: null, category_name: "عیوب سیم هادی فاز S", defect_code: 400, title: "پارگی سیم هادی", default_priority: "high", default_severity: "major", status: "active" },
+  { id: 35, category_id: null, category_name: "عیوب سیم هادی فاز S", defect_code: 403, title: "پیچش سیم هادی باندل", default_priority: "high", default_severity: "major", status: "active" },
+  { id: 65, category_id: null, category_name: "عیوب سیم هادی فاز T", defect_code: 393, title: "بادکردگی سیم هادی", default_priority: "high", default_severity: "major", status: "active" },
+  { id: 66, category_id: null, category_name: "عیوب سیم هادی فاز T", defect_code: 394, title: "بادکردگی سیم هادی", default_priority: "high", default_severity: "major", status: "active" },
+  { id: 67, category_id: null, category_name: "عیوب سیم هادی فاز T", defect_code: 401, title: "پارگی سیم هادی", default_priority: "high", default_severity: "major", status: "active" },
+  { id: 17, category_id: null, category_name: "عیوب یراق آلات هادی فاز R", defect_code: 410, title: "جابجا شدن اسپیسر فازی", default_priority: "high", default_severity: "major", status: "active" },
+  { id: 18, category_id: null, category_name: "عیوب یراق آلات هادی فاز R", defect_code: 413, title: "جابجا شدن دمپر سیم هادی", default_priority: "high", default_severity: "major", status: "active" },
+  { id: 19, category_id: null, category_name: "عیوب یراق آلات هادی فاز R", defect_code: 416, title: "جابجایی گوی هشدار بر روی سیم هادی", default_priority: "high", default_severity: "major", status: "active" },
+  { id: 46, category_id: null, category_name: "عیوب یراق آلات هادی فاز S", defect_code: 386, title: "از بین رفتن رنگ گوی هشدار سیم هادی", default_priority: "high", default_severity: "major", status: "active" },
+  { id: 47, category_id: null, category_name: "عیوب یراق آلات هادی فاز S", defect_code: 389, title: "آسیب دیدگی لاستیک اسپیسر فازی", default_priority: "high", default_severity: "major", status: "active" },
+  { id: 48, category_id: null, category_name: "عیوب یراق آلات هادی فاز S", defect_code: 396, title: "باز شدن اسپیسر فازی", default_priority: "high", default_severity: "major", status: "active" },
+  { id: 79, category_id: null, category_name: "عیوب یراق آلات هادی فاز T", defect_code: 387, title: "از بین رفتن رنگ گوی هشدار سیم هادی", default_priority: "high", default_severity: "major", status: "active" },
+  { id: 80, category_id: null, category_name: "عیوب یراق آلات هادی فاز T", defect_code: 390, title: "آسیب دیدگی لاستیک اسپیسر فازی", default_priority: "high", default_severity: "major", status: "active" },
+  { id: 81, category_id: null, category_name: "عیوب یراق آلات هادی فاز T", defect_code: 397, title: "باز شدن اسپیسر فازی", default_priority: "high", default_severity: "major", status: "active" },
+  { id: 100, category_id: null, category_name: "عیوب اسپیسر بین فازی", defect_code: 384, title: "از بین رفتن چترک اسپیسر بین فازی", default_priority: "high", default_severity: "major", status: "active" },
+  { id: 101, category_id: null, category_name: "عیوب اسپیسر بین فازی", defect_code: 398, title: "باز شدن اسپیسر بین فازی", default_priority: "high", default_severity: "major", status: "active" },
+  { id: 102, category_id: null, category_name: "عیوب اسپیسر بین فازی", defect_code: 405, title: "تخریب راد اسپیسر بین فازی", default_priority: "high", default_severity: "major", status: "active" },
+  { id: 311, category_id: null, category_name: "عیوب سیم محافظ", defect_code: 346, title: "اتصال بدنه غیر استاندارد (انشعاب گرفتن از کلمپ به بدنه دکل)", default_priority: "high", default_severity: "major", status: "active" },
+  { id: 312, category_id: null, category_name: "عیوب سیم محافظ", defect_code: 351, title: "باز شدن اتصال بدنه یا جمپر سیم محافظ با دکل", default_priority: "high", default_severity: "major", status: "active" },
+  { id: 313, category_id: null, category_name: "عیوب سیم محافظ", defect_code: 356, title: "پارگی سیم محافظ", default_priority: "high", default_severity: "major", status: "active" },
+  { id: 378, category_id: null, category_name: "عیوب یراق آلات سیم محافظ", defect_code: 347, title: "اتصال نامناسب لوپ فیبر نوری به بدنه دکل", default_priority: "high", default_severity: "major", status: "active" },
+  { id: 379, category_id: null, category_name: "عیوب یراق آلات سیم محافظ", defect_code: 348, title: "ارتفاع نامناسب محل نصب جوینت باکس", default_priority: "high", default_severity: "major", status: "active" },
+  { id: 380, category_id: null, category_name: "عیوب یراق آلات سیم محافظ", defect_code: 349, title: "از بین رفتن رنگ گوی هشدار سیم محافظ", default_priority: "high", default_severity: "major", status: "active" },
+  { id: 99, category_id: null, category_name: "عیب در جاده دسترسی به محل دکل", defect_code: 292, title: "نیاز به ترمیم جاده دسترسی", default_priority: "high", default_severity: "major", status: "active" },
+  { id: 98, category_id: null, category_name: "عیب در جاده دسترسی به محل دکل", defect_code: 282, title: "فاقد جاده دسترسی", default_priority: "high", default_severity: "major", status: "active" },
+  { id: 173, category_id: null, category_name: "عیوب بدنه دکل فلزی مشبک", defect_code: 123, title: "انحراف بازوی دکل", default_priority: "high", default_severity: "major", status: "active" },
+  { id: 174, category_id: null, category_name: "عیوب بدنه دکل فلزی مشبک", defect_code: 127, title: "انحراف و اعوجاج در پایه های اصلی دکل", default_priority: "high", default_severity: "major", status: "active" },
+  { id: 175, category_id: null, category_name: "عیوب بدنه دکل فلزی مشبک", defect_code: 129, title: "انحراف و آسیب دیدگی استاب", default_priority: "high", default_severity: "major", status: "active" },
 ];
 
 // ─── انواع سیم‌ها (v3.5.0 — از Conductors Standard.xlsx؛ نسخه کامل در دیتابیس) ───
 const MOCK_CONDUCTORS: any[] = [
-  { id: 1, name: "Fox", type: "ACSR", type_code: "ACSR", standard: "Bs", core_type: "GS", material_outer: "Alum.", material_inner: "Steel", stranding_outer: "6/2.79", sectional_area_all: 42.8, overall_diameter_all: 8.37, weight_all: 148.0, ultimate_strength: 1340.0, resistance: 0.7822, is_active: 1 },
-  { id: 2, name: "Mink", type: "ACSR", type_code: "ACSR", standard: "BS", core_type: "GS", material_outer: "Alum.", material_inner: "Steel", stranding_outer: "6/3.66", sectional_area_all: 72.6, overall_diameter_all: 10.98, weight_all: 255.0, ultimate_strength: 2220.0, resistance: 0.4546, is_active: 1 },
-  { id: 3, name: "Dog", type: "ACSR", type_code: "ACSR", standard: "Bs", core_type: "GS", material_outer: "Alum.", material_inner: "Steel", stranding_outer: "6/4.72", sectional_area_all: 118.5, overall_diameter_all: 14.15, weight_all: 394.0, ultimate_strength: 3330.0, resistance: 0.2733, is_active: 1 },
-  { id: 4, name: "Hyena", type: "ACSR", type_code: "ACSR", standard: "Bs", core_type: "GS", material_outer: "Alum.", material_inner: "Steel", stranding_outer: "7/4.39", sectional_area_all: 126.5, overall_diameter_all: 14.57, weight_all: 451.0, ultimate_strength: 4180.0, resistance: 0.2707, is_active: 1 },
-  { id: 5, name: "Partridge", type: "ACSR", type_code: "ACSR", standard: "ASTM", core_type: "GS", material_outer: "Alum.", material_inner: "Steel", stranding_outer: "26/2.573", sectional_area_all: 157.2, overall_diameter_all: 16.29, weight_all: 546.5, ultimate_strength: 5130.0, resistance: 0.2136, is_active: 1 },
-  { id: 6, name: "Oriole", type: "ACSR", type_code: "ACSR", standard: "ASTM", core_type: "GS", material_outer: "Alum.", material_inner: "Steel", stranding_outer: "30/2.69", sectional_area_all: 210.3, overall_diameter_all: 18.83, weight_all: 784.6, ultimate_strength: 7870.0, resistance: 0.1698, is_active: 1 },
-  { id: 7, name: "Lynx", type: "ACSR", type_code: "ACSR", standard: "Bs", core_type: "GS", material_outer: "Alum.", material_inner: "Steel", stranding_outer: "30/2.79", sectional_area_all: 226.2, overall_diameter_all: 19.53, weight_all: 842.0, ultimate_strength: 8140.0, resistance: 0.1576, is_active: 1 },
-  { id: 8, name: "Hawk", type: "ACSR", type_code: "ACSR", standard: "ASTM", core_type: "GS", material_outer: "Alum.", material_inner: "Steel", stranding_outer: "26/3.439", sectional_area_all: 280.8, overall_diameter_all: 21.78, weight_all: 976.5, ultimate_strength: 8850.0, resistance: 0.1196, is_active: 1 },
-  { id: 9, name: "Peacock", type: "ACSR", type_code: "ACSR", standard: "ASTM", core_type: "GS", material_outer: "Alum.", material_inner: "Steel", stranding_outer: "24/4.034", sectional_area_all: 346.5, overall_diameter_all: 24.21, weight_all: 1161.0, ultimate_strength: 9790.0, resistance: 0.09413, is_active: 1 },
-  { id: 10, name: "Squab", type: "ACSR", type_code: "ACSR", standard: "ASTM", core_type: "GS", material_outer: "Alum.", material_inner: "Steel", stranding_outer: "26/3.874", sectional_area_all: 356.4, overall_diameter_all: 24.53, weight_all: 1239.0, ultimate_strength: 11000.0, resistance: 0.09422, is_active: 1 },
-  { id: 11, name: "Drake", type: "ACSR", type_code: "ACSR", standard: "ASTM", core_type: "GS", material_outer: "Alum.", material_inner: "Steel", stranding_outer: "26/4.442", sectional_area_all: 468.6, overall_diameter_all: 28.13, weight_all: 1628.0, ultimate_strength: 14300.0, resistance: 0.07167, is_active: 1 },
-  { id: 12, name: "Canary", type: "ACSR", type_code: "ACSR", standard: "ASTM", core_type: "GS", material_outer: "Alum.", material_inner: "Steel", stranding_outer: "54/3.279", sectional_area_all: 515.1, overall_diameter_all: 29.51, weight_all: 1725.0, ultimate_strength: 14500.0, resistance: 0.06332, is_active: 1 },
-  { id: 13, name: "Cardinal", type: "ACSR", type_code: "ACSR", standard: "ASTM", core_type: "GS", material_outer: "Alum.", material_inner: "Steel", stranding_outer: "54/3.376", sectional_area_all: 546.1, overall_diameter_all: 30.39, weight_all: 1828.0, ultimate_strength: 15400.0, resistance: 0.05973, is_active: 1 },
-  { id: 14, name: "Curlew", type: "ACSR", type_code: "ACSR", standard: "ASTM", core_type: "GS", material_outer: "Alum.", material_inner: "Steel", stranding_outer: "54/3.513", sectional_area_all: 691.3, overall_diameter_all: 31.62, weight_all: 1980.0, ultimate_strength: 16600.0, resistance: 0.05518, is_active: 1 },
-  { id: 15, name: "Martin", type: "ACSR", type_code: "ACSR", standard: "ASTM", core_type: "GS", material_outer: "Alum.", material_inner: "Steel", stranding_outer: "54/4.018", sectional_area_all: 771.4, overall_diameter_all: 36.16, weight_all: 2584.0, ultimate_strength: 21000.0, resistance: 0.04238, is_active: 1 },
+  { id: 1, name: "Fox", type: "ACSR", type_code: "ACSR", standard: "Bs", core_type: "GS", material_outer: "Alum.", material_inner: "Steel", stranding_outer: "6/2.79", sectional_area_all: 42.8, overall_diameter_all: 8.37, weight_all: 148.0, ultimate_strength: 1340.0, resistance: 0.7822, status: "active" },
+  { id: 2, name: "Mink", type: "ACSR", type_code: "ACSR", standard: "BS", core_type: "GS", material_outer: "Alum.", material_inner: "Steel", stranding_outer: "6/3.66", sectional_area_all: 72.6, overall_diameter_all: 10.98, weight_all: 255.0, ultimate_strength: 2220.0, resistance: 0.4546, status: "active" },
+  { id: 3, name: "Dog", type: "ACSR", type_code: "ACSR", standard: "Bs", core_type: "GS", material_outer: "Alum.", material_inner: "Steel", stranding_outer: "6/4.72", sectional_area_all: 118.5, overall_diameter_all: 14.15, weight_all: 394.0, ultimate_strength: 3330.0, resistance: 0.2733, status: "active" },
+  { id: 4, name: "Hyena", type: "ACSR", type_code: "ACSR", standard: "Bs", core_type: "GS", material_outer: "Alum.", material_inner: "Steel", stranding_outer: "7/4.39", sectional_area_all: 126.5, overall_diameter_all: 14.57, weight_all: 451.0, ultimate_strength: 4180.0, resistance: 0.2707, status: "active" },
+  { id: 5, name: "Partridge", type: "ACSR", type_code: "ACSR", standard: "ASTM", core_type: "GS", material_outer: "Alum.", material_inner: "Steel", stranding_outer: "26/2.573", sectional_area_all: 157.2, overall_diameter_all: 16.29, weight_all: 546.5, ultimate_strength: 5130.0, resistance: 0.2136, status: "active" },
+  { id: 6, name: "Oriole", type: "ACSR", type_code: "ACSR", standard: "ASTM", core_type: "GS", material_outer: "Alum.", material_inner: "Steel", stranding_outer: "30/2.69", sectional_area_all: 210.3, overall_diameter_all: 18.83, weight_all: 784.6, ultimate_strength: 7870.0, resistance: 0.1698, status: "active" },
+  { id: 7, name: "Lynx", type: "ACSR", type_code: "ACSR", standard: "Bs", core_type: "GS", material_outer: "Alum.", material_inner: "Steel", stranding_outer: "30/2.79", sectional_area_all: 226.2, overall_diameter_all: 19.53, weight_all: 842.0, ultimate_strength: 8140.0, resistance: 0.1576, status: "active" },
+  { id: 8, name: "Hawk", type: "ACSR", type_code: "ACSR", standard: "ASTM", core_type: "GS", material_outer: "Alum.", material_inner: "Steel", stranding_outer: "26/3.439", sectional_area_all: 280.8, overall_diameter_all: 21.78, weight_all: 976.5, ultimate_strength: 8850.0, resistance: 0.1196, status: "active" },
+  { id: 9, name: "Peacock", type: "ACSR", type_code: "ACSR", standard: "ASTM", core_type: "GS", material_outer: "Alum.", material_inner: "Steel", stranding_outer: "24/4.034", sectional_area_all: 346.5, overall_diameter_all: 24.21, weight_all: 1161.0, ultimate_strength: 9790.0, resistance: 0.09413, status: "active" },
+  { id: 10, name: "Squab", type: "ACSR", type_code: "ACSR", standard: "ASTM", core_type: "GS", material_outer: "Alum.", material_inner: "Steel", stranding_outer: "26/3.874", sectional_area_all: 356.4, overall_diameter_all: 24.53, weight_all: 1239.0, ultimate_strength: 11000.0, resistance: 0.09422, status: "active" },
+  { id: 11, name: "Drake", type: "ACSR", type_code: "ACSR", standard: "ASTM", core_type: "GS", material_outer: "Alum.", material_inner: "Steel", stranding_outer: "26/4.442", sectional_area_all: 468.6, overall_diameter_all: 28.13, weight_all: 1628.0, ultimate_strength: 14300.0, resistance: 0.07167, status: "active" },
+  { id: 12, name: "Canary", type: "ACSR", type_code: "ACSR", standard: "ASTM", core_type: "GS", material_outer: "Alum.", material_inner: "Steel", stranding_outer: "54/3.279", sectional_area_all: 515.1, overall_diameter_all: 29.51, weight_all: 1725.0, ultimate_strength: 14500.0, resistance: 0.06332, status: "active" },
+  { id: 13, name: "Cardinal", type: "ACSR", type_code: "ACSR", standard: "ASTM", core_type: "GS", material_outer: "Alum.", material_inner: "Steel", stranding_outer: "54/3.376", sectional_area_all: 546.1, overall_diameter_all: 30.39, weight_all: 1828.0, ultimate_strength: 15400.0, resistance: 0.05973, status: "active" },
+  { id: 14, name: "Curlew", type: "ACSR", type_code: "ACSR", standard: "ASTM", core_type: "GS", material_outer: "Alum.", material_inner: "Steel", stranding_outer: "54/3.513", sectional_area_all: 691.3, overall_diameter_all: 31.62, weight_all: 1980.0, ultimate_strength: 16600.0, resistance: 0.05518, status: "active" },
+  { id: 15, name: "Martin", type: "ACSR", type_code: "ACSR", standard: "ASTM", core_type: "GS", material_outer: "Alum.", material_inner: "Steel", stranding_outer: "54/4.018", sectional_area_all: 771.4, overall_diameter_all: 36.16, weight_all: 2584.0, ultimate_strength: 21000.0, resistance: 0.04238, status: "active" },
 ];
 
 // ─── پردازشگر اصلی ───
@@ -331,7 +331,7 @@ export async function handleMockRequest(request: NextRequest): Promise<NextRespo
     let body: any = {};
     try { body = await request.json(); } catch { /* empty */ }
     const newId = nextId(MOCK_LINES);
-    const newLine = { ...body, id: newId, is_active: true }; // v3.2.1: id بعد از spread — ستون id خالی اکسل نباید id تولیدی را بازنویسی کند
+    const newLine = { ...body, id: newId, status: "active" }; // v3.2.1: id بعد از spread — ستون id خالی اکسل نباید id تولیدی را بازنویسی کند
     MOCK_LINES.push(newLine);
     return NextResponse.json({ success: true, data: newLine });
   }
@@ -357,7 +357,7 @@ export async function handleMockRequest(request: NextRequest): Promise<NextRespo
         errors.push(`کد خط «${code}» تکراری است`);
       } else {
         const newId = nextId(MOCK_LINES);
-        MOCK_LINES.push({ ...row, id: newId, is_active: true }); // v3.2.1: id بعد از spread
+        MOCK_LINES.push({ ...row, id: newId, status: "active" }); // v3.2.1: id بعد از spread
         statuses.push("inserted");
         errors.push(null);
       }
@@ -473,7 +473,7 @@ export async function handleMockRequest(request: NextRequest): Promise<NextRespo
       return NextResponse.json({ success: false, error: { code: 409, message: "کد دکل در این خط قبلاً ثبت شده" } }, { status: 409 });
     }
     const newId = nextId(MOCK_TOWERS);
-    MOCK_TOWERS.push({ ...body, id: newId, tower_code: code, is_active: 1 });
+    MOCK_TOWERS.push({ ...body, id: newId, tower_code: code, status: "active" });
     return NextResponse.json({ success: true, data: { id: newId, tower_code: code }, message: "دکل با موفقیت ایجاد شد" }, { status: 201 });
   }
 
@@ -485,7 +485,7 @@ export async function handleMockRequest(request: NextRequest): Promise<NextRespo
     const patch: Record<string, any> = body.patch && typeof body.patch === "object" ? body.patch : {};
     if (!ids.length) return NextResponse.json({ success: false, error: { code: 400, message: "لیست شناسه‌ها ارسال نشده" } }, { status: 400 });
     if (ids.length > 100) return NextResponse.json({ success: false, error: { code: 400, message: "حداکثر ۱۰۰ دکل در هر درخواست" } }, { status: 400 });
-    const allowed = new Set(["tower_structure","tower_type","tower_type_code","insulator_r1","insulator_s1","insulator_t1","insulator_r2","insulator_s2","insulator_t2","line_supervisor","is_active"]);
+    const allowed = new Set(["tower_structure","tower_type","tower_type_code","insulator_r1","insulator_s1","insulator_t1","insulator_r2","insulator_s2","insulator_t2","line_supervisor","status"]);
     const safePatch = Object.fromEntries(Object.entries(patch).filter(([k]) => allowed.has(k)));
     if (!Object.keys(safePatch).length) return NextResponse.json({ success: false, error: { code: 400, message: "هیچ فیلد مجازی برای ویرایش ارسال نشده" } }, { status: 400 });
     let updated = 0;
@@ -531,7 +531,7 @@ export async function handleMockRequest(request: NextRequest): Promise<NextRespo
       }
       if (code && existingCodes.has(code)) { statuses.push("failed"); errors.push(`کد دکل ${code} تکراری است`); continue; }
       if (code) existingCodes.add(code);
-      MOCK_TOWERS.push({ ...r, id: newTowerId++, tower_code: code, line_id: line.id, line_code: line.line_code, line_name: line.name, is_active: 1 });
+      MOCK_TOWERS.push({ ...r, id: newTowerId++, tower_code: code, line_id: line.id, line_code: line.line_code, line_name: line.name, status: "active" });
       statuses.push("inserted");
       errors.push(null);
     }
@@ -607,7 +607,7 @@ export async function handleMockRequest(request: NextRequest): Promise<NextRespo
       if (idx === -1) continue;
       // اگر عیبی ثبت کرده و جانشین هست → انتقال، وگرنه رد
       const hasDefects = MOCK_DEFECTS.some(d => (d as any).discovered_by === id);
-      const surrogate = MOCK_PERSONNEL.find(p => !ids.includes(p.id) && p.is_active);
+      const surrogate = MOCK_PERSONNEL.find(p => !ids.includes(p.id) && p.status);
       if (hasDefects && !surrogate) { skipped++; continue; }
       if (hasDefects && surrogate) {
         for (const d of MOCK_DEFECTS) { if ((d as any).discovered_by === id) (d as any).discovered_by = surrogate.id; }
@@ -649,7 +649,7 @@ export async function handleMockRequest(request: NextRequest): Promise<NextRespo
       return NextResponse.json({ success: false, error: { code: 409, message: "این نام سیم قبلاً ثبت شده است" } }, { status: 409 });
     }
     const newId = nextId(MOCK_CONDUCTORS);
-    MOCK_CONDUCTORS.push({ ...body, id: newId, name: String(body.name).trim(), is_active: 1 });
+    MOCK_CONDUCTORS.push({ ...body, id: newId, name: String(body.name).trim(), status: "active" });
     return NextResponse.json({ success: true, data: { id: newId }, message: "سیم ایجاد شد" }, { status: 201 });
   }
   const conductorMatch = path.match(/^\/conductors\/(\d+)$/);
@@ -697,7 +697,7 @@ export async function handleMockRequest(request: NextRequest): Promise<NextRespo
         statuses.push("updated"); errors.push(null); updated++;
       } else {
         const newId = nextId(MOCK_CONDUCTORS);
-        MOCK_CONDUCTORS.push({ ...r, id: newId, name, is_active: 1 });
+        MOCK_CONDUCTORS.push({ ...r, id: newId, name, status: "active" });
         statuses.push("inserted"); errors.push(null); inserted++;
       }
     }
@@ -756,7 +756,7 @@ export async function handleMockRequest(request: NextRequest): Promise<NextRespo
           national_id: nat, father_name: r.father_name || null,
           personnel_type: r.personnel_type || "employee", position: r.position || null,
           mobile: r.mobile || null, supervisor_name: r.supervisor_name || null,
-          collaboration_start: r.collaboration_start || null, is_active: 1,
+          collaboration_start: r.collaboration_start || null, status: "active",
         });
         statuses.push("inserted"); errors.push(null); inserted++;
       }
@@ -858,7 +858,7 @@ export async function handleMockRequest(request: NextRequest): Promise<NextRespo
     let body: any = {};
     try { body = await request.json(); } catch { /* empty */ }
     const newId = nextId(MOCK_PRICE_LISTS);
-    MOCK_PRICE_LISTS.push({ id: newId, name: body.name, version: body.version || "1.0", effective_date: body.effective_date || "2026-03-21", is_active: 1 });
+    MOCK_PRICE_LISTS.push({ id: newId, name: body.name, version: body.version || "1.0", effective_date: body.effective_date || "2026-03-21", status: "active" });
     return NextResponse.json({ success: true, data: { id: newId }, message: "فهرست بها ایجاد شد" }, { status: 201 });
   }
   if (path === "/price-list-items" && method === "GET") {
@@ -871,7 +871,7 @@ export async function handleMockRequest(request: NextRequest): Promise<NextRespo
     try { body = await request.json(); } catch { /* empty */ }
     const newId = nextId(MOCK_PRICE_LIST_ITEMS);
     const code = body.code || ("P-" + String(newId).padStart(3, "0"));
-    MOCK_PRICE_LIST_ITEMS.push({ id: newId, price_list_id: Number(body.price_list_id), code, title: body.title, unit: body.unit || "عدد", unit_price: Number(body.unit_price || 0), category: body.category || "عملیات", is_active: 1 });
+    MOCK_PRICE_LIST_ITEMS.push({ id: newId, price_list_id: Number(body.price_list_id), code, title: body.title, unit: body.unit || "عدد", unit_price: Number(body.unit_price || 0), category: body.category || "عملیات", status: "active" });
     return NextResponse.json({ success: true, data: { id: newId, code }, message: "قلم ایجاد شد" }, { status: 201 });
   }
   const priceListItemMatch = path.match(/^\/price-list-items\/(\d+)$/);
@@ -890,7 +890,7 @@ export async function handleMockRequest(request: NextRequest): Promise<NextRespo
     let body: any = {};
     try { body = await request.json(); } catch { /* empty */ }
     const newId = nextId(MOCK_CHECKLIST_TEMPLATES);
-    MOCK_CHECKLIST_TEMPLATES.push({ id: newId, name: body.name, description: body.description || null, applies_to: body.applies_to || "tower", is_active: 1, created_at: new Date().toISOString().slice(0, 19).replace("T", " ") });
+    MOCK_CHECKLIST_TEMPLATES.push({ id: newId, name: body.name, description: body.description || null, applies_to: body.applies_to || "tower", status: "active", created_at: new Date().toISOString().slice(0, 19).replace("T", " ") });
     return NextResponse.json({ success: true, data: { id: newId }, message: "چک‌لیست ایجاد شد" }, { status: 201 });
   }
 
@@ -976,7 +976,7 @@ export async function handleMockRequest(request: NextRequest): Promise<NextRespo
       personnel_type: body.personnel_type || "employee", position: body.position || null,
       phone: body.phone || null, mobile: body.mobile || null, email: body.email || null,
       supervisor_name: body.supervisor_name || null, collaboration_start: body.collaboration_start || null,
-      is_active: 1,
+      status: "active",
     });
     return NextResponse.json({ success: true, data: { id: newId, personnel_code: code }, message: "پرسنل ایجاد شد" }, { status: 201 });
   }

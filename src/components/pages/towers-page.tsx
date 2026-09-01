@@ -9,7 +9,6 @@ import { ImportExcelDialog } from "@/components/import-excel-dialog";
 import { IssuesBadge } from "@/components/issues-badge";
 import { TowersStatsBar } from "@/components/towers/towers-stats-bar";
 import { BulkTowersActions } from "@/components/towers/bulk-towers-actions";
-import { GenericBulkActions } from "@/components/generic-bulk-actions";
 import { getTowerIssues } from "@/lib/towers-quality";
 import { usePersonnelOptions } from "@/hooks/use-personnel-options";
 import { useToast } from "@/hooks/use-toast";
@@ -228,7 +227,7 @@ export function TowersPage() {
       "insulator_r1", "insulator_s1", "insulator_t1", "insulator_r2", "insulator_s2", "insulator_t2",
       "insulator_count_r1", "insulator_count_s1", "insulator_count_t1",
       "insulator_count_r2", "insulator_count_s2", "insulator_count_t2",
-      "gps_lat", "gps_lng", "line_supervisor", "is_active",
+      "gps_lat", "gps_lng", "line_supervisor", "status",
     ];
     const payload: Record<string, unknown> = {};
     for (const key of allowedFields) {
@@ -244,7 +243,7 @@ export function TowersPage() {
                     "gps_lat", "gps_lng"].includes(key)) {
           const n = Number(String(v).replace(",", "."));
           payload[key] = isNaN(n) ? null : n;
-        } else if (key === "is_active") {
+        } else if (key === "status") {
           const s = String(v).toLowerCase().trim();
           payload[key] = (s === "1" || s === "true" || s === "بله" || s === "yes");
         } else {
@@ -414,7 +413,7 @@ export function TowersPage() {
     { key: "gps_lat", header: "عرض جغرافیایی", sortable: true, type: "number", hidden: true, align: "right" },
     { key: "gps_lng", header: "طول جغرافیایی", sortable: true, type: "number", hidden: true, align: "right" },
     { key: "line_supervisor", header: "سرپرست خط", sortable: true, filterable: true, hidden: true, align: "right" },
-    { key: "is_active", header: "فعال", type: "boolean", filterable: true, align: "right" },
+    { key: "status", header: "وضعیت", type: "status", filterable: true, align: "right" },
     // ستون سلامت داده — با نگه‌داشتن موس روی علامت، جزئیات خطاها نمایش داده می‌شود
     {
       key: "data_quality", header: "سلامت داده", align: "center", width: "110px",
@@ -455,7 +454,6 @@ export function TowersPage() {
         onLoadAllRows={handleLoadAllRows}
         toolbarExtra={(rows) => <div className="flex items-center gap-1">
           <BulkTowersActions getSelection={getSelection} onApplied={handleBulkApplied} />
-          <GenericBulkActions rows={rows} endpoint={API_ENDPOINTS.towers} entityName="دکل" onApplied={handleBulkApplied} canChangeContract />
         </div>}
         tableRef={tableRef}
         layoutKey="towers"

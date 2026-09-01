@@ -13,7 +13,7 @@ import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { logError } from "@/lib/error-log";
 
-interface RefRow { id:number; name?:string; code?:string; title?:string|null; sort_order:number; is_active:number; }
+interface RefRow { id:number; name?:string; code?:string; title?:string|null; sort_order:number; status:string; }
 
 export function TowerReferencePage({ kind }: { kind: "structures" | "type-codes" }) {
   const endpoint = kind === "structures" ? "tower-structures" : "tower-type-codes";
@@ -26,19 +26,19 @@ export function TowerReferencePage({ kind }: { kind: "structures" | "type-codes"
   const columns:DataTableColumn<RefRow>[] = kind === "structures" ? [
     {key:"name",header:"نام ساختار دکل",sortable:true,filterable:true,align:"right"},
     {key:"sort_order",header:"ترتیب",sortable:true,filterable:true,type:"number",align:"right"},
-    {key:"is_active",header:"فعال",sortable:true,filterable:true,type:"boolean",align:"right"},
+    {key:"status",header:"وضعیت",sortable:true,filterable:true,type:"status",align:"right"},
   ] : [
     {key:"code",header:"کد",sortable:true,filterable:true,align:"right"},
     {key:"title",header:"عنوان",sortable:true,filterable:true,align:"right"},
     {key:"sort_order",header:"ترتیب",sortable:true,filterable:true,type:"number",align:"right"},
-    {key:"is_active",header:"فعال",sortable:true,filterable:true,type:"boolean",align:"right"},
+    {key:"status",header:"وضعیت",sortable:true,filterable:true,type:"status",align:"right"},
   ];
-  const start=(row?:RefRow)=>{setEdit(row||null);setValue(row?.name||row?.code||"");setTitle(row?.title||"");setSort(String(row?.sort_order??0));setActive((row?.is_active??1)===1);setOpen(true)};
-  const save=async()=>{if(!value.trim()){toast({title:"مقدار الزامی است",variant:"destructive"});return;} setSaving(true); try{const payload=kind==="structures"?{name:value.trim(),sort_order:Number(sort)||0,is_active:active?1:0}:{code:value.trim(),title:title.trim()||null,sort_order:Number(sort)||0,is_active:active?1:0}; if(edit) await apiClient.put(`${endpoint}/${edit.id}`,payload); else await apiClient.post(endpoint,payload); setOpen(false);setRefreshKey(k=>k+1);toast({title:"ذخیره شد"});}catch(e:any){toast({title:"ذخیره انجام نشد",description:e?.message||"خطا",variant:"destructive"})}finally{setSaving(false)}};
+  const start=(row?:RefRow)=>{setEdit(row||null);setValue(row?.name||row?.code||"");setTitle(row?.title||"");setSort(String(row?.sort_order??0));setActive((row?.status??"active")==="active");setOpen(true)};
+  const save=async()=>{if(!value.trim()){toast({title:"مقدار الزامی است",variant:"destructive"});return;} setSaving(true); try{const payload=kind==="structures"?{name:value.trim(),sort_order:Number(sort)||0,status:active?"active":"inactive"}:{code:value.trim(),title:title.trim()||null,sort_order:Number(sort)||0,status:active?"active":"inactive"}; if(edit) await apiClient.put(`${endpoint}/${edit.id}`,payload); else await apiClient.post(endpoint,payload); setOpen(false);setRefreshKey(k=>k+1);toast({title:"ذخیره شد"});}catch(e:any){toast({title:"ذخیره انجام نشد",description:e?.message||"خطا",variant:"destructive"})}finally{setSaving(false)}};
   const remove=async(rows:RefRow[])=>{if(!rows.length)return;for(const r of rows){try{await apiClient.delete(`${endpoint}/${r.id}`)}catch{}}setRefreshKey(k=>k+1);tableRef.current?.clearSelection()};
   return <div className="space-y-3">
     <div className="flex items-center justify-between gap-2"><div><h2 className="text-base font-bold text-slate-800 dark:text-slate-100">{singular}</h2><p className="text-xs text-slate-500">مدیریت مقادیر مرجع مورد استفاده در فرم‌ها</p></div><Button onClick={()=>start()} className="gap-2"><Plus className="w-4 h-4"/>افزودن</Button></div>
-    <DataTable data={data} columns={columns} loading={loading} title={singular} searchKeys={kind==="structures"?["name"]:["code","title"]} onAdd={()=>start()} onRefresh={()=>setRefreshKey(k=>k+1)} onEdit={start} onDelete={remove} tableRef={tableRef} layoutKey={`tower-${kind}`} toolbarExtra={(rows)=><GenericBulkActions rows={rows} endpoint={endpoint} entityName={singular} onApplied={()=>setRefreshKey(k=>k+1)} canToggleActive/>}/>
+    <DataTable data={data} columns={columns} loading={loading} title={singular} searchKeys={kind==="structures"?["name"]:["code","title"]} onAdd={()=>start()} onRefresh={()=>setRefreshKey(k=>k+1)} onEdit={start} onDelete={remove} tableRef={tableRef} layoutKey={`tower-${kind}`} toolbarExtra={(rows)=><GenericBulkActions rows={rows} endpoint={endpoint} entityName={singular} onApplied={()=>setRefreshKey(k=>k+1)} canToggleStatus/>}/>
     <Dialog open={open} onOpenChange={setOpen}><DialogContent><DialogHeader><DialogTitle className="text-right">{edit?`ویرایش ${singular}`:`افزودن ${singular}`}</DialogTitle></DialogHeader><div className="space-y-4 text-right">
       <div className="space-y-2"><Label>{kind==="structures"?"نام ساختار":"کد"}</Label><Input value={value} onChange={e=>setValue(e.target.value)} dir="rtl" /></div>
       {kind==="type-codes"&&<div className="space-y-2"><Label>عنوان</Label><Input value={title} onChange={e=>setTitle(e.target.value)} /></div>}

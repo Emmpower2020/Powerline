@@ -37,9 +37,9 @@ class Auth
         // بارگذاری کاربر از دیتابیس
         $db = Database::getInstance();
         $user = $db->fetchOne(
-            "SELECT u.id, u.username, u.full_name, u.email, u.is_active, u.organization_id
+            "SELECT u.id, u.username, u.full_name, u.email, u.status, u.organization_id
              FROM users u
-             WHERE u.id = ? AND u.is_active = 1",
+             WHERE u.id = ? AND u.status = 'active'",
             [$payload['sub']]
         );
 
@@ -64,9 +64,9 @@ class Auth
 
         $db = Database::getInstance();
         $user = $db->fetchOne(
-            "SELECT u.id, u.username, u.full_name, u.email, u.is_active, u.organization_id
+            "SELECT u.id, u.username, u.full_name, u.email, u.status, u.organization_id
              FROM users u
-             WHERE u.id = ? AND u.is_active = 1",
+             WHERE u.id = ? AND u.status = 'active'",
             [$payload['sub']]
         );
 
@@ -271,7 +271,7 @@ class Auth
 
         // پیدا کردن کاربر
         $user = $db->fetchOne(
-            "SELECT id, username, password_hash, full_name, email, is_active, failed_attempts, locked_until
+            "SELECT id, username, password_hash, full_name, email, status, failed_attempts, locked_until
              FROM users
              WHERE username = ?",
             [$username]
@@ -283,7 +283,7 @@ class Auth
         }
 
         // بررسی فعال بودن
-        if (!$user['is_active']) {
+        if (($user['status'] ?? 'active') !== 'active') {
             return ['success' => false, 'error' => 'حساب کاربری غیرفعال است'];
         }
 

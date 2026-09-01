@@ -34,7 +34,7 @@ function syncLineTowerStructure(PDO $pdo, ?int $lineId): void
     $structureCols = isset($lineCols['tower_structure']) ? ['tower_structure'] : [];
     if (!$structureCols) return;
 
-    $stmt = $pdo->prepare("SELECT tower_structure, COUNT(*) AS cnt FROM towers WHERE line_id = ? AND is_active = 1 AND tower_structure IS NOT NULL AND tower_structure <> '' GROUP BY tower_structure ORDER BY cnt DESC, tower_structure ASC LIMIT 1");
+    $stmt = $pdo->prepare("SELECT tower_structure, COUNT(*) AS cnt FROM towers WHERE line_id = ? AND status = 'active' AND tower_structure IS NOT NULL AND tower_structure <> '' GROUP BY tower_structure ORDER BY cnt DESC, tower_structure ASC LIMIT 1");
     $stmt->execute([$lineId]);
     $row = $stmt->fetch(PDO::FETCH_ASSOC);
     $sets = [];
@@ -75,7 +75,7 @@ function registerTowerRoutes(Router $router): void
                     ST_Distance_Sphere(t.geom, ST_GeomFromText('POINT($lng $lat)', 4326)) AS distance_meters
              FROM towers t
              LEFT JOIN `lines` l ON l.id = t.line_id
-             WHERE t.is_active = 1
+             WHERE t.status = 'active'
                AND (? IS NULL OR t.contract_id = ?)
                AND ST_Distance_Sphere(t.geom, ST_GeomFromText('POINT($lng $lat)', 4326)) <= ?
              ORDER BY distance_meters ASC
@@ -250,7 +250,7 @@ function registerTowerRoutes(Router $router): void
         $columns[]='gps_lng'; $values[]='?'; $params[]=$gpsLng;
         $columns[]='geom'; $values[]='ST_GeomFromText(?)'; $params[]=$geomWkt;
         $columns[]='line_supervisor'; $values[]='?'; $params[]=$supervisor;
-        if (isset($dbColumns['is_active'])) { $columns[]='is_active'; $values[]='1'; }
+        if (isset($dbColumns['status'])) { $columns[]='status'; $values[]='1'; }
         if (isset($dbColumns['created_at'])) { $columns[]='created_at'; $values[]='NOW()'; }
         $quotedCols = implode(', ', array_map(fn($c) => "`$c`", $columns));
         $sql = "INSERT INTO towers (" . $quotedCols . ") VALUES (" . implode(', ', $values) . ")";
@@ -295,7 +295,7 @@ function registerTowerRoutes(Router $router): void
             'insulator_r1', 'insulator_s1', 'insulator_t1', 'insulator_r2', 'insulator_s2', 'insulator_t2',
             'insulator_count_r1', 'insulator_count_s1', 'insulator_count_t1',
             'insulator_count_r2', 'insulator_count_s2', 'insulator_count_t2',
-            'line_supervisor', 'contract_id', 'is_active',
+            'line_supervisor', 'contract_id', 'status',
         ];
 
         $updates = [];
@@ -381,7 +381,7 @@ function registerTowerRoutes(Router $router): void
             'tower_structure', 'tower_type', 'tower_type_code',
             'insulator_r1', 'insulator_s1', 'insulator_t1',
             'insulator_r2', 'insulator_s2', 'insulator_t2',
-            'line_supervisor', 'contract_id', 'is_active',
+            'line_supervisor', 'contract_id', 'status',
         ];
 
         $updates = [];
@@ -596,7 +596,7 @@ function registerTowerRoutes(Router $router): void
                     if (isset($towerColumns[$f])) { $cols[]=$f; $vals[]='?'; $params[]=$d[$f] ?? null; }
                 }
                 if (isset($towerColumns['geom'])) { $cols[]='geom'; $vals[]='ST_GeomFromText(?)'; $params[]=$d['geom_wkt'] ?? 'POINT EMPTY'; }
-                if (isset($towerColumns['is_active'])) { $cols[]='is_active'; $vals[]='1'; }
+                if (isset($towerColumns['status'])) { $cols[]='status'; $vals[]='1'; }
                 if (isset($towerColumns['created_at'])) { $cols[]='created_at'; $vals[]='NOW()'; }
                 $sql='INSERT INTO `towers` ('.implode(', ', array_map(fn($c)=>"`$c`",$cols)).') VALUES ('.implode(', ',$vals).')';
                 $pdo->prepare($sql)->execute($params);
@@ -767,7 +767,7 @@ function formatTowerRow(array $row): array
         'gps_lat'           => $num($row['gps_lat'] ?? null),
         'gps_lng'           => $num($row['gps_lng'] ?? null),
         'line_supervisor'   => $row['line_supervisor'] ?? null,
-        'is_active'          => (bool) $row['is_active'],
+        'status'          => (string) $row['status'],
         'created_at'        => $row['created_at'] ?? null,
         'updated_at'        => $row['updated_at'] ?? null,
     ];

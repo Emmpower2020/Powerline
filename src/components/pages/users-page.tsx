@@ -10,7 +10,7 @@ import { Loader2, Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import type { PaginatedResponse } from "@/lib/types";
 
-interface UserList { id: number; username: string; full_name: string; email: string | null; is_active: boolean; roles: string | null; last_login_at: string | null; }
+interface UserList { id: number; username: string; full_name: string; email: string | null; status: boolean; roles: string | null; last_login_at: string | null; }
 
 export function UsersPage() {
   const [users, setUsers] = useState<UserList[]>([]);
@@ -45,7 +45,7 @@ export function UsersPage() {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1">
                     <h3 className="font-semibold text-slate-800 dark:text-slate-100 truncate text-right">{user.full_name}</h3>
-                    {user.is_active ? <Badge className="bg-green-100 text-green-700" variant="secondary">فعال</Badge> : <Badge variant="secondary" className="bg-slate-100 text-slate-500">غیرفعال</Badge>}
+                    {user.status === "active" ? <Badge className="bg-green-100 text-green-700" variant="secondary">فعال</Badge> : <Badge variant="secondary" className="bg-slate-100 text-slate-500">غیرفعال</Badge>}
                   </div>
                   <p className="text-xs text-slate-500 text-right">@{user.username}</p>
                   {user.email && <p className="text-xs text-slate-400 truncate text-right">{user.email}</p>}

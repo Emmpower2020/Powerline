@@ -24,21 +24,21 @@ function registerDashboardRoutes(Router $router): void
         // آمار کلی
         $stats = [
             'lines' => [
-                'total'      => (int) $pdo->query("SELECT COUNT(*) FROM `lines` WHERE is_active = 1$lineScope")->fetchColumn(),
+                'total'      => (int) $pdo->query("SELECT COUNT(*) FROM `lines` WHERE status = 'active'$lineScope")->fetchColumn(),
                 // v2.4.3: تفکیک بر اساس ولتاژ (نوع خط حذف شد)
                 'by_voltage' => $pdo->query("
                     SELECT voltage_kv, COUNT(*) as count
                     FROM `lines`
-                    WHERE is_active = 1 AND voltage_kv IS NOT NULL$lineScope
+                    WHERE status = 'active' AND voltage_kv IS NOT NULL$lineScope
                     GROUP BY voltage_kv
                 ")->fetchAll(PDO::FETCH_KEY_PAIR),
             ],
             'towers' => [
-                'total' => (int) $pdo->query("SELECT COUNT(*) FROM towers WHERE is_active = 1$towerScope")->fetchColumn(),
+                'total' => (int) $pdo->query("SELECT COUNT(*) FROM towers WHERE status = 'active'$towerScope")->fetchColumn(),
                 'by_type' => $pdo->query("
                     SELECT tower_type, COUNT(*) as count
                     FROM towers
-                    WHERE is_active = 1$towerScope
+                    WHERE status = 'active'$towerScope
                     GROUP BY tower_type
                 ")->fetchAll(PDO::FETCH_KEY_PAIR),
             ],
@@ -65,10 +65,10 @@ function registerDashboardRoutes(Router $router): void
             ],
             'users' => [
                 'total'   => (int) $pdo->query("SELECT COUNT(*) FROM users")->fetchColumn(),
-                'active'  => (int) $pdo->query("SELECT COUNT(*) FROM users WHERE is_active = 1")->fetchColumn(),
+                'active'  => (int) $pdo->query("SELECT COUNT(*) FROM users WHERE status = 'active'")->fetchColumn(),
             ],
             'contractors' => [
-                'total'  => (int) $pdo->query("SELECT COUNT(*) FROM contractors WHERE is_active = 1")->fetchColumn(),
+                'total'  => (int) $pdo->query("SELECT COUNT(*) FROM contractors WHERE status = 'active'")->fetchColumn(),
             ],
             'safety' => [
                 'incidents_this_month' => (int) $pdo->query("SELECT COUNT(*) FROM safety_incidents WHERE 1=1$safetyScope AND MONTH(occurred_at) = MONTH(CURDATE()) AND YEAR(occurred_at) = YEAR(CURDATE())")->fetchColumn(),
@@ -175,7 +175,7 @@ function registerDashboardRoutes(Router $router): void
                    ) AS actual_defect_count
             FROM defect_categories dc
             LEFT JOIN defect_definitions dd ON dd.category_id = dc.id
-            WHERE dc.is_active = 1
+            WHERE dc.status = 'active'
             GROUP BY dc.id
             ORDER BY actual_defect_count DESC, definition_count DESC
         ");

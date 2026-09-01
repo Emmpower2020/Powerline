@@ -396,25 +396,18 @@ export function DefectsPage() {
         onDelete={bulkDelete.requestDelete}
         onImport={() => setShowImport(true)}
         toolbarExtra={(rows) => <div className="flex items-center gap-1">
-          <DropdownMenu dir="rtl">
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="outline"
-                className="h-9 w-9 p-0 text-indigo-600 hover:bg-indigo-50 border-indigo-200"
-                title="عملیات گروهی روی ردیف‌های انتخاب‌شده"
-              >
-                <ListChecks className="w-4 h-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" className="w-60">
-              <DropdownMenuLabel className="text-xs text-right">عملیات گروهی روی عیوب انتخاب‌شده</DropdownMenuLabel>
-              <DropdownMenuSeparator />
+          <GenericBulkActions
+            rows={rows}
+            endpoint={API_ENDPOINTS.defects}
+            entityName="عیب"
+            onApplied={() => setRefreshKey(k => k + 1)}
+            canChangeContract
+            additionalActions={<>
               <ItemRow icon={<Flame className="w-4 h-4 text-orange-500" />} label="شدت" onClick={() => startBulk("severity")} />
               <ItemRow icon={<Gauge className="w-4 h-4 text-amber-500" />} label="اولویت" onClick={() => startBulk("priority")} />
               <ItemRow icon={<ShieldAlert className="w-4 h-4 text-red-500" />} label="ریسک ایمنی" onClick={() => startBulk("safety_risk")} />
-            </DropdownMenuContent>
-          </DropdownMenu>
-          <GenericBulkActions rows={rows} endpoint={API_ENDPOINTS.defects} entityName="عیب" onApplied={() => setRefreshKey(k => k + 1)} canChangeContract />
+            </>}
+          />
         </div>}
       />
 

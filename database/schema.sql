@@ -33,12 +33,12 @@ CREATE TABLE IF NOT EXISTS `organization` (
     `phone`         VARCHAR(50)  NULL,
     `address`       VARCHAR(500) NULL,
     `description`   TEXT NULL,
-    `is_active`     TINYINT(1) NOT NULL DEFAULT 1,
+    `status`        VARCHAR(30) NOT NULL DEFAULT 'active',
     `created_at`    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     `updated_at`    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     INDEX `idx_org_parent` (`parent_id`),
     INDEX `idx_org_type`   (`org_type`),
-    INDEX `idx_org_active` (`is_active`),
+    INDEX `idx_org_status` (`status`),
     CONSTRAINT `fk_org_parent`
         FOREIGN KEY (`parent_id`) REFERENCES `organization`(`id`)
         ON DELETE RESTRICT ON UPDATE CASCADE
@@ -59,14 +59,14 @@ CREATE TABLE IF NOT EXISTS `users` (
     `email`           VARCHAR(200) NULL,
     `phone`           VARCHAR(50)  NULL,
     `avatar_url`      VARCHAR(500) NULL,
-    `is_active`       TINYINT(1) NOT NULL DEFAULT 1,
+    `status`        VARCHAR(30) NOT NULL DEFAULT 'active',
     `last_login_at`   TIMESTAMP NULL,
     `failed_attempts` INT NOT NULL DEFAULT 0,
     `locked_until`    TIMESTAMP NULL,
     `created_at`      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     `updated_at`      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     INDEX `idx_user_org`  (`organization_id`),
-    INDEX `idx_user_act`  (`is_active`),
+    INDEX `idx_user_status`  (`status`),
     CONSTRAINT `fk_user_org`
         FOREIGN KEY (`organization_id`) REFERENCES `organization`(`id`)
         ON DELETE SET NULL ON UPDATE CASCADE
@@ -169,7 +169,7 @@ CREATE TABLE IF NOT EXISTS `personnel` (
     `email`            VARCHAR(200) NULL,
     `hire_date`        DATE NULL,
     `contract_end_date` DATE NULL,
-    `is_active`        TINYINT(1) NOT NULL DEFAULT 1,
+    `status`        VARCHAR(30) NOT NULL DEFAULT 'active',
     `created_at`       TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     `updated_at`       TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     INDEX `idx_pers_org`  (`organization_id`),
@@ -183,24 +183,17 @@ CREATE TABLE IF NOT EXISTS `personnel` (
 
 -- ۳.۲) پیمانکاران (Contractors)
 CREATE TABLE IF NOT EXISTS `contractors` (
-    `id`              BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    `organization_id` BIGINT UNSIGNED NULL,
-    `name`            VARCHAR(200) NOT NULL,
-    `contractor_code` VARCHAR(50)  NULL UNIQUE,
-    `legal_id`        VARCHAR(50)  NULL,                            -- شناسه ملی/اقتصادی
-    `contact_person`  VARCHAR(200) NULL,
-    `phone`           VARCHAR(50)  NULL,
-    `mobile`          VARCHAR(50)  NULL,
-    `email`           VARCHAR(200) NULL,
-    `address`         VARCHAR(500) NULL,
-    `bank_account`    VARCHAR(100) NULL,
-    `is_active`       TINYINT(1) NOT NULL DEFAULT 1,
-    `created_at`      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    `updated_at`      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    INDEX `idx_cont_org` (`organization_id`),
-    INDEX `idx_cont_act` (`is_active`),
-    CONSTRAINT `fk_cont_org` FOREIGN KEY (`organization_id`) REFERENCES `organization`(`id`)
-        ON DELETE SET NULL ON UPDATE CASCADE
+    `id`               BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    `contractor_code`  VARCHAR(50)  NULL UNIQUE,
+    `contractor_name`  VARCHAR(200) NOT NULL,
+    `ceo_name`         VARCHAR(200) NULL,
+    `contractor_phone` VARCHAR(50)  NULL,
+    `mobile`           VARCHAR(50)  NULL,
+    `address`          VARCHAR(500) NULL,
+    `status`           VARCHAR(30) NOT NULL DEFAULT 'active',
+    `created_at`       TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `updated_at`       TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX `idx_cont_status` (`status`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ۳.۳) اکیپ‌های کاری (Crews/Teams)
@@ -212,7 +205,7 @@ CREATE TABLE IF NOT EXISTS `crews` (
     `crew_code`       VARCHAR(50)  NULL UNIQUE,
     `supervisor_id`   BIGINT UNSIGNED NULL,                        -- سرپرست اکیپ (personnel.id)
     `vehicle_id`      VARCHAR(50)  NULL,                            -- شماره خودرو
-    `is_active`       TINYINT(1) NOT NULL DEFAULT 1,
+    `status`        VARCHAR(30) NOT NULL DEFAULT 'active',
     `created_at`      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     `updated_at`      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     INDEX `idx_crew_cont` (`contractor_id`),
@@ -246,7 +239,7 @@ CREATE TABLE IF NOT EXISTS `personnel_certificates` (
     `issue_date`     DATE NULL,
     `expiry_date`    DATE NULL,
     `document_url`   VARCHAR(500) NULL,
-    `is_active`      TINYINT(1) NOT NULL DEFAULT 1,
+    `status`        VARCHAR(30) NOT NULL DEFAULT 'active',
     `created_at`     TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT `fk_pc_pers` FOREIGN KEY (`personnel_id`) REFERENCES `personnel`(`id`)
         ON DELETE CASCADE ON UPDATE CASCADE
@@ -273,7 +266,7 @@ CREATE TABLE IF NOT EXISTS `lines` (
     `geom`            LINESTRING NOT NULL,                            -- هندسه خط (GIS) - هنگام INSERT مقدار خالی بدید: ST_GeomFromText('LINESTRING EMPTY()')
     `construction_date` DATE NULL,
     `commission_date` DATE NULL,
-    `is_active`       TINYINT(1) NOT NULL DEFAULT 1,
+    `status`        VARCHAR(30) NOT NULL DEFAULT 'active',
     `created_at`      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     `updated_at`      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     SPATIAL INDEX `idx_line_geom` (`geom`),
@@ -302,7 +295,7 @@ CREATE TABLE IF NOT EXISTS `towers` (
     `geom`            POINT NOT NULL,                                  -- هندسه نقطه (GIS) - هنگام INSERT مقدار خالی بدید: ST_GeomFromText('POINT EMPTY')
     `altitude_m`      DECIMAL(7,2) NULL,                            -- ارتفاع از سطح دریا
     `construction_date` DATE NULL,
-    `is_active`       TINYINT(1) NOT NULL DEFAULT 1,
+    `status`        VARCHAR(30) NOT NULL DEFAULT 'active',
     `created_at`      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     `updated_at`      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     SPATIAL INDEX `idx_tower_geom` (`geom`),
@@ -336,7 +329,7 @@ CREATE TABLE IF NOT EXISTS `corridors` (
     `name`            VARCHAR(200) NOT NULL,
     `corridor_type`   VARCHAR(100) NULL,
     `geom`            LINESTRING NOT NULL,                            -- هندسه کریدور (GIS)
-    `is_active`       TINYINT(1) NOT NULL DEFAULT 1,
+    `status`        VARCHAR(30) NOT NULL DEFAULT 'active',
     `created_at`      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     `updated_at`      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     SPATIAL INDEX `idx_cor_geom` (`geom`),
@@ -372,7 +365,7 @@ CREATE TABLE IF NOT EXISTS `equipment` (
     `model`            VARCHAR(200) NULL,
     `install_date`     DATE NULL,
     `warranty_expiry`  DATE NULL,
-    `is_active`        TINYINT(1) NOT NULL DEFAULT 1,
+    `status`        VARCHAR(30) NOT NULL DEFAULT 'active',
     `created_at`       TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     `updated_at`       TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     INDEX `idx_eq_class` (`equipment_class_id`),
@@ -396,7 +389,7 @@ CREATE TABLE IF NOT EXISTS `checklist_templates` (
     `name`          VARCHAR(200) NOT NULL,
     `description`   TEXT NULL,
     `applies_to`    ENUM('line','tower','equipment','all') NOT NULL DEFAULT 'tower',
-    `is_active`     TINYINT(1) NOT NULL DEFAULT 1,
+    `status`        VARCHAR(30) NOT NULL DEFAULT 'active',
     `created_at`    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     `updated_at`    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -413,7 +406,7 @@ CREATE TABLE IF NOT EXISTS `checklist_items` (
     `is_required`         TINYINT(1) NOT NULL DEFAULT 0,
     `is_conditional`     TINYINT(1) NOT NULL DEFAULT 0,
     `condition_logic`    JSON NULL,                                 -- منطق شرطی (مثلا: if Q1=defect then show Q2)
-    `is_active`          TINYINT(1) NOT NULL DEFAULT 1,
+    `status`        VARCHAR(30) NOT NULL DEFAULT 'active',
     INDEX `idx_ci_tpl`    (`template_id`),
     INDEX `idx_ci_parent` (`parent_item_id`),
     CONSTRAINT `fk_ci_tpl`    FOREIGN KEY (`template_id`) REFERENCES `checklist_templates`(`id`)
@@ -496,7 +489,7 @@ CREATE TABLE IF NOT EXISTS `defect_categories` (
     `name`          VARCHAR(200) NOT NULL,                         -- مثلا: عیوب بدنه دکل فلزی مشبک مهاری
     `applies_to`    ENUM('tower','line','equipment') NOT NULL DEFAULT 'tower',
     `tower_type`    VARCHAR(20) NULL,
-    `is_active`     TINYINT(1) NOT NULL DEFAULT 1,
+    `status`        VARCHAR(30) NOT NULL DEFAULT 'active',
     `created_at`    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -512,7 +505,7 @@ CREATE TABLE IF NOT EXISTS `defect_definitions` (
     `safety_risk`    ENUM('none','low','medium','high') NOT NULL DEFAULT 'none',
     `repair_required` TINYINT(1) NOT NULL DEFAULT 1,
     `estimated_repair_hours` DECIMAL(5,2) NULL,
-    `is_active`      TINYINT(1) NOT NULL DEFAULT 1,
+    `status`        VARCHAR(30) NOT NULL DEFAULT 'active',
     `created_at`     TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     UNIQUE KEY `uniq_defect_cat_code` (`category_id`, `defect_code`),
     INDEX `idx_dd_cat` (`category_id`),
@@ -710,7 +703,7 @@ CREATE TABLE IF NOT EXISTS `price_lists` (
     `version`        VARCHAR(50) NULL,
     `effective_date` DATE NOT NULL,
     `contract_id`     BIGINT UNSIGNED NULL,                       -- قرارداد
-    `is_active`      TINYINT(1) NOT NULL DEFAULT 1,
+    `status`        VARCHAR(30) NOT NULL DEFAULT 'active',
     `created_at`     TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -723,7 +716,7 @@ CREATE TABLE IF NOT EXISTS `price_list_items` (
     `unit`          VARCHAR(50) NULL,                              -- واحد (متر، عدد، ...)
     `unit_price`    DECIMAL(18,2) NOT NULL DEFAULT 0,
     `category`      VARCHAR(200) NULL,                             -- عملیات، کالا، بازدید
-    `is_active`     TINYINT(1) NOT NULL DEFAULT 1,
+    `status`        VARCHAR(30) NOT NULL DEFAULT 'active',
     UNIQUE KEY `uniq_pli_code` (`price_list_id`, `code`),
     CONSTRAINT `fk_pli_pl` FOREIGN KEY (`price_list_id`) REFERENCES `price_lists`(`id`)
         ON DELETE CASCADE ON UPDATE CASCADE
@@ -756,7 +749,7 @@ CREATE TABLE IF NOT EXISTS `safety_equipment` (
     `id`            BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     `name`          VARCHAR(200) NOT NULL,
     `code`          VARCHAR(50)  NULL UNIQUE,
-    `is_active`     TINYINT(1) NOT NULL DEFAULT 1,
+    `status`        VARCHAR(30) NOT NULL DEFAULT 'active',
     `created_at`    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -1147,7 +1140,7 @@ CREATE TABLE IF NOT EXISTS `tower_structures` (
   `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT,
   `name` varchar(100) NOT NULL,
   `sort_order` int(11) NOT NULL DEFAULT 0,
-  `is_active` tinyint(1) NOT NULL DEFAULT 1,
+  `status` varchar(30) NOT NULL DEFAULT 'active',
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
   PRIMARY KEY (`id`), UNIQUE KEY `uq_tower_structures_name` (`name`)
@@ -1158,7 +1151,7 @@ CREATE TABLE IF NOT EXISTS `tower_type_codes` (
   `code` varchar(20) NOT NULL,
   `title` varchar(100) DEFAULT NULL,
   `sort_order` int(11) NOT NULL DEFAULT 0,
-  `is_active` tinyint(1) NOT NULL DEFAULT 1,
+  `status` varchar(30) NOT NULL DEFAULT 'active',
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
   PRIMARY KEY (`id`), UNIQUE KEY `uq_tower_type_codes_code` (`code`)

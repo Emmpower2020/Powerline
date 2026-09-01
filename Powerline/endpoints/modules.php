@@ -14,8 +14,8 @@ function registerModuleRoutes(Router $router): void
         }
         $pdo = Database::getInstance()->getConnection();
         try {
-            $structures = $pdo->query("SELECT id, name FROM tower_structures WHERE is_active = 1 ORDER BY sort_order, id")->fetchAll();
-            $codes = $pdo->query("SELECT id, code, title FROM tower_type_codes WHERE is_active = 1 ORDER BY sort_order, id")->fetchAll();
+            $structures = $pdo->query("SELECT id, name FROM tower_structures WHERE status = 'active' ORDER BY sort_order, id")->fetchAll();
+            $codes = $pdo->query("SELECT id, code, title FROM tower_type_codes WHERE status = 'active' ORDER BY sort_order, id")->fetchAll();
             Response::success([
                 'tower_structures' => $structures,
                 'tower_type_codes' => $codes,
@@ -30,18 +30,18 @@ function registerModuleRoutes(Router $router): void
     $router->get('tower-structures', function () {
         Auth::authenticate(); Auth::requirePermissionSoft('towers.view');
         $pdo=Database::getInstance()->getConnection();
-        Response::success($pdo->query("SELECT id,name,sort_order,is_active,created_at,updated_at FROM tower_structures ORDER BY sort_order,id")->fetchAll());
+        Response::success($pdo->query("SELECT id,name,sort_order,status,created_at,updated_at FROM tower_structures ORDER BY sort_order,id")->fetchAll());
     });
     $router->post('tower-structures', function () {
         Auth::authenticate(); Auth::requirePermissionSoft('towers.create');
         $b=Helpers::getJsonBody(); if(trim((string)($b['name']??''))==='') Response::error(400,'نام ساختار دکل الزامی است');
-        $pdo=Database::getInstance()->getConnection(); $st=$pdo->prepare("INSERT INTO tower_structures (name,sort_order,is_active) VALUES (?,?,?)");
-        try{$st->execute([trim($b['name']), (int)($b['sort_order']??0), (int)($b['is_active']??1)]);}catch(PDOException $e){Response::error(409,'این ساختار قبلاً ثبت شده است');}
+        $pdo=Database::getInstance()->getConnection(); $st=$pdo->prepare("INSERT INTO tower_structures (name,sort_order,status) VALUES (?,?,?)");
+        try{$st->execute([trim($b['name']), (int)($b['sort_order']??0), (($b['status'] ?? 'active') === 'inactive' ? 'inactive' : 'active')]);}catch(PDOException $e){Response::error(409,'این ساختار قبلاً ثبت شده است');}
         Response::success(['id'=>(int)$pdo->lastInsertId()],'ساختار دکل ایجاد شد',201);
     });
     $router->put('tower-structures/{id}', function($id){
         Auth::authenticate(); Auth::requirePermissionSoft('towers.update'); $b=Helpers::getJsonBody();
-        $fields=[];$params=[]; foreach(['name','sort_order','is_active'] as $f){if(array_key_exists($f,$b)){$fields[]="`$f`=?";$params[]=$b[$f];}}
+        $fields=[];$params=[]; foreach(['name','sort_order','status'] as $f){if(array_key_exists($f,$b)){$fields[]="`$f`=?";$params[]=$b[$f];}}
         if(!$fields) Response::error(400,'فیلدی برای ویرایش ارسال نشده'); $params[]=(int)$id;
         try{Database::getInstance()->execute("UPDATE tower_structures SET ".implode(',',$fields).",updated_at=NOW() WHERE id=?",$params);}catch(PDOException $e){Response::error(409,'ویرایش ساختار انجام نشد: '.$e->getMessage());}
         Response::success(null,'ساختار دکل ویرایش شد');
@@ -52,16 +52,16 @@ function registerModuleRoutes(Router $router): void
 
     $router->get('tower-type-codes', function () {
         Auth::authenticate(); Auth::requirePermissionSoft('towers.view'); $pdo=Database::getInstance()->getConnection();
-        Response::success($pdo->query("SELECT id,code,title,sort_order,is_active,created_at,updated_at FROM tower_type_codes ORDER BY sort_order,id")->fetchAll());
+        Response::success($pdo->query("SELECT id,code,title,sort_order,status,created_at,updated_at FROM tower_type_codes ORDER BY sort_order,id")->fetchAll());
     });
     $router->post('tower-type-codes', function () {
         Auth::authenticate(); Auth::requirePermissionSoft('towers.create'); $b=Helpers::getJsonBody(); if(trim((string)($b['code']??''))==='') Response::error(400,'کد نوع دکل الزامی است');
-        $pdo=Database::getInstance()->getConnection(); $st=$pdo->prepare("INSERT INTO tower_type_codes (code,title,sort_order,is_active) VALUES (?,?,?,?)");
-        try{$st->execute([trim($b['code']),trim((string)($b['title']??''))?:null,(int)($b['sort_order']??0),(int)($b['is_active']??1)]);}catch(PDOException $e){Response::error(409,'این کد قبلاً ثبت شده است');}
+        $pdo=Database::getInstance()->getConnection(); $st=$pdo->prepare("INSERT INTO tower_type_codes (code,title,sort_order,status) VALUES (?,?,?,?)");
+        try{$st->execute([trim($b['code']),trim((string)($b['title']??''))?:null,(int)($b['sort_order']??0),(($b['status'] ?? 'active') === 'inactive' ? 'inactive' : 'active')]);}catch(PDOException $e){Response::error(409,'این کد قبلاً ثبت شده است');}
         Response::success(['id'=>(int)$pdo->lastInsertId()],'کد نوع دکل ایجاد شد',201);
     });
     $router->put('tower-type-codes/{id}', function($id){
-        Auth::authenticate(); Auth::requirePermissionSoft('towers.update'); $b=Helpers::getJsonBody(); $fields=[];$params=[]; foreach(['code','title','sort_order','is_active'] as $f){if(array_key_exists($f,$b)){$fields[]="`$f`=?";$params[]=($f==='title'&&trim((string)$b[$f])==='')?null:$b[$f];}}
+        Auth::authenticate(); Auth::requirePermissionSoft('towers.update'); $b=Helpers::getJsonBody(); $fields=[];$params=[]; foreach(['code','title','sort_order','status'] as $f){if(array_key_exists($f,$b)){$fields[]="`$f`=?";$params[]=($f==='title'&&trim((string)$b[$f])==='')?null:$b[$f];}}
         if(!$fields) Response::error(400,'فیلدی برای ویرایش ارسال نشده'); $params[]=(int)$id; Database::getInstance()->execute("UPDATE tower_type_codes SET ".implode(',',$fields).",updated_at=NOW() WHERE id=?",$params); Response::success(null,'کد نوع دکل ویرایش شد');
     });
     $router->delete('tower-type-codes/{id}', function($id){ Auth::authenticate(); Auth::requirePermissionSoft('towers.delete'); Database::getInstance()->execute("DELETE FROM tower_type_codes WHERE id=?",[(int)$id]); Response::success(null,'کد نوع دکل حذف شد'); });
@@ -119,7 +119,7 @@ function registerModuleRoutes(Router $router): void
         if (Auth::canAccess('conductors.view')) {
             try {
                 $result['conductors'] = $pdo->query(
-                    "SELECT * FROM conductors WHERE is_active = 1 ORDER BY sectional_area_all"
+                    "SELECT * FROM conductors WHERE status = 'active' ORDER BY sectional_area_all"
                 )->fetchAll();
             } catch (Exception $e) {
                 $errors['conductors'] = 'در دسترس نیست';
@@ -130,8 +130,8 @@ function registerModuleRoutes(Router $router): void
         // مراجع دکل
         if (Auth::canAccess('towers.view')) {
             try {
-                $result['tower_structures'] = $pdo->query("SELECT id,name,sort_order FROM tower_structures WHERE is_active=1 ORDER BY sort_order,id")->fetchAll();
-                $result['tower_type_codes'] = $pdo->query("SELECT id,code,title,sort_order FROM tower_type_codes WHERE is_active=1 ORDER BY sort_order,id")->fetchAll();
+                $result['tower_structures'] = $pdo->query("SELECT id,name,sort_order FROM tower_structures WHERE status = 'active' ORDER BY sort_order,id")->fetchAll();
+                $result['tower_type_codes'] = $pdo->query("SELECT id,code,title,sort_order FROM tower_type_codes WHERE status = 'active' ORDER BY sort_order,id")->fetchAll();
             } catch (Exception $e) { $errors['tower_references'] = 'در دسترس نیست'; }
         }
 
@@ -141,10 +141,10 @@ function registerModuleRoutes(Router $router): void
                 $result['lines'] = $pdo->query(
                     "SELECT l.id, l.line_code, l.name, l.voltage_kv, l.dispatch_code,
                             l.conductor_type, l.tower_structure,
-                            (SELECT COUNT(*) FROM towers tt WHERE tt.line_id=l.id AND tt.is_active=1) AS tower_count,
-                            CASE WHEN (SELECT COUNT(*) FROM towers tt2 WHERE tt2.line_id=l.id AND tt2.is_active=1) > 0
+                            (SELECT COUNT(*) FROM towers tt WHERE tt.line_id=l.id AND tt.status = 'active') AS tower_count,
+                            CASE WHEN (SELECT COUNT(*) FROM towers tt2 WHERE tt2.line_id=l.id AND tt2.status = 'active') > 0
                                  THEN 1 ELSE 0 END AS tower_structure_locked,
-                            l.is_active
+                            l.status
                      FROM `lines` l ORDER BY l.line_code"
                 )->fetchAll();
             } catch (Exception $e) {
@@ -170,19 +170,37 @@ function registerModuleRoutes(Router $router): void
         if (!empty($search)) { $where .= ' AND (c.contract_code LIKE ? OR c.title LIKE ?)'; $sp = "%$search%"; $params[] = $sp; $params[] = $sp; }
         if ($status) { $where .= ' AND c.status = ?'; $params[] = $status; }
         $countStmt = $pdo->prepare("SELECT COUNT(*) FROM contracts c WHERE $where"); $countStmt->execute($params); $total = (int)$countStmt->fetchColumn();
-        $stmt = $pdo->prepare("SELECT c.*, ct.name AS contractor_name FROM contracts c LEFT JOIN contractors ct ON ct.id = c.contractor_id WHERE $where ORDER BY c.id DESC LIMIT $pageSize OFFSET $offset");
+        $stmt = $pdo->prepare("SELECT c.*, ct.contractor_name AS contractor_name FROM contracts c LEFT JOIN contractors ct ON ct.id = c.contractor_id WHERE $where ORDER BY c.id DESC LIMIT $pageSize OFFSET $offset");
         $stmt->execute($params);
         Response::paginated($stmt->fetchAll(), $page, $pageSize, $total);
     });
 
     $router->post('contracts', function () {
-        $user = Auth::authenticate(); Auth::requirePermission('contracts.create');
+        Auth::authenticate(); Auth::requirePermission('contracts.create');
         $body = Helpers::getJsonBody();
-        if (empty($body['title'])) Response::error(400, 'عنوان قرارداد الزامی است');
+        $title = trim((string)($body['title'] ?? ''));
+        if ($title === '') Response::error(400, 'عنوان قرارداد الزامی است');
+        $contractorId = (int)($body['contractor_id'] ?? 0);
+        if ($contractorId <= 0) Response::error(400, 'انتخاب پیمانکار الزامی است');
         $pdo = Database::getInstance()->getConnection();
-        $code = $body['contract_code'] ?? ('C-' . date('Y') . '-' . str_pad((string)random_int(0, 9999), 4, '0', STR_PAD_LEFT));
+        $chk = $pdo->prepare("SELECT id FROM contractors WHERE id = ? LIMIT 1");
+        $chk->execute([$contractorId]);
+        if (!$chk->fetchColumn()) Response::error(400, 'پیمانکار انتخاب‌شده وجود ندارد');
+        $code = trim((string)($body['contract_code'] ?? ''));
+        if ($code === '') $code = 'C-' . date('Y') . '-' . str_pad((string)random_int(0, 9999), 4, '0', STR_PAD_LEFT);
+        $start = !empty($body['start_date']) ? $body['start_date'] : date('Y-m-d');
+        $end = !empty($body['end_date']) ? $body['end_date'] : date('Y-m-d', strtotime('+1 year'));
+        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)$start) || !preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)$end)) Response::error(400, 'فرمت تاریخ قرارداد نامعتبر است');
+        if ($end < $start) Response::error(400, 'تاریخ پایان نمی‌تواند قبل از شروع باشد');
+        $type = (string)($body['contract_type'] ?? 'maintenance');
+        if (!in_array($type, ['maintenance','construction','inspection','consulting','supply'], true)) Response::error(400, 'نوع قرارداد نامعتبر است');
         $stmt = $pdo->prepare("INSERT INTO contracts (contract_code, title, contractor_id, organization_id, contract_type, start_date, end_date, amount, currency, status, notes, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'IRR', 'draft', ?, NOW())");
-        $stmt->execute([$code, $body['title'], $body['contractor_id'] ?? null, $body['organization_id'] ?? null, $body['contract_type'] ?? 'maintenance', $body['start_date'] ?? date('Y-m-d'), $body['end_date'] ?? date('Y-m-d', strtotime('+1 year')), $body['amount'] ?? 0, $body['notes'] ?? null]);
+        try {
+            $stmt->execute([$code, $title, $contractorId, $body['organization_id'] ?? null, $type, $start, $end, (float)($body['amount'] ?? 0), $body['notes'] ?? null]);
+        } catch (\PDOException $e) {
+            if ($e->getCode() === '23000') Response::error(409, 'کد قرارداد تکراری است یا ارتباط پیمانکار/سازمان معتبر نیست.');
+            Response::error(500, 'ثبت قرارداد ناموفق بود: ' . $e->getMessage());
+        }
         Response::success(['id' => (int)$pdo->lastInsertId(), 'contract_code' => $code], 'قرارداد ایجاد شد', 201);
     });
 
@@ -220,7 +238,7 @@ function registerModuleRoutes(Router $router): void
         if (!empty($search)) { $where .= ' AND (i.invoice_code LIKE ? OR c.title LIKE ?)'; $sp = "%$search%"; $params[] = $sp; $params[] = $sp; }
         if ($status) { $where .= ' AND i.status = ?'; $params[] = $status; }
         $countStmt = $pdo->prepare("SELECT COUNT(*) FROM invoices i LEFT JOIN contracts c ON c.id = i.contract_id WHERE $where"); $countStmt->execute($params); $total = (int)$countStmt->fetchColumn();
-        $stmt = $pdo->prepare("SELECT i.*, c.title AS contract_title, ct.name AS contractor_name FROM invoices i LEFT JOIN contracts c ON c.id = i.contract_id LEFT JOIN contractors ct ON ct.id = i.contractor_id WHERE $where ORDER BY i.id DESC LIMIT $pageSize OFFSET $offset");
+        $stmt = $pdo->prepare("SELECT i.*, c.title AS contract_title, ct.contractor_name AS contractor_name FROM invoices i LEFT JOIN contracts c ON c.id = i.contract_id LEFT JOIN contractors ct ON ct.id = i.contractor_id WHERE $where ORDER BY i.id DESC LIMIT $pageSize OFFSET $offset");
         $stmt->execute($params);
         Response::paginated($stmt->fetchAll(), $page, $pageSize, $total);
     });
@@ -330,7 +348,7 @@ function registerModuleRoutes(Router $router): void
         if (empty($body['first_name'])) Response::error(400, 'نام الزامی است');
         $pdo = Database::getInstance()->getConnection();
         $code = $body['personnel_code'] ?? ('P-' . str_pad((string)random_int(0, 9999), 4, '0', STR_PAD_LEFT));
-        $stmt = $pdo->prepare("INSERT INTO personnel (organization_id, user_id, personnel_code, first_name, last_name, national_id, personnel_type, position, phone, mobile, email, hire_date, contract_id, is_active, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, NOW())");
+        $stmt = $pdo->prepare("INSERT INTO personnel (organization_id, user_id, personnel_code, first_name, last_name, national_id, personnel_type, position, phone, mobile, email, hire_date, contract_id, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, NOW())");
         $stmt->execute([$body['organization_id'] ?? 1, $body['user_id'] ?? null, $code, $body['first_name'], $body['last_name'] ?? '', $body['national_id'] ?? null, $body['personnel_type'] ?? 'employee', $body['position'] ?? null, $body['phone'] ?? null, $body['mobile'] ?? null, $body['email'] ?? null, $body['hire_date'] ?? date('Y-m-d'), $body['contract_id'] ?? null]);
         Response::success(['id' => (int)$pdo->lastInsertId(), 'personnel_code' => $code], 'پرسنل ایجاد شد', 201);
     });
@@ -339,7 +357,7 @@ function registerModuleRoutes(Router $router): void
         Auth::authenticate();
         Auth::requirePermissionSoft('personnel.update');
         $body = Helpers::getJsonBody(); $pdo = Database::getInstance()->getConnection();
-        $fields = ['first_name', 'last_name', 'national_id', 'personnel_type', 'position', 'phone', 'mobile', 'email', 'hire_date', 'contract_id', 'is_active', 'father_name', 'supervisor_name', 'collaboration_start'];
+        $fields = ['first_name', 'last_name', 'national_id', 'personnel_type', 'position', 'phone', 'mobile', 'email', 'hire_date', 'contract_id', 'status', 'father_name', 'supervisor_name', 'collaboration_start'];
         $updates = []; $params = [];
         foreach ($fields as $f) { if (array_key_exists($f, $body)) { $updates[] = "`$f` = ?"; $params[] = $body[$f]; } }
         if (empty($updates)) Response::error(400, 'هیچ فیلدی ارسال نشده');
@@ -380,7 +398,7 @@ function registerModuleRoutes(Router $router): void
             // یافتن پرسنل جانشین: اولین پرسنل فعال خارج از لیست حذف
             $surrogate = null;
             $inList = '(' . $idPlaceholders . ')';
-            $stmt = $pdo->prepare("SELECT id FROM personnel WHERE id NOT IN $inList AND is_active = 1 ORDER BY id LIMIT 1");
+            $stmt = $pdo->prepare("SELECT id FROM personnel WHERE id NOT IN $inList AND status = 'active' ORDER BY id LIMIT 1");
             $stmt->execute($ids);
             if ($row = $stmt->fetch()) $surrogate = (int) $row['id'];
 
@@ -475,7 +493,7 @@ function registerModuleRoutes(Router $router): void
                 if (!empty($r['personnel_code'])) $byCode[trim((string) $r['personnel_code'])] = (int) $r['id'];
             }
 
-            $ins = $pdo->prepare("INSERT INTO personnel (organization_id, personnel_code, first_name, last_name, national_id, father_name, personnel_type, position, phone, mobile, email, supervisor_name, collaboration_start, is_active, created_at)
+            $ins = $pdo->prepare("INSERT INTO personnel (organization_id, personnel_code, first_name, last_name, national_id, father_name, personnel_type, position, phone, mobile, email, supervisor_name, collaboration_start, status, created_at)
                                    VALUES (4, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, NOW())");
             $upd = $pdo->prepare("UPDATE personnel SET first_name = ?, last_name = ?, national_id = ?, father_name = ?, personnel_type = ?, position = ?, phone = ?, mobile = ?, email = ?, supervisor_name = ?, collaboration_start = ? WHERE id = ?");
 
@@ -566,9 +584,9 @@ function registerModuleRoutes(Router $router): void
         'weight_outer' => ($t = $r['weight_outer'] ?? null) !== null && $t !== '' ? (float)$t : null,
         'ultimate_strength' => ($t = $r['ultimate_strength'] ?? null) !== null && $t !== '' ? (float)$t : null,
         'resistance' => ($t = $r['resistance'] ?? null) !== null && $t !== '' ? (float)$t : null,
-        'is_active' => isset($r['is_active']) ? (int)$r['is_active'] : 1,
+        'status' => isset($r['status']) ? (string)$r['status'] : 'active',
     ];
-    $conductorCols = "(`name`,`type`,`type_code`,`standard`,`core_type`,`material_outer`,`material_inner`,`stranding_outer`,`stranding_inner`,`sectional_area_outer`,`sectional_area_all`,`overall_diameter_all`,`overall_diameter_inner`,`diameter_code_all`,`diameter_code_inner`,`weight_all`,`weight_inner`,`weight_outer`,`ultimate_strength`,`resistance`,`is_active`)";
+    $conductorCols = "(`name`,`type`,`type_code`,`standard`,`core_type`,`material_outer`,`material_inner`,`stranding_outer`,`stranding_inner`,`sectional_area_outer`,`sectional_area_all`,`overall_diameter_all`,`overall_diameter_inner`,`diameter_code_all`,`diameter_code_inner`,`weight_all`,`weight_inner`,`weight_outer`,`ultimate_strength`,`resistance`,`status`)";
 
     $router->get('conductors', function () {
         Auth::authenticate();
@@ -870,6 +888,7 @@ function registerModuleRoutes(Router $router): void
     });
 
     // ============================================================
+    // ============================================================
     //  پیمانکاران (Contractors) — CRUD کامل
     // ============================================================
     $router->get('contractors', function () {
@@ -878,10 +897,24 @@ function registerModuleRoutes(Router $router): void
         $pdo = Database::getInstance()->getConnection();
         $page = Helpers::getPage(); $pageSize = Helpers::getPageSize(); $offset = Helpers::getOffset();
         $search = Helpers::getSearch();
+        $status = Helpers::query('status');
         $where = '1=1'; $params = [];
-        if (!empty($search)) { $where .= ' AND (c.name LIKE ? OR c.contractor_code LIKE ?)'; $sp = "%$search%"; $params[] = $sp; $params[] = $sp; }
-        $countStmt = $pdo->prepare("SELECT COUNT(*) FROM contractors c WHERE $where"); $countStmt->execute($params); $total = (int)$countStmt->fetchColumn();
-        $stmt = $pdo->prepare("SELECT * FROM contractors c WHERE $where ORDER BY c.id DESC LIMIT $pageSize OFFSET $offset");
+        if (!empty($search)) {
+            $where .= ' AND (c.contractor_name LIKE ? OR c.contractor_code LIKE ? OR c.ceo_name LIKE ?)';
+            $sp = "%$search%"; array_push($params, $sp, $sp, $sp);
+        }
+        if ($status !== null && $status !== '' && $status !== 'all') {
+            $statusValue = ((string)$status === '1') ? 'active' : (((string)$status === '0') ? 'inactive' : (string)$status);
+            $where .= ' AND c.status = ?'; $params[] = $statusValue;
+        }
+        $countStmt = $pdo->prepare("SELECT COUNT(*) FROM contractors c WHERE $where");
+        $countStmt->execute($params); $total = (int)$countStmt->fetchColumn();
+        $stmt = $pdo->prepare("SELECT c.id, c.contractor_code, c.contractor_name,
+                                      c.ceo_name,
+                                      c.contractor_phone, c.mobile, c.address, c.status,
+                                      c.created_at, c.updated_at
+                               FROM contractors c WHERE $where
+                               ORDER BY c.id DESC LIMIT $pageSize OFFSET $offset");
         $stmt->execute($params);
         Response::paginated($stmt->fetchAll(), $page, $pageSize, $total);
     });
@@ -890,11 +923,29 @@ function registerModuleRoutes(Router $router): void
         Auth::authenticate();
         Auth::requirePermissionSoft('contractors.create');
         $body = Helpers::getJsonBody();
-        if (empty($body['name'])) Response::error(400, 'نام پیمانکار الزامی است');
+        $name = trim((string)($body['contractor_name'] ?? $body['name'] ?? ''));
+        if ($name === '') Response::error(400, 'نام پیمانکار الزامی است');
         $pdo = Database::getInstance()->getConnection();
-        $code = $body['contractor_code'] ?? ('PC-' . str_pad((string)random_int(0, 999), 3, '0', STR_PAD_LEFT));
-        $stmt = $pdo->prepare("INSERT INTO contractors (organization_id, name, contractor_code, legal_id, contact_person, phone, mobile, email, address, bank_account, is_active, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, NOW())");
-        $stmt->execute([$body['organization_id'] ?? null, $body['name'], $code, $body['legal_id'] ?? null, $body['contact_person'] ?? null, $body['phone'] ?? null, $body['mobile'] ?? null, $body['email'] ?? null, $body['address'] ?? null, $body['bank_account'] ?? null]);
+        $code = trim((string)($body['contractor_code'] ?? ''));
+        if ($code === '') $code = 'PC-' . str_pad((string)random_int(0, 999), 3, '0', STR_PAD_LEFT);
+        $status = ($body['status'] ?? 'active') === 'inactive' ? 'inactive' : 'active';
+        $stmt = $pdo->prepare("INSERT INTO contractors
+            (contractor_code, contractor_name, ceo_name, contractor_phone, mobile, address, status, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, NOW())");
+        try {
+            $stmt->execute([
+                $code,
+                $name,
+                ($body['ceo_name'] ?? null) ?: null,
+                ($body['contractor_phone'] ?? null) ?: null,
+                ($body['mobile'] ?? null) ?: null,
+                ($body['address'] ?? null) ?: null,
+                $status,
+            ]);
+        } catch (\PDOException $e) {
+            if ($e->getCode() === '23000') Response::error(409, 'کد پیمانکار تکراری است.');
+            Response::error(500, 'ثبت پیمانکار ناموفق بود: ' . $e->getMessage());
+        }
         Response::success(['id' => (int)$pdo->lastInsertId(), 'contractor_code' => $code], 'پیمانکار ایجاد شد', 201);
     });
 
@@ -902,12 +953,26 @@ function registerModuleRoutes(Router $router): void
         Auth::authenticate();
         Auth::requirePermissionSoft('contractors.update');
         $body = Helpers::getJsonBody(); $pdo = Database::getInstance()->getConnection();
-        $fields = ['name', 'contact_person', 'phone', 'mobile', 'email', 'address', 'bank_account', 'is_active'];
+        $fields = ['contractor_code', 'contractor_name', 'ceo_name', 'contractor_phone', 'mobile', 'address', 'status'];
         $updates = []; $params = [];
-        foreach ($fields as $f) { if (array_key_exists($f, $body)) { $updates[] = "`$f` = ?"; $params[] = $body[$f]; } }
-        if (empty($updates)) Response::error(400, 'هیچ فیلدی ارسال نشده');
+        foreach ($fields as $f) {
+            if (!array_key_exists($f, $body)) continue;
+            $v = $body[$f];
+            if ($f === 'contractor_name' && trim((string)$v) === '') Response::error(400, 'نام پیمانکار الزامی است');
+            if ($f === 'status') {
+                $v = ((string)$v === 'inactive' || (string)$v === '0') ? 'inactive' : 'active';
+            }
+            if ($f === 'contractor_code' && trim((string)$v) === '') $v = null;
+            $updates[] = "`$f` = ?"; $params[] = ($v === '' ? null : $v);
+        }
+        if (!$updates) Response::error(400, 'هیچ فیلدی ارسال نشده');
         $params[] = (int)$id;
-        $pdo->prepare("UPDATE contractors SET " . implode(', ', $updates) . " WHERE id = ?")->execute($params);
+        try {
+            $pdo->prepare("UPDATE contractors SET " . implode(', ', $updates) . " WHERE id = ?")->execute($params);
+        } catch (\PDOException $e) {
+            if ($e->getCode() === '23000') Response::error(409, 'کد پیمانکار تکراری است.');
+            Response::error(500, 'ویرایش پیمانکار ناموفق بود: ' . $e->getMessage());
+        }
         Response::success(null, 'پیمانکار ویرایش شد');
     });
 
@@ -943,7 +1008,7 @@ function registerModuleRoutes(Router $router): void
         $body = Helpers::getJsonBody();
         if (empty($body['equipment_class_id'])) Response::error(400, 'گروه تجهیز الزامی است');
         $pdo = Database::getInstance()->getConnection();
-        $stmt = $pdo->prepare("INSERT INTO equipment (equipment_class_id, tower_id, line_id, contract_id, serial_number, manufacturer, model, install_date, warranty_expiry, is_active, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, NOW())");
+        $stmt = $pdo->prepare("INSERT INTO equipment (equipment_class_id, tower_id, line_id, contract_id, serial_number, manufacturer, model, install_date, warranty_expiry, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', NOW())");
         $stmt->execute([$body['equipment_class_id'], $body['tower_id'] ?? null, $body['line_id'] ?? null, $body['contract_id'] ?? null, $body['serial_number'] ?? null, $body['manufacturer'] ?? null, $body['model'] ?? null, $body['install_date'] ?? null, $body['warranty_expiry'] ?? null]);
         Response::success(['id' => (int)$pdo->lastInsertId()], 'تجهیز ایجاد شد', 201);
     });
@@ -952,7 +1017,7 @@ function registerModuleRoutes(Router $router): void
         Auth::authenticate();
         Auth::requirePermissionSoft('equipment.update');
         $body = Helpers::getJsonBody(); $pdo = Database::getInstance()->getConnection();
-        $fields = ['serial_number', 'manufacturer', 'model', 'install_date', 'warranty_expiry', 'is_active'];
+        $fields = ['serial_number', 'manufacturer', 'model', 'install_date', 'warranty_expiry', 'status'];
         $updates = []; $params = [];
         foreach ($fields as $f) { if (array_key_exists($f, $body)) { $updates[] = "`$f` = ?"; $params[] = $body[$f]; } }
         if (empty($updates)) Response::error(400, 'هیچ فیلدی ارسال نشده');
@@ -1000,7 +1065,7 @@ function registerModuleRoutes(Router $router): void
         $body = Helpers::getJsonBody();
         if (empty($body['name'])) Response::error(400, 'نام فهرست الزامی است');
         $pdo = Database::getInstance()->getConnection();
-        $stmt = $pdo->prepare("INSERT INTO price_lists (name, version, effective_date, contract_id, is_active, created_at) VALUES (?, ?, ?, ?, 1, NOW())");
+        $stmt = $pdo->prepare("INSERT INTO price_lists (name, version, effective_date, contract_id, status, created_at) VALUES (?, ?, ?, ?, 'active', NOW())");
         $stmt->execute([$body['name'], $body['version'] ?? '1.0', $body['effective_date'] ?? date('Y-m-d'), $body['contract_id'] ?? null]);
         Response::success(['id' => (int)$pdo->lastInsertId()], 'فهرست بها ایجاد شد', 201);
     });
@@ -1010,7 +1075,7 @@ function registerModuleRoutes(Router $router): void
         Auth::requirePermissionSoft('price_lists.update');
         $body = Helpers::getJsonBody();
         $pdo = Database::getInstance()->getConnection();
-        $fields = ['name','version','effective_date','contract_id','is_active'];
+        $fields = ['name','version','effective_date','contract_id','status'];
         $updates=[]; $params=[];
         foreach ($fields as $f) { if (array_key_exists($f,$body)) { $updates[] = "`$f` = ?"; $params[] = $body[$f]; } }
         if (!$updates) Response::error(400, 'هیچ فیلدی برای ویرایش ارسال نشده');
@@ -1038,7 +1103,7 @@ function registerModuleRoutes(Router $router): void
         if (empty($body['title']) || empty($body['price_list_id'])) Response::error(400, 'عنوان و فهرست الزامی است');
         $pdo = Database::getInstance()->getConnection();
         $code = $body['code'] ?? ('PL-' . str_pad((string)random_int(0, 9999), 4, '0', STR_PAD_LEFT));
-        $stmt = $pdo->prepare("INSERT INTO price_list_items (price_list_id, code, title, unit, unit_price, category, is_active) VALUES (?, ?, ?, ?, ?, ?, 1)");
+        $stmt = $pdo->prepare("INSERT INTO price_list_items (price_list_id, code, title, unit, unit_price, category, status) VALUES (?, ?, ?, ?, ?, 'active')");
         $stmt->execute([(int)$body['price_list_id'], $code, $body['title'], $body['unit'] ?? 'عدد', $body['unit_price'] ?? 0, $body['category'] ?? 'عملیات']);
         Response::success(['id' => (int)$pdo->lastInsertId(), 'code' => $code], 'قلم ایجاد شد', 201);
     });
@@ -1047,7 +1112,7 @@ function registerModuleRoutes(Router $router): void
         Auth::authenticate();
         Auth::requirePermissionSoft('price_lists.update');
         $body = Helpers::getJsonBody(); $pdo = Database::getInstance()->getConnection();
-        $fields = ['code','title','unit','unit_price','category','is_active'];
+        $fields = ['code','title','unit','unit_price','category','status'];
         $updates = []; $params = [];
         foreach ($fields as $f) { if (array_key_exists($f, $body)) { $updates[] = "`$f` = ?"; $params[] = $body[$f]; } }
         if (!$updates) Response::error(400, 'هیچ فیلدی ارسال نشده');
@@ -1070,7 +1135,7 @@ function registerModuleRoutes(Router $router): void
         Auth::authenticate();
         Auth::requirePermissionSoft('checklists.view');
         $pdo = Database::getInstance()->getConnection();
-        Response::success($pdo->query("SELECT * FROM checklist_templates WHERE is_active = 1 ORDER BY id")->fetchAll());
+        Response::success($pdo->query("SELECT * FROM checklist_templates WHERE status = 'active' ORDER BY id")->fetchAll());
     });
 
     $router->post('checklist-templates', function () {
@@ -1079,7 +1144,7 @@ function registerModuleRoutes(Router $router): void
         $body = Helpers::getJsonBody();
         if (empty($body['name'])) Response::error(400, 'نام الزامی است');
         $pdo = Database::getInstance()->getConnection();
-        $stmt = $pdo->prepare("INSERT INTO checklist_templates (name, description, applies_to, is_active, created_at) VALUES (?, ?, ?, 1, NOW())");
+        $stmt = $pdo->prepare("INSERT INTO checklist_templates (name, description, applies_to, status, created_at) VALUES (?, ?, ?, 'active', NOW())");
         $stmt->execute([$body['name'], $body['description'] ?? null, $body['applies_to'] ?? 'tower']);
         Response::success(['id' => (int)$pdo->lastInsertId()], 'چک‌لیست ایجاد شد', 201);
     });
@@ -1108,7 +1173,7 @@ function registerModuleRoutes(Router $router): void
         Auth::authenticate();
         Auth::requirePermissionSoft('settings.view');
         $pdo = Database::getInstance()->getConnection();
-        Response::success($pdo->query("SELECT * FROM organization WHERE is_active = 1 ORDER BY id")->fetchAll());
+        Response::success($pdo->query("SELECT * FROM organization WHERE status = 'active' ORDER BY id")->fetchAll());
     });
 
     $router->post('organization', function () {
@@ -1117,7 +1182,7 @@ function registerModuleRoutes(Router $router): void
         $body = Helpers::getJsonBody();
         if (empty($body['name'])) Response::error(400, 'نام الزامی است');
         $pdo = Database::getInstance()->getConnection();
-        $stmt = $pdo->prepare("INSERT INTO organization (parent_id, org_type, name, code, phone, address, is_active, created_at) VALUES (?, ?, ?, ?, ?, ?, 1, NOW())");
+        $stmt = $pdo->prepare("INSERT INTO organization (parent_id, org_type, name, code, phone, address, status, created_at) VALUES (?, ?, ?, ?, ?, ?, 'active', NOW())");
         $stmt->execute([$body['parent_id'] ?? null, $body['org_type'] ?? 'unit', $body['name'], $body['code'] ?? null, $body['phone'] ?? null, $body['address'] ?? null]);
         Response::success(['id' => (int)$pdo->lastInsertId()], 'واحد سازمانی ایجاد شد', 201);
     });
@@ -1129,7 +1194,7 @@ function registerModuleRoutes(Router $router): void
         Auth::authenticate();
         Auth::requirePermissionSoft('crews.view');
         $pdo = Database::getInstance()->getConnection();
-        $rows = $pdo->query("SELECT cr.*, ct.name AS contractor_name FROM crews cr LEFT JOIN contractors ct ON ct.id = cr.contractor_id WHERE cr.is_active = 1 ORDER BY cr.id")->fetchAll();
+        $rows = $pdo->query("SELECT cr.*, ct.contractor_name AS contractor_name FROM crews cr LEFT JOIN contractors ct ON ct.id = cr.contractor_id WHERE cr.status = 'active' ORDER BY cr.id")->fetchAll();
         Response::success($rows);
     });
 
@@ -1140,7 +1205,7 @@ function registerModuleRoutes(Router $router): void
         if (empty($body['name'])) Response::error(400, 'نام اکیپ الزامی است');
         $pdo = Database::getInstance()->getConnection();
         $code = $body['crew_code'] ?? ('CR-' . str_pad((string)random_int(0, 999), 3, '0', STR_PAD_LEFT));
-        $stmt = $pdo->prepare("INSERT INTO crews (contractor_id, organization_id, name, crew_code, supervisor_id, vehicle_id, is_active, created_at) VALUES (?, ?, ?, ?, ?, ?, 1, NOW())");
+        $stmt = $pdo->prepare("INSERT INTO crews (contractor_id, organization_id, name, crew_code, supervisor_id, vehicle_id, status, created_at) VALUES (?, ?, ?, ?, ?, ?, 'active', NOW())");
         $stmt->execute([$body['contractor_id'] ?? null, $body['organization_id'] ?? 1, $body['name'], $code, $body['supervisor_id'] ?? null, $body['vehicle_id'] ?? null]);
         Response::success(['id' => (int)$pdo->lastInsertId(), 'crew_code' => $code], 'اکیپ ایجاد شد', 201);
     });

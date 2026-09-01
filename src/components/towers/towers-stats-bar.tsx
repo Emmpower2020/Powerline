@@ -37,7 +37,7 @@ export function TowersStatsBar({ data, issuesCount, onIssuesClick, issuesFilterA
       if (row.tower_type === "آویزی") suspension++;
       const v = Number(row.voltage_kv);
       if (Number.isFinite(v) && v > 0) byVoltage.set(v, (byVoltage.get(v) || 0) + 1);
-      if (row.is_active) activeCount++;
+      if (row.status === "active") activeCount++;
     }
 
     return {

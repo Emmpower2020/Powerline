@@ -39,7 +39,7 @@ export interface BootstrapData {
   lines: Array<{
     id: number; line_code: string; name: string; voltage_kv: number | null;
     dispatch_code?: string | null; conductor_type?: string | null;
-    tower_structure?: string | null; is_active?: number;
+    tower_structure?: string | null; status?: string;
   }>;
   generated_at?: string;
 }

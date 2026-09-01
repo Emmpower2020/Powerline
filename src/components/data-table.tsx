@@ -21,11 +21,12 @@ import {
 import { cn } from "@/lib/utils";
 import { ExportDialog, type ExportOptions, type ExportScope } from "@/components/export-dialog";
 import { PrintDialog, type PrintScope as PrintScopeType } from "@/components/print-dialog";
+import { IssuesBadge } from "@/components/issues-badge";
 
 export interface DataTableColumn<T> {
   key: string; header: string; width?: string;
   sortable?: boolean; filterable?: boolean; hidden?: boolean;
-  type?: "text" | "number" | "badge" | "date" | "boolean";
+  type?: "text" | "number" | "badge" | "date" | "boolean" | "status";
   badgeLabels?: Record<string, string>; badgeColors?: Record<string, string>;
   render?: (row: T) => ReactNode; align?: "right" | "left" | "center";
   /** اگه true باشه، متن داخل سلول شکسته می‌شه و در چند خط نمایش داده می‌شه (برای متن‌های طولانی مثل نام خط) */
@@ -86,6 +87,11 @@ function SortableColumnRow({ id, header, hidden, onToggle, onUp, onDown, first, 
     <button type="button" onClick={onUp} disabled={first} className="p-1 hover:text-indigo-600 disabled:opacity-30 cursor-pointer shrink-0" title="بالا"><ArrowUp className="w-3.5 h-3.5" /></button>
     <button type="button" onClick={onDown} disabled={last} className="p-1 hover:text-indigo-600 disabled:opacity-30 cursor-pointer shrink-0" title="پایین"><ArrowDown className="w-3.5 h-3.5" /></button>
   </div>;
+}
+
+function DefaultHealthCell({ row }: { row: any }) {
+  const issues = Array.isArray(row?.data_quality) ? row.data_quality : (Array.isArray(row?.quality_issues) ? row.quality_issues : []);
+  return <IssuesBadge issues={issues} />;
 }
 
 function DataTableInner<T extends { id: number }>({
@@ -181,9 +187,25 @@ function DataTableInner<T extends { id: number }>({
 
   const clearSelection = () => setSelectedRows(new Set());
 
+  // سلامت داده به‌صورت پیش‌فرض در همه جدول‌ها نمایش داده می‌شود.
+  const effectiveColumns = useMemo<DataTableColumn<T>[]>(() => {
+    if (columns.some(c => c.key === "data_quality")) return columns;
+    return [...columns, { key: "data_quality", header: "سلامت داده", align: "center", width: "110px", render: (row: T) => <DefaultHealthCell row={row} /> }];
+  }, [columns]);
+
+  useEffect(() => {
+    const newKeys = effectiveColumns.map(c => c.key);
+    setColumnOrder(prev => {
+      const existing = prev.filter(k => newKeys.includes(k));
+      const added = newKeys.filter(k => !prev.includes(k));
+      const next = [...existing, ...added];
+      return next.length === prev.length && next.every((v, i) => v === prev[i]) ? prev : next;
+    });
+  }, [effectiveColumns]);
+
   // Compute visible columns respecting order + hidden
   const visibleColumns = columnOrder
-    .map(key => columns.find(c => c.key === key))
+    .map(key => effectiveColumns.find(c => c.key === key))
     .filter((c): c is DataTableColumn<T> => !!c && !hiddenColumns.has(c.key));
 
   // Auto-calculate column widths based on content
@@ -214,7 +236,7 @@ function DataTableInner<T extends { id: number }>({
       const v = row[col.key as keyof T];
       if (v === null || v === undefined) text = "—";
       else if (col.type === "badge" && col.badgeLabels) text = col.badgeLabels[String(v)] || String(v);
-      else if (col.type === "boolean") text = v ? "بله" : "خیر";
+      else if (col.type === "boolean" || col.type === "status") text = String(v) === "active" || v === true || v === 1 ? "فعال" : "غیرفعال";
       else if (col.type === "date") text = "۱۴۰۳/۰۵/۱۵"; // approx
       else if (col.type === "number") text = Number(v).toLocaleString("fa-IR");
       else text = String(v);
@@ -482,6 +504,7 @@ function DataTableInner<T extends { id: number }>({
     if (value === null || value === undefined) return <span className="text-slate-300">—</span>;
     if (col.type === "badge") { const v = String(value); return <Badge className={col.badgeColors?.[v] || "bg-slate-100 text-slate-700"} variant="secondary">{col.badgeLabels?.[v] || v}</Badge>; }
     if (col.type === "boolean") return value ? <Badge className="bg-green-100 text-green-700">بله</Badge> : <Badge className="bg-slate-100 text-slate-500">خیر</Badge>;
+    if (col.type === "status") return String(value) === "active" ? <Badge className="bg-green-100 text-green-700">فعال</Badge> : <Badge className="bg-red-100 text-red-700">غیرفعال</Badge>;
     if (col.type === "date") { try { return new Date(String(value)).toLocaleDateString("fa-IR"); } catch { return String(value); } }
     if (col.type === "number") return <span className="nums-fa">{Number(value).toLocaleString("fa-IR")}</span>;
     return String(value);

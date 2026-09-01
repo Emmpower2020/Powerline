@@ -229,7 +229,7 @@ foreach ($excelCategories as $catName => $info) {
     } elseif ($AUTO_CREATE_CATEGORIES) {
         try {
             $stmt = $pdo->prepare("
-                INSERT INTO defect_categories (name, applies_to, tower_type, is_active, created_at)
+                INSERT INTO defect_categories (name, applies_to, tower_type, status, created_at)
                 VALUES (?, 'tower', ?, 1, NOW())
             ");
             // ذخیره نام به‌صورت اصلی (با نیم‌فاصله) برای یکدستی
@@ -274,7 +274,7 @@ $categoryStats = [];
 
 $insertStmt = $pdo->prepare("
     INSERT INTO defect_definitions
-        (category_id, defect_code, title, default_priority, default_severity, is_active, created_at)
+        (category_id, defect_code, title, default_priority, default_severity, status, created_at)
     VALUES
         (?, ?, ?, ?, 'minor', 1, NOW())
     ON DUPLICATE KEY UPDATE

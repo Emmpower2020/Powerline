@@ -23,19 +23,19 @@ function registerLineRoutes(Router $router): void
         $pageSize = Helpers::getPageSize();
         $offset = Helpers::getOffset();
         $search = Helpers::getSearch();
-        $isActive = Helpers::query('is_active');
+        $isActive = Helpers::query('status');
         $contractId = Helpers::getContractId();
 
         $where = '1=1';
         $params = [];
 
-        // فیلتر is_active: پیش‌فرض فقط فعال‌ها نمایش داده می‌شوند
-        // کاربر می‌تواند با ?is_active=all همه را ببیند یا با ?is_active=0 غیرفعال‌ها را
+        // فیلتر status: پیش‌فرض فقط فعال‌ها نمایش داده می‌شوند
+        // کاربر می‌تواند با ?status=all همه را ببیند یا با ?status = 'inactive' غیرفعال‌ها را
         if ($isActive !== null && $isActive !== '' && $isActive !== 'all') {
-            $where .= ' AND l.is_active = ?';
-            $params[] = (int) $isActive;
+            $where .= ' AND l.status = ?';
+            $params[] = ((string)$isActive === '0' || (string)$isActive === 'inactive') ? 'inactive' : 'active';
         } elseif ($isActive === null || $isActive === '') {
-            $where .= ' AND l.is_active = 1';
+            $where .= " AND l.status = 'active'";
         }
 
         if ($contractId !== null) { $where .= ' AND l.contract_id = ?'; $params[] = $contractId; }
@@ -55,8 +55,8 @@ function registerLineRoutes(Router $router): void
         $lineColumns = [];
         foreach ($db->fetchAll("SHOW COLUMNS FROM `lines`") as $cr) if (isset($cr['Field'])) $lineColumns[(string)$cr['Field']] = true;
         $resolvedStructure = isset($lineColumns['tower_structure']) ? 'l.tower_structure' : 'NULL';
-        $sql = "SELECT l.*, o.name AS owner_org_name, c.name AS contractor_name, ct.title AS contract_title,
-                       (SELECT COUNT(*) FROM towers tt WHERE tt.line_id = l.id AND tt.is_active = 1) AS tower_count,
+        $sql = "SELECT l.*, o.name AS owner_org_name, c.contractor_name AS contractor_name, ct.title AS contract_title,
+                       (SELECT COUNT(*) FROM towers tt WHERE tt.line_id = l.id AND tt.status = 'active') AS tower_count,
                        $resolvedStructure AS resolved_tower_structure
                 FROM `lines` l
                 LEFT JOIN organization o ON o.id = l.owner_org_id
@@ -86,8 +86,8 @@ function registerLineRoutes(Router $router): void
         foreach ($db->fetchAll("SHOW COLUMNS FROM `lines`") as $cr) if (isset($cr['Field'])) $lineColumns[(string)$cr['Field']] = true;
         $resolvedStructure = isset($lineColumns['tower_structure']) ? 'l.tower_structure' : 'NULL';
         $row = $db->fetchOne(
-            "SELECT l.*, o.name AS owner_org_name, c.name AS contractor_name, ct.title AS contract_title,
-                    (SELECT COUNT(*) FROM towers tt WHERE tt.line_id = l.id AND tt.is_active = 1) AS tower_count,
+            "SELECT l.*, o.name AS owner_org_name, c.contractor_name AS contractor_name, ct.title AS contract_title,
+                    (SELECT COUNT(*) FROM towers tt WHERE tt.line_id = l.id AND tt.status = 'active') AS tower_count,
                     $resolvedStructure AS resolved_tower_structure
              FROM `lines` l
              LEFT JOIN organization o ON o.id = l.owner_org_id
@@ -156,7 +156,7 @@ function registerLineRoutes(Router $router): void
             'length_km','circuit_length_km','total_towers','tension_towers','suspension_towers',
             'plain_terrain','semi_mountainous','mountainous',
             'commission_year','line_supervisor','line_expert','owner_org_id','contractor_id','contract_id',
-            'geom','is_active'
+            'geom','status'
         ];
 
         // در برابر نسخه‌های قدیمی دیتابیس/کد هم مقاوم باشد: فقط ستون‌هایی که واقعاً در جدول وجود دارند وارد INSERT شوند.
@@ -177,7 +177,7 @@ function registerLineRoutes(Router $router): void
             if ($column === 'geom') {
                 $insertValues[] = 'ST_GeomFromText(?)';
                 $params[] = $geomWkt;
-            } elseif ($column === 'is_active') {
+            } elseif ($column === 'status') {
                 $insertValues[] = '1';
             } else {
                 $insertValues[] = '?';
@@ -233,10 +233,10 @@ function registerLineRoutes(Router $router): void
             'total_towers', 'tension_towers', 'suspension_towers',
             'plain_terrain', 'semi_mountainous', 'mountainous',
             'commission_year', 'line_supervisor', 'line_expert',
-            'owner_org_id', 'contractor_id', 'is_active',
+            'owner_org_id', 'contractor_id', 'status',
         ];
 
-        $towerCountRow = $db->fetchOne("SELECT COUNT(*) AS cnt FROM towers WHERE line_id = ? AND is_active = 1", [(int)$id]);
+        $towerCountRow = $db->fetchOne("SELECT COUNT(*) AS cnt FROM towers WHERE line_id = ? AND status = 'active'", [(int)$id]);
         $structureLocked = (int)($towerCountRow['cnt'] ?? 0) > 0;
         $lineColumns = [];
         foreach ($db->fetchAll("SHOW COLUMNS FROM `lines`") as $cr) if (isset($cr['Field'])) $lineColumns[(string)$cr['Field']] = true;
@@ -355,7 +355,7 @@ function registerLineRoutes(Router $router): void
             'circuit_count', 'bundle_count', 'conductor_type', 'tower_structure',
             'length_km', 'circuit_length_km', 'total_towers', 'tension_towers', 'suspension_towers',
             'plain_terrain', 'semi_mountainous', 'mountainous', 'commission_year',
-            'line_supervisor', 'line_expert', 'owner_org_id', 'contractor_id', 'contract_id', 'is_active',
+            'line_supervisor', 'line_expert', 'owner_org_id', 'contractor_id', 'contract_id', 'status',
         ];
         $inserted = 0; $failed = 0; $firstError = ''; $failIndexes = [];
         $statuses = [];
@@ -386,7 +386,7 @@ function registerLineRoutes(Router $router): void
                         if (array_key_exists($f, $r) && isset($actual[$f])) {
                             $cols[] = "`$f`";
                             $marks[] = '?';
-                            $params[] = ($f === 'is_active') ? (($r[$f] === false || $r[$f] === 0 || $r[$f] === '0') ? 0 : 1) : $r[$f];
+                            $params[] = ($f === 'status') ? ((in_array((string)$r[$f], ['0','inactive'], true)) ? 'inactive' : 'active') : $r[$f];
                         }
                     }
                     $pdo->prepare("INSERT INTO `lines` (" . implode(',', $cols) . ") VALUES (" . implode(',', $marks) . ")")->execute($params);
@@ -472,7 +472,7 @@ function registerLineRoutes(Router $router): void
 
         $db = Database::getInstance();
         $contractId = Helpers::getContractId();
-        $where = 'line_id = ? AND is_active = 1';
+        $where = "line_id = ? AND status = 'active'";
         $params = [(int) $id];
         if ($contractId !== null) { $where .= ' AND contract_id = ?'; $params[] = $contractId; }
         $rows = $db->fetchAll(
@@ -526,7 +526,7 @@ function formatLineRow(array $row): array
         'commission_year'    => $row['commission_year'] !== null ? (int) $row['commission_year'] : null,
         'line_supervisor'    => $row['line_supervisor'] ?? null,
         'line_expert'        => $row['line_expert'] ?? null,
-        'is_active'          => (bool) ($row['is_active'] ?? 1),
+        'status'          => (string) ($row['status'] ?? 'active'),
         'created_at'         => $row['created_at'] ?? null,
         'updated_at'         => $row['updated_at'] ?? null,
     ];

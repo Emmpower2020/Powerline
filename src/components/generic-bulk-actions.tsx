@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { ListChecks, Power, PowerOff, RefreshCcw, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -13,15 +13,17 @@ export function GenericBulkActions({
   endpoint,
   entityName,
   onApplied,
-  canToggleActive = false,
+  canToggleStatus = false,
   canChangeContract = false,
+  additionalActions,
 }: {
   rows: any[];
   endpoint: string;
   entityName: string;
   onApplied: () => void;
-  canToggleActive?: boolean;
+  canToggleStatus?: boolean;
   canChangeContract?: boolean;
+  additionalActions?: ReactNode;
 }) {
   const [busy, setBusy] = useState(false);
   const [contractOpen, setContractOpen] = useState(false);
@@ -90,10 +92,11 @@ export function GenericBulkActions({
         {canChangeContract && <DropdownMenuItem className="gap-2 cursor-pointer" onClick={openContractDialog}>
           <FileText className="w-4 h-4 text-indigo-600" /> تغییر قرارداد
         </DropdownMenuItem>}
-        {canChangeContract && (canToggleActive || true) && <DropdownMenuSeparator />}
-        {canToggleActive && <>
-          <DropdownMenuItem className="gap-2 cursor-pointer" onClick={() => run({is_active: 1}, "فعال") }><Power className="w-4 h-4 text-emerald-600"/>فعال کردن</DropdownMenuItem>
-          <DropdownMenuItem className="gap-2 cursor-pointer" onClick={() => run({is_active: 0}, "غیرفعال") }><PowerOff className="w-4 h-4 text-slate-500"/>غیرفعال کردن</DropdownMenuItem>
+        {canChangeContract && (canToggleStatus || true) && <DropdownMenuSeparator />}
+        {additionalActions}{additionalActions && (canToggleStatus || canChangeContract) && <DropdownMenuSeparator />}
+        {canToggleStatus && <>
+          <DropdownMenuItem className="gap-2 cursor-pointer" onClick={() => run({status: "active"}, "فعال") }><Power className="w-4 h-4 text-emerald-600"/>فعال کردن</DropdownMenuItem>
+          <DropdownMenuItem className="gap-2 cursor-pointer" onClick={() => run({status: "inactive"}, "غیرفعال") }><PowerOff className="w-4 h-4 text-slate-500"/>غیرفعال کردن</DropdownMenuItem>
         </>}
         <DropdownMenuItem className="gap-2 cursor-pointer" onClick={() => { onApplied(); toast({title:"بروزرسانی شد", description:"جدول با داده‌های جدید بارگذاری شد"}); }}><RefreshCcw className="w-4 h-4 text-blue-600"/>بروزرسانی</DropdownMenuItem>
       </DropdownMenuContent>

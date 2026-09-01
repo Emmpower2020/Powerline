@@ -38,7 +38,7 @@ export function useContractOptions(enabled = true) {
     return () => { alive = false; };
   }, [enabled]);
 
-  const options = useMemo<SearchableOption[]>(() => rows.map((r) => ({
+  const options = useMemo<SearchableOption[]>(() => [...rows].sort((a,b) => (a.status === "active" ? 0 : 1) - (b.status === "active" ? 0 : 1) || Number(b.id) - Number(a.id)).map((r) => ({
     value: String(r.id),
     label: r.title || `قرارداد #${r.id}`,
     // عنوان قرارداد اصلی است و نام پیمانکار مانند قبل به‌صورت توضیح کم‌رنگ نمایش داده می‌شود.
