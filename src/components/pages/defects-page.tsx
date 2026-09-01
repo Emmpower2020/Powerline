@@ -246,6 +246,7 @@ export function DefectsPage() {
       key: "defect_code", header: "کد رهگیری", sortable: true, filterable: true, align: "right",
       render: (row) => <span className="font-mono text-xs font-bold text-indigo-700">{row.defect_code}</span>,
     },
+    { key: "contract_title", header: "قرارداد", sortable: true, filterable: true, wrap: true, align: "right" },
     { key: "title", header: "عنوان عیب", sortable: true, filterable: true, wrap: true, align: "right" },
     {
       // v3.1.0: دسته عیب استاندارد (از JOIN با defect_definitions)

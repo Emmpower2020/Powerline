@@ -119,7 +119,17 @@ class ApiClient {
     // v3.5.1: _retried فقط داخلی است — جلوگیری از حلقه بی‌نهایت 401→refresh→retry→401
     const { method = "GET", body, params, skipAuth, headers = {}, timeoutMs = 30_000, _retried } = options;
 
-    const url = this.buildUrl(endpoint, params);
+    // v4.3.39: Scope سراسری قرارداد برای ماژول‌های عملیاتی.
+    // Endpointهای مرجع/قراردادها عمداً از این فیلتر مستثنا هستند.
+    const contractScoped = method === "GET" && [
+      "lines", "towers", "circuits", "personnel", "equipment",
+      "inspections", "defects", "work-orders", "safety-incidents",
+      "price-lists", "invoices", "dashboard/stats", "dashboard/recent-defects",
+    ].some((name) => endpoint === name || endpoint.startsWith(`${name}/`));
+    const scopedParams = contractScoped && typeof window !== "undefined"
+      ? { ...(params || {}), contract_id: params?.contract_id ?? (localStorage.getItem("powerline_selected_contract") || undefined) }
+      : params;
+    const url = this.buildUrl(endpoint, scopedParams);
 
     const requestHeaders: Record<string, string> = {
       "Content-Type": "application/json",

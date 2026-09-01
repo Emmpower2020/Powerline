@@ -113,6 +113,7 @@ export function CircuitsPage() {
       key: "dispatch_code", header: "کد دیسپاچینگ", sortable: true, filterable: true, align: "right",
       render: (row) => <span className="font-mono font-bold text-indigo-700">{row.dispatch_code}</span>,
     },
+    { key: "contract_title", header: "قرارداد", sortable: true, filterable: true, wrap: true, align: "right" },
     { key: "name", header: "نام مدار", sortable: true, filterable: true, wrap: true, align: "right" },
     {
       key: "voltage", header: "ولتاژ", sortable: true, filterable: true, type: "badge", align: "right",

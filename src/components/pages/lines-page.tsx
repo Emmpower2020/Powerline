@@ -307,6 +307,7 @@ export function LinesPage() {
 
   const columns: DataTableColumn<any>[] = [
     { key: "line_code", header: "کد خط", sortable: true, filterable: true, align: "right" },
+    { key: "contract_title", header: "قرارداد", sortable: true, filterable: true, wrap: true, align: "right" },
     { key: "dispatch_code", header: "کد دیسپاچینگ", sortable: true, filterable: true, align: "right" },
     // v2.5.0: ستون «نام مجموعه خط» به‌صورت ستون مستقل و به‌طور پیش‌فرض قبل از «نام خط»
     { key: "group_name", header: "نام مجموعه خط", sortable: true, filterable: true, width: "340px", wrap: true, align: "right" },

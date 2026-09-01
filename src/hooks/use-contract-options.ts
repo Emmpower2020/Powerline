@@ -10,6 +10,7 @@ export interface ContractOptionRow {
   contract_code?: string | null;
   title?: string | null;
   contractor_name?: string | null;
+  status?: string | null;
 }
 
 /** گزینه‌های قرارداد، مشترک همه فرم‌های عملیاتی */
@@ -29,6 +30,7 @@ export function useContractOptions(enabled = true) {
           contract_code: r.contract_code ?? null,
           title: r.title ?? null,
           contractor_name: r.contractor_name ?? null,
+          status: r.status ?? null,
         })));
       })
       .catch(() => { if (alive) setRows([]); })

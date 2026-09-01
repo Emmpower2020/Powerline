@@ -23,6 +23,8 @@ import { cn } from "@/lib/utils";
 import { useBootstrap } from "@/hooks/use-bootstrap";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { APP_VERSION } from "@/lib/version";
+import { ContractSelect } from "@/components/contract-select";
+import { useContractOptions } from "@/hooks/use-contract-options";
 
 type Page =
   | "dashboard" | "maps"
@@ -141,11 +143,29 @@ export function DashboardLayout({ children, currentPage, onNavigate, title, subt
 }) {
   const { user, logout, hasPermission } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const { rows: contractRows, loading: contractsLoading } = useContractOptions(true);
+  const [selectedContract, setSelectedContract] = useState("");
 
   // v3.4.0: فعال‌سازی ثبت خودکار خطاهای API در «لاگ خطاها» (یک‌بار)
   useEffect(() => {
     attachApiErrorLogging();
   }, []);
+
+  // v4.3.39: قرارداد پیش‌فرض = آخرین قرارداد فعال؛ انتخاب کاربر تا زمان تغییر/رفرش حفظ می‌شود.
+  useEffect(() => {
+    if (contractsLoading || !contractRows.length) return;
+    const active = contractRows
+      .filter((r: any) => r.status === "active")
+      .sort((a: any, b: any) => Number(b.id) - Number(a.id))[0];
+    const next = active ? String(active.id) : String(contractRows[0].id);
+    setSelectedContract(next);
+    localStorage.setItem("powerline_selected_contract", next);
+  }, [contractRows, contractsLoading]);
+
+  const onContractChange = (value: string) => {
+    setSelectedContract(value);
+    if (typeof window !== "undefined") localStorage.setItem("powerline_selected_contract", value);
+  };
   const visibleNavItems = navItems.filter(item => !item.permission || hasPermission(item.permission));
   const groups: { [key: string]: NavItem[] } = {};
   visibleNavItems.forEach(item => { const g = item.group || "سایر"; if (!groups[g]) groups[g] = []; groups[g].push(item); });
@@ -213,6 +233,10 @@ export function DashboardLayout({ children, currentPage, onNavigate, title, subt
           <div className="flex items-center gap-1.5">
             {/* v3.5.2: وضعیت داده‌های مرجع — آنلاین/کش محلی/آفلاین */}
             <DataStatusBadge />
+            <div className="hidden lg:flex items-center gap-2 min-w-[260px] max-w-[360px]">
+              <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 whitespace-nowrap">قرارداد جاری</span>
+              <ContractSelect value={selectedContract} onChange={onContractChange} disabled={contractsLoading} className="min-w-0 flex-1" />
+            </div>
             {/* v2.8.0: اطلاعات کاربر با آیکون UserCog زیبا‌تر */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -310,7 +334,7 @@ export function DashboardLayout({ children, currentPage, onNavigate, title, subt
           </div>
         </header>
         {/* v2.8.0: padding کم‌تر برای main (p-4 lg:p-6 → p-3 lg:p-4) */}
-        <main className="flex-1 p-3 lg:p-4 bg-slate-50 dark:bg-slate-950">{children}</main>
+        <main className="flex-1 p-3 lg:p-4 bg-slate-50 dark:bg-slate-950"><div key={selectedContract}>{children}</div></main>
       </div>
     </div>
   );

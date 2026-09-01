@@ -15,12 +15,15 @@ function registerInspectionRoutes(Router $router): void
         $pageSize = Helpers::getPageSize();
         $offset = Helpers::getOffset();
         $search = Helpers::getSearch();
+        $contractId = Helpers::getContractId();
         $status = Helpers::query('status');
         $lineId = Helpers::queryInt('line_id');
         $towerId = Helpers::queryInt('tower_id');
 
         $where = '1=1';
         $params = [];
+
+        if ($contractId !== null) { $where .= ' AND i.contract_id = ?'; $params[] = $contractId; }
 
         if (!empty($search)) {
             $where .= ' AND (i.inspection_code LIKE ? OR i.notes LIKE ?)';

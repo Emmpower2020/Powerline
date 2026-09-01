@@ -12,47 +12,56 @@ function registerDashboardRoutes(Router $router): void
         $db = Database::getInstance();
         $pdo = $db->getConnection();
 
+        // قرارداد جاری (Scope انتخاب‌شده در هدر)
+        $contractId = Helpers::getContractId();
+        $lineScope = $contractId !== null ? ' AND contract_id = ' . (int)$contractId : '';
+        $towerScope = $contractId !== null ? ' AND contract_id = ' . (int)$contractId : '';
+        $defectScope = $contractId !== null ? ' AND contract_id = ' . (int)$contractId : '';
+        $inspectionScope = $contractId !== null ? ' AND contract_id = ' . (int)$contractId : '';
+        $workOrderScope = $contractId !== null ? ' AND contract_id = ' . (int)$contractId : '';
+        $safetyScope = $contractId !== null ? ' AND contract_id = ' . (int)$contractId : '';
+
         // آمار کلی
         $stats = [
             'lines' => [
-                'total'      => (int) $pdo->query("SELECT COUNT(*) FROM `lines` WHERE is_active = 1")->fetchColumn(),
+                'total'      => (int) $pdo->query("SELECT COUNT(*) FROM `lines` WHERE is_active = 1$lineScope")->fetchColumn(),
                 // v2.4.3: تفکیک بر اساس ولتاژ (نوع خط حذف شد)
                 'by_voltage' => $pdo->query("
                     SELECT voltage_kv, COUNT(*) as count
                     FROM `lines`
-                    WHERE is_active = 1 AND voltage_kv IS NOT NULL
+                    WHERE is_active = 1 AND voltage_kv IS NOT NULL$lineScope
                     GROUP BY voltage_kv
                 ")->fetchAll(PDO::FETCH_KEY_PAIR),
             ],
             'towers' => [
-                'total' => (int) $pdo->query("SELECT COUNT(*) FROM towers WHERE is_active = 1")->fetchColumn(),
+                'total' => (int) $pdo->query("SELECT COUNT(*) FROM towers WHERE is_active = 1$towerScope")->fetchColumn(),
                 'by_type' => $pdo->query("
                     SELECT tower_type, COUNT(*) as count
                     FROM towers
-                    WHERE is_active = 1
+                    WHERE is_active = 1$towerScope
                     GROUP BY tower_type
                 ")->fetchAll(PDO::FETCH_KEY_PAIR),
             ],
             'defects' => [
-                'total'      => (int) $pdo->query("SELECT COUNT(*) FROM defects")->fetchColumn(),
-                'new'        => (int) $pdo->query("SELECT COUNT(*) FROM defects WHERE status = 'new'")->fetchColumn(),
-                'approved'   => (int) $pdo->query("SELECT COUNT(*) FROM defects WHERE status = 'approved'")->fetchColumn(),
-                'in_progress'=> (int) $pdo->query("SELECT COUNT(*) FROM defects WHERE status = 'in_progress'")->fetchColumn(),
-                'repaired'   => (int) $pdo->query("SELECT COUNT(*) FROM defects WHERE status = 'repaired'")->fetchColumn(),
-                'verified'   => (int) $pdo->query("SELECT COUNT(*) FROM defects WHERE status = 'verified'")->fetchColumn(),
-                'critical'   => (int) $pdo->query("SELECT COUNT(*) FROM defects WHERE priority = 'critical' AND status NOT IN ('verified', 'cancelled')")->fetchColumn(),
-                'high'       => (int) $pdo->query("SELECT COUNT(*) FROM defects WHERE priority = 'high' AND status NOT IN ('verified', 'cancelled')")->fetchColumn(),
+                'total'      => (int) $pdo->query("SELECT COUNT(*) FROM defects WHERE 1=1$defectScope")->fetchColumn(),
+                'new'        => (int) $pdo->query("SELECT COUNT(*) FROM defects WHERE 1=1$defectScope AND status = 'new'")->fetchColumn(),
+                'approved'   => (int) $pdo->query("SELECT COUNT(*) FROM defects WHERE 1=1$defectScope AND status = 'approved'")->fetchColumn(),
+                'in_progress'=> (int) $pdo->query("SELECT COUNT(*) FROM defects WHERE 1=1$defectScope AND status = 'in_progress'")->fetchColumn(),
+                'repaired'   => (int) $pdo->query("SELECT COUNT(*) FROM defects WHERE 1=1$defectScope AND status = 'repaired'")->fetchColumn(),
+                'verified'   => (int) $pdo->query("SELECT COUNT(*) FROM defects WHERE 1=1$defectScope AND status = 'verified'")->fetchColumn(),
+                'critical'   => (int) $pdo->query("SELECT COUNT(*) FROM defects WHERE 1=1$defectScope AND priority = 'critical' AND status NOT IN ('verified', 'cancelled')")->fetchColumn(),
+                'high'       => (int) $pdo->query("SELECT COUNT(*) FROM defects WHERE 1=1$defectScope AND priority = 'high' AND status NOT IN ('verified', 'cancelled')")->fetchColumn(),
             ],
             'inspections' => [
-                'total'        => (int) $pdo->query("SELECT COUNT(*) FROM inspections")->fetchColumn(),
-                'today'        => (int) $pdo->query("SELECT COUNT(*) FROM inspections WHERE DATE(inspection_date) = CURDATE()")->fetchColumn(),
-                'this_week'    => (int) $pdo->query("SELECT COUNT(*) FROM inspections WHERE inspection_date >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)")->fetchColumn(),
-                'pending_approval' => (int) $pdo->query("SELECT COUNT(*) FROM inspections WHERE status = 'submitted'")->fetchColumn(),
+                'total'        => (int) $pdo->query("SELECT COUNT(*) FROM inspections WHERE 1=1$inspectionScope")->fetchColumn(),
+                'today'        => (int) $pdo->query("SELECT COUNT(*) FROM inspections WHERE 1=1$inspectionScope AND DATE(inspection_date) = CURDATE()")->fetchColumn(),
+                'this_week'    => (int) $pdo->query("SELECT COUNT(*) FROM inspections WHERE 1=1$inspectionScope AND inspection_date >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)")->fetchColumn(),
+                'pending_approval' => (int) $pdo->query("SELECT COUNT(*) FROM inspections WHERE 1=1$inspectionScope AND status = 'submitted'")->fetchColumn(),
             ],
             'work_orders' => [
-                'total'        => (int) $pdo->query("SELECT COUNT(*) FROM work_orders")->fetchColumn(),
-                'open'         => (int) $pdo->query("SELECT COUNT(*) FROM work_orders WHERE status IN ('draft', 'assigned', 'in_progress')")->fetchColumn(),
-                'overdue'      => (int) $pdo->query("SELECT COUNT(*) FROM work_orders WHERE planned_end < NOW() AND status NOT IN ('completed', 'cancelled', 'verified')")->fetchColumn(),
+                'total'        => (int) $pdo->query("SELECT COUNT(*) FROM work_orders WHERE 1=1$workOrderScope")->fetchColumn(),
+                'open'         => (int) $pdo->query("SELECT COUNT(*) FROM work_orders WHERE 1=1$workOrderScope AND status IN ('draft', 'assigned', 'in_progress')")->fetchColumn(),
+                'overdue'      => (int) $pdo->query("SELECT COUNT(*) FROM work_orders WHERE 1=1$workOrderScope AND planned_end < NOW() AND status NOT IN ('completed', 'cancelled', 'verified')")->fetchColumn(),
             ],
             'users' => [
                 'total'   => (int) $pdo->query("SELECT COUNT(*) FROM users")->fetchColumn(),
@@ -62,8 +71,8 @@ function registerDashboardRoutes(Router $router): void
                 'total'  => (int) $pdo->query("SELECT COUNT(*) FROM contractors WHERE is_active = 1")->fetchColumn(),
             ],
             'safety' => [
-                'incidents_this_month' => (int) $pdo->query("SELECT COUNT(*) FROM safety_incidents WHERE MONTH(occurred_at) = MONTH(CURDATE()) AND YEAR(occurred_at) = YEAR(CURDATE())")->fetchColumn(),
-                'near_miss_this_month' => (int) $pdo->query("SELECT COUNT(*) FROM safety_incidents WHERE incident_type = 'near_miss' AND MONTH(occurred_at) = MONTH(CURDATE())")->fetchColumn(),
+                'incidents_this_month' => (int) $pdo->query("SELECT COUNT(*) FROM safety_incidents WHERE 1=1$safetyScope AND MONTH(occurred_at) = MONTH(CURDATE()) AND YEAR(occurred_at) = YEAR(CURDATE())")->fetchColumn(),
+                'near_miss_this_month' => (int) $pdo->query("SELECT COUNT(*) FROM safety_incidents WHERE 1=1$safetyScope AND incident_type = 'near_miss' AND MONTH(occurred_at) = MONTH(CURDATE())")->fetchColumn(),
             ],
         ];
 
@@ -73,7 +82,7 @@ function registerDashboardRoutes(Router $router): void
                 DATE(d.created_at) AS date,
                 COUNT(DISTINCT d.id) AS defects
             FROM defects d
-            WHERE d.created_at >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)
+            WHERE d.created_at >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)$defectScope
             GROUP BY DATE(d.created_at)
             ORDER BY date
         ")->fetchAll();
@@ -83,7 +92,7 @@ function registerDashboardRoutes(Router $router): void
                 DATE(i.inspection_date) AS date,
                 COUNT(*) AS inspections
             FROM inspections i
-            WHERE i.inspection_date >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)
+            WHERE i.inspection_date >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)$inspectionScope
             GROUP BY DATE(i.inspection_date)
             ORDER BY date
         ")->fetchAll();
@@ -117,6 +126,8 @@ function registerDashboardRoutes(Router $router): void
         Auth::authenticate();
 
         $db = Database::getInstance();
+        $contractId = Helpers::getContractId();
+        $defectScope = $contractId !== null ? ' AND d.contract_id = ' . (int)$contractId : '';
         $limit = min(50, max(1, (int) Helpers::query('limit', 10)));
 
         $rows = $db->fetchAll(
@@ -127,6 +138,7 @@ function registerDashboardRoutes(Router $router): void
              FROM defects d
              LEFT JOIN `lines` l ON l.id = d.line_id
              LEFT JOIN towers t ON t.id = d.tower_id
+             WHERE 1=1$defectScope
              ORDER BY d.id DESC
              LIMIT ?",
             [$limit]
@@ -158,7 +170,7 @@ function registerDashboardRoutes(Router $router): void
         $rows = $db->fetchAll("
             SELECT dc.id, dc.name, dc.tower_type,
                    COUNT(dd.id) AS definition_count,
-                   (SELECT COUNT(*) FROM defects d WHERE d.defect_definition_id IN
+                   (SELECT COUNT(*) FROM defects WHERE 1=1$defectScope d WHERE d.defect_definition_id IN
                        (SELECT id FROM defect_definitions WHERE category_id = dc.id)
                    ) AS actual_defect_count
             FROM defect_categories dc

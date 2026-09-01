@@ -63,6 +63,7 @@ function registerTowerRoutes(Router $router): void
         $lat = (float) Helpers::query('lat', 0);
         $lng = (float) Helpers::query('lng', 0);
         $radius = (int) Helpers::query('radius', 5000);  // متر
+        $contractId = Helpers::getContractId();
 
         if (!$lat || !$lng) {
             Response::error(400, 'مختصات lat و lng الزامی است');
@@ -75,10 +76,11 @@ function registerTowerRoutes(Router $router): void
              FROM towers t
              LEFT JOIN `lines` l ON l.id = t.line_id
              WHERE t.is_active = 1
+               AND (? IS NULL OR t.contract_id = ?)
                AND ST_Distance_Sphere(t.geom, ST_GeomFromText('POINT($lng $lat)', 4326)) <= ?
              ORDER BY distance_meters ASC
              LIMIT 50",
-            [$radius]
+            [$contractId, $contractId, $radius]
         );
 
         $data = array_map(function ($row) {
@@ -103,9 +105,12 @@ function registerTowerRoutes(Router $router): void
         $lineId = Helpers::queryInt('line_id');
         $towerType = Helpers::query('tower_type');
         $towerTypeCode = Helpers::query('tower_type_code');
+        $contractId = Helpers::getContractId();
 
         $where = '1=1';
         $params = [];
+
+        if ($contractId !== null) { $where .= ' AND t.contract_id = ?'; $params[] = $contractId; }
 
         if (!empty($search)) {
             $where .= ' AND (t.tower_code LIKE ? OR CAST(t.tower_number AS CHAR) LIKE ? OR t.tower_structure LIKE ? OR t.tower_type LIKE ? OR t.line_supervisor LIKE ?)';

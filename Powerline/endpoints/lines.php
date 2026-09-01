@@ -24,6 +24,7 @@ function registerLineRoutes(Router $router): void
         $offset = Helpers::getOffset();
         $search = Helpers::getSearch();
         $isActive = Helpers::query('is_active');
+        $contractId = Helpers::getContractId();
 
         $where = '1=1';
         $params = [];
@@ -36,6 +37,8 @@ function registerLineRoutes(Router $router): void
         } elseif ($isActive === null || $isActive === '') {
             $where .= ' AND l.is_active = 1';
         }
+
+        if ($contractId !== null) { $where .= ' AND l.contract_id = ?'; $params[] = $contractId; }
 
         if (!empty($search)) {
             $where .= ' AND (l.line_code LIKE ? OR l.name LIKE ? OR l.conductor_type LIKE ?)';
@@ -468,9 +471,13 @@ function registerLineRoutes(Router $router): void
         Auth::requirePermission('towers.view');
 
         $db = Database::getInstance();
+        $contractId = Helpers::getContractId();
+        $where = 'line_id = ? AND is_active = 1';
+        $params = [(int) $id];
+        if ($contractId !== null) { $where .= ' AND contract_id = ?'; $params[] = $contractId; }
         $rows = $db->fetchAll(
-            "SELECT * FROM towers WHERE line_id = ? AND is_active = 1 ORDER BY tower_number",
-            [(int) $id]
+            "SELECT * FROM towers WHERE $where ORDER BY tower_number",
+            $params
         );
 
         $data = array_map(function ($row) {

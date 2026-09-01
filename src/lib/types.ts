@@ -188,6 +188,8 @@ export interface WorkOrder {
   crew_name: string | null;
   contractor_id: number | null;
   contractor_name: string | null;
+  contract_id: number | null;
+  contract_title: string | null;
   planned_start: string | null;
   planned_end: string | null;
   actual_start: string | null;

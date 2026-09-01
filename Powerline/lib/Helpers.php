@@ -39,6 +39,12 @@ class Helpers
         return (int) $val;
     }
 
+    /** شناسه قرارداد انتخاب‌شده در Scope سراسری برنامه */
+    public static function getContractId(): ?int
+    {
+        return self::queryInt('contract_id');
+    }
+
     /**
      * دریافت صفحه فعلی از query
      */

@@ -122,6 +122,7 @@ export function PersonnelPage() {
 
   const columns: DataTableColumn<Person>[] = [
     { key: "personnel_code", header: "کد پرسنلی", sortable: true, filterable: true, align: "right" },
+    { key: "contract_title", header: "قرارداد", sortable: true, filterable: true, wrap: true, align: "right" },
     { key: "first_name", header: "نام", sortable: true, filterable: true, align: "right" },
     { key: "last_name", header: "نام خانوادگی", sortable: true, filterable: true, align: "right" },
     { key: "national_id", header: "کد ملی", align: "right" },

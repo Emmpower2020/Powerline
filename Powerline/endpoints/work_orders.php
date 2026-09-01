@@ -15,6 +15,7 @@ function registerWorkOrderRoutes(Router $router): void
         $pageSize = Helpers::getPageSize();
         $offset = Helpers::getOffset();
         $search = Helpers::getSearch();
+        $contractId = Helpers::getContractId();
         $status = Helpers::query('status');
         $priority = Helpers::query('priority');
         $crewId = Helpers::queryInt('crew_id');
@@ -22,6 +23,8 @@ function registerWorkOrderRoutes(Router $router): void
 
         $where = '1=1';
         $params = [];
+
+        if ($contractId !== null) { $where .= ' AND wo.contract_id = ?'; $params[] = $contractId; }
 
         if (!empty($search)) {
             $where .= ' AND (wo.wo_code LIKE ? OR wo.title LIKE ? OR wo.description LIKE ?)';

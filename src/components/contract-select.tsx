@@ -8,13 +8,17 @@ export function ContractSelect({
   onChange,
   disabled = false,
   placeholder = "انتخاب قرارداد...",
+  className,
 }: {
   value: string;
   onChange: (value: string) => void;
   disabled?: boolean;
   placeholder?: string;
+  className?: string;
 }) {
   const { options, loading } = useContractOptions(true);
+
+
   return (
     <SearchableSelect
       value={value}
@@ -24,6 +28,7 @@ export function ContractSelect({
       searchPlaceholder="جستجوی کد یا عنوان قرارداد..."
       allowClear
       disabled={disabled}
+      className={className}
     />
   );
 }

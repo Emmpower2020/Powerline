@@ -20,9 +20,12 @@ function registerDefectRoutes(Router $router): void
         $priority = Helpers::query('priority');
         $lineId = Helpers::queryInt('line_id');
         $towerId = Helpers::queryInt('tower_id');
+        $contractId = Helpers::getContractId();
 
         $where = '1=1';
         $params = [];
+
+        if ($contractId !== null) { $where .= ' AND d.contract_id = ?'; $params[] = $contractId; }
 
         if (!empty($search)) {
             $where .= ' AND (d.defect_code LIKE ? OR d.title LIKE ? OR d.description LIKE ?)';
