@@ -18,6 +18,7 @@ import { ImportExcelDialog } from "@/components/import-excel-dialog";
 import { BulkDeleteDialog } from "@/components/bulk-delete-dialog";
 import { useBulkDelete } from "@/hooks/use-bulk-delete";
 import { GenericBulkActions } from "@/components/generic-bulk-actions";
+import { BulkOperationDialog, type BulkOperationProgress } from "@/components/bulk-operation-dialog";
 import { CreateDefectDialog } from "@/components/defects/create-defect-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { logError } from "@/lib/error-log";
@@ -86,6 +87,9 @@ export function DefectsPage() {
   const [bulkValue, setBulkValue] = useState("");
   const [bulkRows, setBulkRows] = useState<Defect[]>([]);
   const [bulkApplying, setBulkApplying] = useState(false);
+  const [bulkOperationOpen, setBulkOperationOpen] = useState(false);
+  const [bulkOperationProgress, setBulkOperationProgress] = useState<BulkOperationProgress | null>(null);
+  const [bulkOperationField, setBulkOperationField] = useState<"severity" | "priority" | "safety_risk" | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -178,28 +182,38 @@ export function DefectsPage() {
     setBulkField(field);
   };
 
-  const applyBulk = async () => {
+  const requestBulk = () => {
     if (!bulkField || !bulkValue) return;
+    setBulkOperationProgress({ completed: 0, total: bulkRows.length, success: 0, failed: 0 });
+    setBulkOperationField(bulkField);
+    setBulkField(null);
+    setBulkOperationOpen(true);
+  };
+
+  const executeBulk = async () => {
+    const field = bulkOperationField;
+    if (!field || !bulkValue || !bulkRows.length) return;
     setBulkApplying(true);
     let success = 0;
     const errs: string[] = [];
-    for (const row of bulkRows) {
-      try {
-        await apiClient.put(`${API_ENDPOINTS.defects}/${row.id}`, { [bulkField]: bulkValue });
-        success++;
-      } catch (err: any) {
-        errs.push(`${row.defect_code}: ${err?.message || "خطا"}`);
+    try {
+      for (let i = 0; i < bulkRows.length; i++) {
+        const row = bulkRows[i];
+        try {
+          await apiClient.put(`${API_ENDPOINTS.defects}/${row.id}`, { [field]: bulkValue });
+          success++;
+        } catch (err: any) {
+          errs.push(`${row.defect_code}: ${err?.message || "خطا"}`);
+        }
+        setBulkOperationProgress({ completed: i + 1, total: bulkRows.length, success, failed: errs.length });
       }
-    }
-    setBulkApplying(false);
-    setBulkField(null);
-    setRefreshKey(k => k + 1);
-    // v3.2.0: پاک شدن خودکار انتخاب‌ها بعد از عملیات گروهی
-    if (tableRef.current) tableRef.current.clearSelection();
-    if (errs.length === 0) {
-      toast({ title: "انجام شد", description: `${success.toLocaleString("fa-IR")} عیب به‌روزرسانی شد` });
-    } else {
-      toast({ title: "اعمال ناقص", description: `${success.toLocaleString("fa-IR")} موفق، ${errs.length.toLocaleString("fa-IR")} ناموفق — اولین خطا: ${errs[0]}`, variant: "destructive" });
+      setRefreshKey(k => k + 1);
+      tableRef.current?.clearSelection();
+      setBulkOperationOpen(false);
+      if (errs.length === 0) toast({ title: "انجام شد", description: `${success.toLocaleString("fa-IR")} عیب به‌روزرسانی شد` });
+      else toast({ title: "اعمال ناقص", description: `${success.toLocaleString("fa-IR")} موفق، ${errs.length.toLocaleString("fa-IR")} ناموفق — اولین خطا: ${errs[0]}`, variant: "destructive" });
+    } finally {
+      setBulkApplying(false);
     }
   };
 
@@ -475,13 +489,23 @@ export function DefectsPage() {
               type="button"
               className="bg-indigo-600 hover:bg-indigo-700"
               disabled={bulkApplying || !bulkValue}
-              onClick={applyBulk}
+              onClick={requestBulk}
             >
               {bulkApplying ? <><Loader2 className="w-4 h-4 ml-2 animate-spin" />در حال اعمال...</> : "اعمال روی همه"}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <BulkOperationDialog
+        open={bulkOperationOpen}
+        entityName="عیب"
+        operationLabel="اعمال تغییرات گروهی"
+        progress={bulkOperationProgress}
+        running={bulkApplying}
+        onCancel={() => { if (!bulkApplying) { setBulkOperationOpen(false); setBulkOperationField(null); } }}
+        onConfirm={executeBulk}
+      />
     </div>
   );
 }

@@ -22,6 +22,7 @@ import { usePersonnelOptions } from "@/hooks/use-personnel-options";
 import { useTowerReferences } from "@/hooks/use-tower-references";
 import { useToast } from "@/hooks/use-toast";
 import { logError } from "@/lib/error-log";
+import { BulkOperationDialog, type BulkOperationProgress } from "@/components/bulk-operation-dialog";
 
 interface BulkTowersActionsProps {
   getSelection: () => any[];
@@ -52,7 +53,9 @@ export function BulkTowersActions({ getSelection, onApplied }: BulkTowersActions
   const [rows, setRows] = useState<any[]>([]);
   const [value, setValue] = useState("");
   const [applying, setApplying] = useState(false);
-  const [progress, setProgress] = useState({ completed: 0, total: 0, batch: 0, totalBatches: 0 });
+  const [progress, setProgress] = useState<BulkOperationProgress | null>(null);
+  const [pendingOperation, setPendingOperation] = useState<{ rows: any[]; patch: Record<string, unknown>; label: string } | null>(null);
+  const [operationOpen, setOperationOpen] = useState(false);
   const [lines, setLines] = useState<any[]>([]);
   const [linesLoaded, setLinesLoaded] = useState(false);
   // v3.0.0: سرپرست‌ها از پرسنل با کمبوباکس قابل جستجو
@@ -103,18 +106,24 @@ export function BulkTowersActions({ getSelection, onApplied }: BulkTowersActions
     setFieldAction(action);
   };
 
-  // v4.3.32: ویرایش گروهی با درخواست‌های ۱۰۰تایی؛ از ارسال صدها PUT جداگانه جلوگیری می‌کند.
-  const applyPatch = async (targetRows: any[], patch: Record<string, unknown>, successText: string) => {
+  // ویرایش گروهی ابتدا تأیید می‌شود؛ همان پنجره در زمان اجرا نوار پیشرفت را نمایش می‌دهد.
+  const requestPatch = (targetRows: any[], patch: Record<string, unknown>, successText: string) => {
     if (targetRows.length === 0) return;
+    setPendingOperation({ rows: targetRows, patch, label: successText });
+    setProgress({ completed: 0, total: targetRows.length, success: 0, failed: 0 });
+    setOperationOpen(true);
+  };
+
+  const applyPatch = async () => {
+    if (!pendingOperation) return;
+    const { rows: targetRows, patch, label: successText } = pendingOperation;
     const BATCH_SIZE = 100;
     const batches = Array.from({ length: Math.ceil(targetRows.length / BATCH_SIZE) }, (_, i) =>
       targetRows.slice(i * BATCH_SIZE, (i + 1) * BATCH_SIZE)
     );
     setApplying(true);
-    setProgress({ completed: 0, total: targetRows.length, batch: 0, totalBatches: batches.length });
     let success = 0;
     const errors: string[] = [];
-
     try {
       for (let i = 0; i < batches.length; i++) {
         const batch = batches[i];
@@ -128,23 +137,15 @@ export function BulkTowersActions({ getSelection, onApplied }: BulkTowersActions
           errors.push(`بسته ${i + 1}: ${err?.message || "خطای نامشخص"}`);
         }
         const completed = Math.min((i + 1) * BATCH_SIZE, targetRows.length);
-        setProgress({ completed, total: targetRows.length, batch: i + 1, totalBatches: batches.length });
+        setProgress({ completed, total: targetRows.length, success, failed: errors.length });
       }
+      onApplied();
+      setOperationOpen(false);
+      if (errors.length === 0) toast({ title: "انجام شد", description: `${successText} — ${success.toLocaleString("fa-IR")} ردیف` });
+      else toast({ title: "اعمال ناقص", description: `${success.toLocaleString("fa-IR")} ردیف موفق، ${errors.length.toLocaleString("fa-IR")} بسته ناموفق — اولین خطا: ${errors[0]}`, variant: "destructive" });
     } finally {
       setApplying(false);
-    }
-
-    setFieldAction(null);
-    onApplied();
-
-    if (errors.length === 0) {
-      toast({ title: "انجام شد", description: `${successText} — ${success.toLocaleString("fa-IR")} ردیف` });
-    } else {
-      toast({
-        title: "اعمال ناقص",
-        description: `${success.toLocaleString("fa-IR")} ردیف موفق، ${errors.length.toLocaleString("fa-IR")} بسته ناموفق — اولین خطا: ${errors[0]}`,
-        variant: "destructive",
-      });
+      setPendingOperation(null);
     }
   };
 
@@ -182,7 +183,7 @@ export function BulkTowersActions({ getSelection, onApplied }: BulkTowersActions
     const label = actionMeta[fieldAction].title
       .replace("تغییر گروهی ", "")
       .replace("اتصال گروهی دکل‌ها به ", "اتصال به ");
-    await applyPatch(rows, patch, label + " تغییر کرد");
+    requestPatch(rows, patch, label + " تغییر کرد");
   };
 
   const dialogOpen = fieldAction !== null;
@@ -206,11 +207,11 @@ export function BulkTowersActions({ getSelection, onApplied }: BulkTowersActions
           <DropdownMenuSeparator />
           <ItemRow icon={<Power className="w-4 h-4 text-emerald-600" />} label="فعال کردن" onClick={() => {
             if (!requireSelection()) return;
-            applyPatch(getSelection(), { status: "active" }, "دکل‌ها فعال شدند");
+            requestPatch(getSelection(), { status: "active" }, "دکل‌ها فعال شدند");
           }} />
           <ItemRow icon={<PowerOff className="w-4 h-4 text-slate-500" />} label="غیرفعال کردن" onClick={() => {
             if (!requireSelection()) return;
-            applyPatch(getSelection(), { status: "inactive" }, "دکل‌ها غیرفعال شدند");
+            requestPatch(getSelection(), { status: "inactive" }, "دکل‌ها غیرفعال شدند");
           }} />
           <DropdownMenuSeparator />
           <ItemRow icon={<Building2 className="w-4 h-4 text-slate-600" />} label="ساختار دکل" onClick={() => startFieldAction("tower_structure")} />
@@ -380,6 +381,16 @@ export function BulkTowersActions({ getSelection, onApplied }: BulkTowersActions
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <BulkOperationDialog
+        open={operationOpen}
+        entityName="دکل"
+        operationLabel={pendingOperation?.label ?? "عملیات گروهی"}
+        progress={progress}
+        running={applying}
+        onCancel={() => { if (!applying) { setOperationOpen(false); setPendingOperation(null); } }}
+        onConfirm={applyPatch}
+      />
     </>
   );
 }

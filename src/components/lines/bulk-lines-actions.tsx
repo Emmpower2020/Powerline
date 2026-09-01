@@ -21,6 +21,7 @@ import { usePersonnelOptions } from "@/hooks/use-personnel-options";
 import { useToast } from "@/hooks/use-toast";
 import { useTowerReferences } from "@/hooks/use-tower-references";
 import { ContractSelect } from "@/components/contract-select";
+import { BulkOperationDialog, type BulkOperationProgress } from "@/components/bulk-operation-dialog";
 
 interface BulkLinesActionsProps {
   /** ردیف‌های انتخاب‌شده — در لحظهٔ کلیک از جدول خوانده می‌شود */
@@ -55,6 +56,9 @@ export function BulkLinesActions({ getSelection, onApplied }: BulkLinesActionsPr
   const [rows, setRows] = useState<any[]>([]);
   const [value, setValue] = useState("");
   const [applying, setApplying] = useState(false);
+  const [pendingOperation, setPendingOperation] = useState<{ rows: any[]; patch: Record<string, unknown>; label: string } | null>(null);
+  const [operationOpen, setOperationOpen] = useState(false);
+  const [progress, setProgress] = useState<BulkOperationProgress | null>(null);
   const [contractors, setContractors] = useState<any[]>([]);
   const [contractorsLoaded, setContractorsLoaded] = useState(false);
   // v3.0.0: سرپرست‌ها و کارشناس‌ها از پرسنل با کمبوباکس قابل جستجو
@@ -94,35 +98,37 @@ export function BulkLinesActions({ getSelection, onApplied }: BulkLinesActionsPr
     setFieldAction(action);
   };
 
-  const applyPatch = async (targetRows: any[], patch: Record<string, unknown>, successText: string) => {
+  const requestPatch = (targetRows: any[], patch: Record<string, unknown>, successText: string) => {
     if (targetRows.length === 0) return;
+    setPendingOperation({ rows: targetRows, patch, label: successText });
+    setProgress({ completed: 0, total: targetRows.length, success: 0, failed: 0 });
+    setOperationOpen(true);
+  };
+
+  const applyPatch = async () => {
+    if (!pendingOperation) return;
+    const { rows: targetRows, patch, label: successText } = pendingOperation;
     setApplying(true);
     let success = 0;
     const errors: string[] = [];
-    for (const row of targetRows) {
-      try {
-        await apiClient.put(`${API_ENDPOINTS.lines}/${row.id}`, patch);
-        success++;
-      } catch (err: any) {
-        errors.push(`${row.line_code || row.id}: ${err?.message || "خطا"}`);
+    try {
+      for (let i = 0; i < targetRows.length; i++) {
+        const row = targetRows[i];
+        try {
+          await apiClient.put(`${API_ENDPOINTS.lines}/${row.id}`, patch);
+          success++;
+        } catch (err: any) {
+          errors.push(`${row.line_code || row.id}: ${err?.message || "خطا"}`);
+        }
+        setProgress({ completed: i + 1, total: targetRows.length, success, failed: errors.length });
       }
-    }
-    setApplying(false);
-    setFieldAction(null);
-
-    onApplied();
-
-    if (errors.length === 0) {
-      toast({
-        title: "انجام شد",
-        description: `${successText} — ${success.toLocaleString("fa-IR")} ردیف`
-      });
-    } else {
-      toast({
-        title: "اعمال ناقص",
-        description: `${success.toLocaleString("fa-IR")} ردیف موفق، ${errors.length.toLocaleString("fa-IR")} ناموفق — اولین خطا: ${errors[0]}`,
-        variant: "destructive",
-      });
+      onApplied();
+      setOperationOpen(false);
+      if (errors.length === 0) toast({ title: "انجام شد", description: `${successText} — ${success.toLocaleString("fa-IR")} ردیف` });
+      else toast({ title: "اعمال ناقص", description: `${success.toLocaleString("fa-IR")} ردیف موفق، ${errors.length.toLocaleString("fa-IR")} ناموفق — اولین خطا: ${errors[0]}`, variant: "destructive" });
+    } finally {
+      setApplying(false);
+      setPendingOperation(null);
     }
   };
 
@@ -156,7 +162,7 @@ export function BulkLinesActions({ getSelection, onApplied }: BulkLinesActionsPr
       }
       default: return;
     }
-    await applyPatch(rows, patch, actionMeta[fieldAction].title.replace("تغییر گروهی ", "") + " تغییر کرد");
+    requestPatch(rows, patch, actionMeta[fieldAction].title.replace("تغییر گروهی ", "") + " تغییر کرد");
   };
 
   const dialogOpen = fieldAction !== null;
@@ -180,11 +186,11 @@ export function BulkLinesActions({ getSelection, onApplied }: BulkLinesActionsPr
           <DropdownMenuSeparator />
           <ItemRow icon={<Power className="w-4 h-4 text-emerald-600" />} label="فعال کردن" onClick={() => {
             if (!requireSelection()) return;
-            applyPatch(getSelection(), { status: "active" }, "خطوط فعال شدند");
+            requestPatch(getSelection(), { status: "active" }, "خطوط فعال شدند");
           }} />
           <ItemRow icon={<PowerOff className="w-4 h-4 text-slate-500" />} label="غیرفعال کردن" onClick={() => {
             if (!requireSelection()) return;
-            applyPatch(getSelection(), { status: "inactive" }, "خطوط غیرفعال شدند");
+            requestPatch(getSelection(), { status: "inactive" }, "خطوط غیرفعال شدند");
           }} />
           <DropdownMenuSeparator />
           <ItemRow icon={<Zap className="w-4 h-4 text-amber-500" />} label="ولتاژ" onClick={() => startFieldAction("voltage")} />
@@ -311,6 +317,16 @@ export function BulkLinesActions({ getSelection, onApplied }: BulkLinesActionsPr
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <BulkOperationDialog
+        open={operationOpen}
+        entityName="خط"
+        operationLabel={pendingOperation?.label ?? "عملیات گروهی"}
+        progress={progress}
+        running={applying}
+        onCancel={() => { if (!applying) { setOperationOpen(false); setPendingOperation(null); } }}
+        onConfirm={applyPatch}
+      />
     </>
   );
 }

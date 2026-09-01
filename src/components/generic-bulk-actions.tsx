@@ -7,6 +7,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "
 import { useToast } from "@/hooks/use-toast";
 import { apiClient } from "@/lib/api-client";
 import { ContractSelect } from "@/components/contract-select";
+import { BulkOperationDialog, type BulkOperationProgress } from "@/components/bulk-operation-dialog";
 
 export function GenericBulkActions({
   rows,
@@ -26,38 +27,47 @@ export function GenericBulkActions({
   additionalActions?: ReactNode;
 }) {
   const [busy, setBusy] = useState(false);
+  const [pendingRun, setPendingRun] = useState<{ patch: Record<string, unknown>; label: string } | null>(null);
+  const [operationOpen, setOperationOpen] = useState(false);
+  const [progress, setProgress] = useState<BulkOperationProgress | null>(null);
   const [contractOpen, setContractOpen] = useState(false);
   const [contractId, setContractId] = useState("");
   const { toast } = useToast();
 
-  const run = async (patch: Record<string, unknown>, label: string) => {
+  const requestRun = (patch: Record<string, unknown>, label: string) => {
     if (!rows.length) {
       toast({ title: "هیچ ردیفی انتخاب نشده", description: `برای ${label} ابتدا ردیف‌ها را انتخاب کنید` });
       return;
     }
+    setPendingRun({ patch, label });
+    setProgress({ completed: 0, total: rows.length, success: 0, failed: 0 });
+    setOperationOpen(true);
+  };
+
+  const run = async () => {
+    if (!pendingRun || !rows.length) return;
     setBusy(true);
     let ok = 0, fail = 0;
     try {
-      const BATCH_SIZE = 100;
-      for (let i = 0; i < rows.length; i += BATCH_SIZE) {
-        const batch = rows.slice(i, i + BATCH_SIZE);
-        for (const row of batch) {
-          try {
-            await apiClient.put(`${endpoint}/${row.id}`, patch);
-            ok++;
-          } catch {
-            fail++;
-          }
+      for (let i = 0; i < rows.length; i++) {
+        try {
+          await apiClient.put(`${endpoint}/${rows[i].id}`, pendingRun.patch);
+          ok++;
+        } catch {
+          fail++;
         }
+        setProgress({ completed: i + 1, total: rows.length, success: ok, failed: fail });
       }
       onApplied();
+      setOperationOpen(false);
       toast({
         title: fail ? "اعمال ناقص" : "انجام شد",
-        description: `${ok.toLocaleString("fa-IR")} ${entityName} با موفقیت ${label} شد${fail ? `، ${fail.toLocaleString("fa-IR")} مورد ناموفق بود` : ""}`,
+        description: `${ok.toLocaleString("fa-IR")} ${entityName} با موفقیت ${pendingRun.label} شد${fail ? `، ${fail.toLocaleString("fa-IR")} مورد ناموفق بود` : ""}`,
         variant: fail ? "destructive" : undefined,
       });
     } finally {
       setBusy(false);
+      setPendingRun(null);
     }
   };
 
@@ -76,7 +86,7 @@ export function GenericBulkActions({
       return;
     }
     setContractOpen(false);
-    await run({ contract_id: Number(contractId) }, "منتقل به قرارداد انتخاب‌شده");
+    requestRun({ contract_id: Number(contractId) }, "منتقل به قرارداد انتخاب‌شده");
   };
 
   return <>
@@ -95,8 +105,8 @@ export function GenericBulkActions({
         {canChangeContract && (canToggleStatus || true) && <DropdownMenuSeparator />}
         {additionalActions}{additionalActions && (canToggleStatus || canChangeContract) && <DropdownMenuSeparator />}
         {canToggleStatus && <>
-          <DropdownMenuItem className="gap-2 cursor-pointer" onClick={() => run({status: "active"}, "فعال") }><Power className="w-4 h-4 text-emerald-600"/>فعال کردن</DropdownMenuItem>
-          <DropdownMenuItem className="gap-2 cursor-pointer" onClick={() => run({status: "inactive"}, "غیرفعال") }><PowerOff className="w-4 h-4 text-slate-500"/>غیرفعال کردن</DropdownMenuItem>
+          <DropdownMenuItem className="gap-2 cursor-pointer" onClick={() => requestRun({status: "active"}, "فعال") }><Power className="w-4 h-4 text-emerald-600"/>فعال کردن</DropdownMenuItem>
+          <DropdownMenuItem className="gap-2 cursor-pointer" onClick={() => requestRun({status: "inactive"}, "غیرفعال") }><PowerOff className="w-4 h-4 text-slate-500"/>غیرفعال کردن</DropdownMenuItem>
         </>}
         <DropdownMenuItem className="gap-2 cursor-pointer" onClick={() => { onApplied(); toast({title:"بروزرسانی شد", description:"جدول با داده‌های جدید بارگذاری شد"}); }}><RefreshCcw className="w-4 h-4 text-blue-600"/>بروزرسانی</DropdownMenuItem>
       </DropdownMenuContent>
@@ -115,5 +125,15 @@ export function GenericBulkActions({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+
+    <BulkOperationDialog
+      open={operationOpen}
+      entityName={entityName}
+      operationLabel={pendingRun?.label ?? "عملیات گروهی"}
+      progress={progress}
+      running={busy}
+      onCancel={() => { if (!busy) { setOperationOpen(false); setPendingRun(null); } }}
+      onConfirm={run}
+    />
   </>;
 }
