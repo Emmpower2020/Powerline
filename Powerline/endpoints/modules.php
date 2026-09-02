@@ -37,28 +37,135 @@ function registerModuleRoutes(Router $router): void
             : ['is_active', $inactive ? 0 : 1];
     };
 
-    // v4.3.57: حذف محافظت‌شده — رکوردی که در جدول دیگری استفاده شده باشد
-    // با پیام فارسی دقیق (شامل تعداد و نام بخش) رد می‌شود، نه خطای خام MySQL.
-    $guardedDelete = function (string $table, string $label, int $id, array $guards): void {
+    // v4.3.58: حذف هوشمند و توضیح‌دار رکوردهای دارای وابستگی FK.
+    // فقط روابطی که واقعاً DELETE را منع می‌کنند (RESTRICT / NO ACTION) مانع حذف می‌شوند.
+    // روابط SET NULL / CASCADE طبق قواعد خود دیتابیس بدون خطا مدیریت خواهند شد.
+    $guardedDelete = function (string $table, string $label, int $id, array $guards = []): void {
         $db = Database::getInstance();
-        foreach ($guards as $gKey => $gLabel) {
-            // کلید می‌تواند «جدول» یا «جدول.ستون» باشد (ستون پیش‌فرض: table_id)
-            $gTable = $gKey;
-            $gCol = $table . '_id';
-            if (str_contains($gKey, '.')) { [$gTable, $gCol] = explode('.', $gKey, 2); }
-            try {
-                $cnt = (int)$db->fetchOne("SELECT COUNT(*) AS c FROM `$gTable` WHERE `$gCol` = ?", [$id])['c'];
-            } catch (Throwable $e) { continue; } // جدول/ستون ارجاع‌دهنده در این دیتابیس نیست
-            if ($cnt > 0) {
-                Response::error(409, "این $label در «{$gLabel}» استفاده می‌شود ({$cnt} مورد) و حذف آن ممکن نیست.\nابتدا آن رکوردها را حذف کنید یا $label آنها را تغییر دهید.");
+        $pdo = $db->getConnection();
+        $schema = $pdo->query('SELECT DATABASE()')->fetchColumn();
+
+        // برچسب خوانا برای نمایش دلیل خطا؛ برای جداول ناشناخته نام خود جدول هم قابل‌فهم است.
+        $labels = [
+            'contracts' => 'قراردادها',
+            'invoices' => 'صورت‌وضعیت‌ها',
+            'crews' => 'اکیپ‌ها',
+            'lines' => 'خطوط',
+            'work_orders' => 'دستورکارها',
+            'defects' => 'عیوب',
+            'inspections' => 'بازدیدها',
+            'equipment' => 'تجهیزات',
+            'towers' => 'دکل‌ها',
+            'personnel' => 'پرسنل',
+            'crew_members' => 'اعضای اکیپ',
+            'contract_price_list_items' => 'اقلام قیمت قرارداد',
+            'price_lists' => 'فهرست بها',
+            'safety_incidents' => 'حوادث ایمنی',
+        ];
+
+        $humanTable = static function (string $name) use ($labels): string {
+            return $labels[$name] ?? $name;
+        };
+
+        $blockers = [];
+        try {
+            $sql = "
+                SELECT DISTINCT kcu.TABLE_NAME AS child_table, kcu.COLUMN_NAME AS child_column,
+                       rc.DELETE_RULE AS delete_rule
+                FROM INFORMATION_SCHEMA.KEY_COLUMN_USAGE kcu
+                INNER JOIN INFORMATION_SCHEMA.REFERENTIAL_CONSTRAINTS rc
+                  ON rc.CONSTRAINT_SCHEMA = kcu.CONSTRAINT_SCHEMA
+                 AND rc.CONSTRAINT_NAME = kcu.CONSTRAINT_NAME
+                 AND rc.TABLE_NAME = kcu.TABLE_NAME
+                WHERE kcu.REFERENCED_TABLE_SCHEMA = ?
+                  AND kcu.REFERENCED_TABLE_NAME = ?
+                  AND kcu.REFERENCED_COLUMN_NAME = 'id'
+                  AND kcu.TABLE_NAME <> ?
+                ORDER BY kcu.TABLE_NAME, kcu.COLUMN_NAME";
+            $st = $pdo->prepare($sql);
+            $st->execute([$schema, $table, $table]);
+            foreach ($st->fetchAll() as $fk) {
+                $childTable = (string)$fk['child_table'];
+                $childColumn = (string)$fk['child_column'];
+                $rule = strtoupper((string)$fk['delete_rule']);
+                if (in_array($rule, ['SET NULL', 'CASCADE', 'SET DEFAULT'], true)) {
+                    continue;
+                }
+                $cntStmt = $pdo->prepare("SELECT COUNT(*) FROM `$childTable` WHERE `$childColumn` = ?");
+                $cntStmt->execute([$id]);
+                $count = (int)$cntStmt->fetchColumn();
+                if ($count > 0) {
+                    $blockers[] = [
+                        'table' => $childTable,
+                        'column' => $childColumn,
+                        'count' => $count,
+                        'rule' => $rule,
+                        'label' => $humanTable($childTable),
+                    ];
+                }
+            }
+        } catch (Throwable $e) {
+            Logger::error('guardedDelete FK introspection failed', [
+                'table' => $table,
+                'id' => $id,
+                'error' => $e->getMessage(),
+            ]);
+            // در صورت شکست introspection، نگاشت صریح قبلی را به‌عنوان fallback اجرا می‌کنیم.
+            foreach ($guards as $gKey => $gLabel) {
+                $gTable = $gKey;
+                $gCol = $table . '_id';
+                if (str_contains($gKey, '.')) { [$gTable, $gCol] = explode('.', $gKey, 2); }
+                try {
+                    $cnt = (int)$db->fetchOne("SELECT COUNT(*) AS c FROM `$gTable` WHERE `$gCol` = ?", [$id])['c'];
+                } catch (Throwable $ignored) { continue; }
+                if ($cnt > 0) {
+                    $blockers[] = [
+                        'table' => $gTable,
+                        'column' => $gCol,
+                        'count' => $cnt,
+                        'rule' => 'RESTRICT',
+                        'label' => $gLabel,
+                    ];
+                }
             }
         }
-        try {
-            $db->execute("DELETE FROM `$table` WHERE id = ?", [$id]);
-        } catch (PDOException $e) {
-            Response::error(409, "حذف این $label به دلیل استفاده در رکوردهای دیگر ممکن نیست");
+
+        if ($blockers) {
+            $lines = [];
+            foreach ($blockers as $b) {
+                $countText = number_format($b['count'], 0, '.', ',');
+                $lines[] = "• {$b['label']}: {$countText} مورد";
+            }
+            $detail = implode("\n", $lines);
+            $name = $label === 'پیمانکار' ? 'این پیمانکار' : "این $label";
+            $message = "$name قابل حذف نیست چون در رکوردهای زیر استفاده شده است:\n$detail\n\nابتدا این وابستگی‌ها را مدیریت/حذف کنید و سپس دوباره تلاش کنید.";
+            Response::error(409, $message, [
+                'entity' => $table,
+                'entity_id' => $id,
+                'blockers' => $blockers,
+            ]);
         }
-        Response::success(null, "$label حذف شد");
+
+        try {
+            $stmt = $pdo->prepare("DELETE FROM `$table` WHERE id = ?");
+            $stmt->execute([$id]);
+            if ($stmt->rowCount() === 0) {
+                Response::error(404, "$label پیدا نشد یا قبلاً حذف شده است");
+            }
+        } catch (PDOException $e) {
+            Logger::error('guardedDelete delete failed', [
+                'table' => $table,
+                'id' => $id,
+                'error' => $e->getMessage(),
+            ]);
+            // اگر دیتابیس رابطه‌ای را که در introspection دیده نشده بود گزارش کرد،
+            // پیام را به‌صورت کاربرپسند برگردان و متن خام SQL را نمایش نده.
+            if ((string)$e->getCode() === '23000') {
+                Response::error(409, "حذف این $label انجام نشد چون هنوز رکوردهای وابسته به آن وجود دارد. ابتدا رکوردهای مرتبط را مدیریت کنید.");
+            }
+            Response::error(500, "حذف این $label با خطای داخلی سرور مواجه شد. جزئیات در لاگ سیستم ثبت شده است.");
+        }
+        Response::success(null, "$label با موفقیت حذف شد");
     };
 
     // مرجع‌های دکل: ساختارهای سازه و کدهای نوع دکل از جداول مرجع خوانده می‌شوند.
@@ -1086,7 +1193,10 @@ function registerModuleRoutes(Router $router): void
     $router->delete('contractors/{id}', function ($id) use ($guardedDelete) {
         Auth::authenticate();
         Auth::requirePermissionSoft('contractors.delete');
-        $guardedDelete('contractors', 'پیمانکار', (int)$id, ['contracts' => 'قراردادها', 'invoices' => 'صورت‌وضعیت‌ها']);
+        $guardedDelete('contractors', 'پیمانکار', (int)$id, [
+            'contracts' => 'قراردادها',
+            'invoices' => 'صورت‌وضعیت‌ها',
+        ]);
     });
 
     // ============================================================

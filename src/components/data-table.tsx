@@ -195,7 +195,21 @@ function DataTableInner<T extends { id: number }>({
     }
   }, [selectedRows, selectedRowCache, tableRef]);
 
-  const clearSelection = () => { setSelectedRows(new Set()); setSelectedRowCache(new Map()); setSelectionAllActive(false); };
+  const clearSelection = useCallback(() => {
+    setSelectedRows(new Set());
+    setSelectedRowCache(new Map());
+    setSelectionAllActive(false);
+  }, []);
+
+  // هر بار دادهٔ جدول تازه از والد دریافت می‌شود (مثلاً بعد از حذف، ویرایش یا رفرش)،
+  // انتخاب‌های قبلی نباید به رکوردهای جدید منتقل شوند و شمارندهٔ انتخاب نباید باقی بماند.
+  const previousDataRef = useRef<T[] | null>(null);
+  useEffect(() => {
+    if (previousDataRef.current !== data) {
+      previousDataRef.current = data;
+      clearSelection();
+    }
+  }, [data, clearSelection]);
 
   // سلامت داده به‌صورت پیش‌فرض در همه جدول‌ها نمایش داده می‌شود.
   const effectiveColumns = useMemo<DataTableColumn<T>[]>(() => {
