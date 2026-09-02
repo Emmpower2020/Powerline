@@ -1,6 +1,6 @@
 "use client";
 import { useState, type ReactNode } from "react";
-import { ListChecks, Power, PowerOff, RefreshCcw, FileText } from "lucide-react";
+import { ListChecks, Power, PowerOff, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -115,7 +115,6 @@ export function GenericBulkActions({
           <DropdownMenuItem className="gap-2 cursor-pointer" onClick={() => requestRun({status: "active"}, "فعال کردن") }><Power className="w-4 h-4 text-emerald-600"/>فعال کردن</DropdownMenuItem>
           <DropdownMenuItem className="gap-2 cursor-pointer" onClick={() => requestRun({status: "inactive"}, "غیرفعال کردن") }><PowerOff className="w-4 h-4 text-slate-500"/>غیرفعال کردن</DropdownMenuItem>
         </>}
-        <DropdownMenuItem className="gap-2 cursor-pointer" onClick={() => { onApplied(); toast({title:"بروزرسانی شد", description:"جدول با داده‌های جدید بارگذاری شد"}); }}><RefreshCcw className="w-4 h-4 text-blue-600"/>بروزرسانی</DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
 

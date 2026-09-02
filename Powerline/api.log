@@ -26,3 +26,7 @@
 [2026-09-02 21:46:15] [INFO] [IP:127.0.0.1] [POST /api.php/personnel/bulk-import] API request Context: {"method":"POST","uri":"/api.php/personnel/bulk-import"}
 [2026-09-02 21:46:28] [INFO] [IP:127.0.0.1] [POST /api.php/personnel/bulk-import] API request Context: {"method":"POST","uri":"/api.php/personnel/bulk-import"}
 [2026-09-02 21:46:47] [INFO] [IP:127.0.0.1] [GET /api.php/personnel?page=1&page_size=50] API request Context: {"method":"GET","uri":"/api.php/personnel?page=1&page_size=50"}
+[2026-09-02 22:22:18] [INFO] [IP:127.0.0.1] [GET /api.php/backend-version] API request Context: {"method":"GET","uri":"/api.php/backend-version"}
+[2026-09-02 22:22:20] [INFO] [IP:127.0.0.1] [PUT /api.php/personnel/327] API request Context: {"method":"PUT","uri":"/api.php/personnel/327"}
+[2026-09-02 22:22:20] [INFO] [IP:127.0.0.1] [PUT /api.php/personnel/327] API request Context: {"method":"PUT","uri":"/api.php/personnel/327"}
+[2026-09-02 22:22:20] [INFO] [IP:127.0.0.1] [PUT /api.php/personnel/327] API request Context: {"method":"PUT","uri":"/api.php/personnel/327"}

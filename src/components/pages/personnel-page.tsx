@@ -17,7 +17,7 @@ import { BulkDeleteDialog } from "@/components/bulk-delete-dialog";
 import { useBulkDelete } from "@/hooks/use-bulk-delete";
 import { useToast } from "@/hooks/use-toast";
 import { useStatsVisible } from "@/hooks/use-stats-visible";
-import { GenericBulkActions } from "@/components/generic-bulk-actions";
+import { BulkPersonnelActions } from "@/components/personnel/bulk-personnel-actions";
 import { logError } from "@/lib/error-log";
 import { Loader2, Plus, HardHat, UserCog, Cog, Users, Car, Wrench } from "lucide-react";
 
@@ -223,7 +223,11 @@ export function PersonnelPage() {
         onCopy={handleCopy}
         onDelete={bulkDelete.requestDelete}
         onImport={() => setShowImport(true)}
-        toolbarExtra={(rows) => <GenericBulkActions rows={rows} endpoint={API_ENDPOINTS.personnel} entityName="پرسنل" onApplied={() => setRefreshKey(k => k + 1)} canToggleStatus />}
+        toolbarExtra={() => <BulkPersonnelActions
+          getSelection={() => { const ids = tableRef.current?.getSelectedRows?.() ?? []; return data.filter(r => ids.includes(r.id)); }}
+          onApplied={() => setRefreshKey(k => k + 1)}
+          positionOptions={Array.from(new Set(data.map(p => (p.position || "").trim()).filter(Boolean))).map(v => ({ value: v, label: v }))}
+        />}
       />
 
       <PersonnelDialog
