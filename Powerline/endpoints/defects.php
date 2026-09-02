@@ -271,7 +271,7 @@ function registerDefectRoutes(Router $router): void
         } catch (\PDOException $e) {
             if ($pdo->inTransaction()) $pdo->rollBack();
             Logger::error("Defects bulk-delete failed", ['error' => $e->getMessage()]);
-            Response::error(500, 'حذف انبوه عیوب ناموفق بود: ' . $e->getMessage());
+            Response::error(500, 'حذف انبوه عیوب ناموفق بود: ' . fa_db_error($e));
         }
         Logger::info('Defects bulk-deleted', ['count' => $deleted, 'user_id' => $user['id']]);
         Response::success(['deleted' => $deleted], "{$deleted} عیب حذف شد");
@@ -367,7 +367,7 @@ function registerDefectRoutes(Router $router): void
             $pdo->commit();
         } catch (\PDOException $e) {
             if ($pdo->inTransaction()) $pdo->rollBack();
-            Response::error(500, 'ورود انبوه عیوب ناموفق بود: ' . $e->getMessage());
+            Response::error(500, 'ورود انبوه عیوب ناموفق بود: ' . fa_db_error($e));
         }
 
         Response::success([

@@ -200,7 +200,7 @@ function registerLineRoutes(Router $router): void
                 }
                 Response::error(409, 'داده تکراری: ' . $msg);
             }
-            Response::error(500, 'خطای دیتابیس: ' . $e->getMessage());
+            Response::error(500, 'خطای دیتابیس: ' . fa_db_error($e));
         }
 
         $newId = (int) $db->lastInsertId();
@@ -339,7 +339,7 @@ function registerLineRoutes(Router $router): void
         } catch (Throwable $e) {
             if ($pdo->inTransaction()) $pdo->rollBack();
             Logger::error('Lines bulk-update failed', ['error' => $e->getMessage(), 'count' => count($ids)]);
-            Response::error(500, 'ویرایش گروهی خطوط ناموفق بود: ' . $e->getMessage());
+            Response::error(500, 'ویرایش گروهی خطوط ناموفق بود: ' . fa_db_error($e));
         }
 
         Logger::info('Lines bulk-updated', ['count' => $updated, 'user_id' => $user['id']]);
@@ -381,7 +381,7 @@ function registerLineRoutes(Router $router): void
                 $pdo->rollBack();
             }
             Logger::error("Line delete failed", ['line_id' => $lineId, 'error' => $e->getMessage()]);
-            Response::error(500, 'حذف خط ناموفق بود: ' . $e->getMessage());
+            Response::error(500, 'حذف خط ناموفق بود: ' . fa_db_error($e));
         }
 
         Logger::info('Line hard-deleted', ['line_id' => $lineId, 'user_id' => $user['id']]);
@@ -460,7 +460,7 @@ function registerLineRoutes(Router $router): void
         } catch (\PDOException $e) {
             if ($pdo->inTransaction()) $pdo->rollBack();
             Logger::error("Lines bulk-import failed", ['error' => $e->getMessage()]);
-            Response::error(500, 'ورود انبوه ناموفق بود: ' . $e->getMessage());
+            Response::error(500, 'ورود انبوه ناموفق بود: ' . fa_db_error($e));
         }
 
         Logger::info('Lines bulk-import', ['inserted' => $inserted, 'failed' => $failed, 'user_id' => $user['id']]);
@@ -515,7 +515,7 @@ function registerLineRoutes(Router $router): void
                 $pdo->rollBack();
             }
             Logger::error("Lines bulk-delete failed", ['error' => $e->getMessage()]);
-            Response::error(500, 'حذف انبوه ناموفق بود: ' . $e->getMessage());
+            Response::error(500, 'حذف انبوه ناموفق بود: ' . fa_db_error($e));
         }
 
         Logger::info('Lines bulk-deleted', ['count' => $deleted, 'user_id' => $user['id']]);

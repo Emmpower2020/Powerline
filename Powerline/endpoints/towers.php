@@ -434,7 +434,7 @@ function registerTowerRoutes(Router $router): void
         } catch (Throwable $e) {
             if ($pdo->inTransaction()) $pdo->rollBack();
             Logger::error('Towers bulk-update failed', ['error' => $e->getMessage(), 'count' => count($ids)]);
-            Response::error(500, 'ویرایش گروهی دکل‌ها ناموفق بود: ' . $e->getMessage());
+            Response::error(500, 'ویرایش گروهی دکل‌ها ناموفق بود: ' . fa_db_error($e));
         }
 
         foreach (array_keys($affectedLines) as $lineId) {
@@ -477,7 +477,7 @@ function registerTowerRoutes(Router $router): void
                 $pdo->rollBack();
             }
             Logger::error("Tower delete failed", ['tower_id' => $towerId, 'error' => $e->getMessage()]);
-            Response::error(500, 'حذف دکل ناموفق بود: ' . $e->getMessage());
+            Response::error(500, 'حذف دکل ناموفق بود: ' . fa_db_error($e));
         }
 
         Logger::info('Tower hard-deleted', ['tower_id' => $towerId, 'user_id' => $user['id']]);
@@ -526,7 +526,7 @@ function registerTowerRoutes(Router $router): void
                 $pdo->rollBack();
             }
             Logger::error("Towers bulk-delete failed", ['error' => $e->getMessage()]);
-            Response::error(500, 'حذف انبوه ناموفق بود: ' . $e->getMessage());
+            Response::error(500, 'حذف انبوه ناموفق بود: ' . fa_db_error($e));
         }
 
         Logger::info('Towers bulk-deleted', ['count' => $deleted, 'user_id' => $user['id']]);
@@ -731,7 +731,7 @@ function registerTowerRoutes(Router $router): void
         } catch (\PDOException $e) {
             if ($pdo->inTransaction()) $pdo->rollBack();
             Logger::error("Towers bulk-import failed", ['error' => $e->getMessage()]);
-            Response::error(500, 'ورود انبوه ناموفق بود: ' . $e->getMessage());
+            Response::error(500, 'ورود انبوه ناموفق بود: ' . fa_db_error($e));
         }
 
         Logger::info('Towers bulk-import', ['inserted' => $inserted, 'updated' => $updated, 'failed' => $failed, 'user_id' => $user['id']]);

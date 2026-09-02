@@ -38,7 +38,7 @@ const FIELD_LABELS: Record<string, string> = {
   contract_code: "کد قرارداد", title: "عنوان", start_date: "تاریخ شروع", end_date: "تاریخ پایان",
   amount: "مبلغ (ریال)", status: "وضعیت", notes: "یادداشت",
   first_name: "نام", last_name: "نام خانوادگی", position: "سمت",
-  mobile: "موبایل", email: "ایمیل", hire_date: "تاریخ استخدام",
+  phone: "تلفن", mobile: "موبایل", email: "ایمیل", hire_date: "تاریخ استخدام",
   incident_type: "نوع حادثه", severity: "شدت", description: "توضیحات",
   location_desc: "محل وقوع", occurred_at: "تاریخ وقوع", line_id: "خط", tower_id: "دکل",
   period_start: "شروع دوره", period_end: "پایان دوره", total_amount: "مبلغ کل",
@@ -46,13 +46,13 @@ const FIELD_LABELS: Record<string, string> = {
   install_date: "تاریخ نصب", warranty_expiry: "پایان گارانتی",
   contractor_code: "کد پیمانکار", contractor_name: "نام پیمانکار", ceo_name: "مدیرعامل",
   contractor_phone: "تلفن دفتر", address: "آدرس", father_name: "نام پدر",
-  supervisor_name: "سرپرست",
+  supervisor_name: "سرپرست", collaboration_start: "شروع همکاری",
 };
 
 /** فیلدهای تاریخ — ورودی به‌صورت متن شمسی با فرمت 1405/05/30 */
 const DATE_FIELDS = new Set([
   "start_date", "end_date", "period_start", "period_end", "hire_date",
-  "install_date", "warranty_expiry", "occurred_at",
+  "install_date", "warranty_expiry", "occurred_at", "collaboration_start",
 ]);
 
 const JALALI_DATE_RE = /^\d{4}\/(0?[1-9]|1[0-2])\/(0?[1-9]|[12]\d|3[01])$/;
@@ -135,7 +135,7 @@ const configs: Record<string, GenericConfig> = {
     { key: "occurred_at", header: "تاریخ", type: "date", sortable: true },
     { key: "status", header: "وضعیت", type: "badge", badgeLabels: { reported: "گزارش شده", under_investigation: "در حال بررسی", resolved: "حل شده", closed: "بسته شده" }, badgeColors: { reported: "bg-blue-100 text-blue-700", resolved: "bg-green-100 text-green-700", closed: "bg-slate-100 text-slate-500" } },
   ]},
-  personnel: { title: "پرسنل", activityStatus: true, editKeys: ["contract_id","first_name","last_name","position","mobile","email","hire_date","status"], importKeys: ["contract_id","first_name","last_name","position","mobile","email","hire_date","status"], columns: [
+  personnel: { title: "پرسنل", activityStatus: true, editKeys: ["contract_id","first_name","last_name","position","phone","mobile","email","status"], importKeys: ["contract_id","first_name","last_name","position","phone","mobile","email","status"], columns: [
     { key: "personnel_code", header: "کد", sortable: true, filterable: true, align: "left" },
     { key: "contract_title", header: "قرارداد", sortable: true, filterable: true, wrap: true },
     { key: "first_name", header: "نام", sortable: true, filterable: true },
@@ -144,7 +144,7 @@ const configs: Record<string, GenericConfig> = {
     { key: "mobile", header: "موبایل", align: "left" },
   ]},
   contractors: { title: "پیمانکاران", activityStatus: true, editKeys: ["contractor_code","contractor_name","ceo_name","contractor_phone","mobile","address","status"], importKeys: ["contractor_code","contractor_name","ceo_name","contractor_phone","mobile","address","status"], columns: [
-    { key: "id", header: "ID", sortable: true, filterable: true, align: "left" },
+    { key: "id", header: "شناسه", sortable: true, filterable: true, align: "left" },
     { key: "contractor_code", header: "کد پیمانکار", sortable: true, filterable: true, align: "left" },
     { key: "contractor_name", header: "نام پیمانکار", sortable: true, filterable: true, wrap: true },
     { key: "ceo_name", header: "مدیرعامل", sortable: true, filterable: true },
@@ -167,11 +167,11 @@ const configs: Record<string, GenericConfig> = {
     { key: "action", header: "عملیات", sortable: true, filterable: true },
     { key: "entity_type", header: "موجودیت", sortable: true, filterable: true },
     { key: "entity_id", header: "شناسه", align: "left" },
-    { key: "ip_address", header: "IP", align: "left" },
+    { key: "ip_address", header: "آی‌پی", align: "left" },
     { key: "created_at", header: "زمان", type: "date" },
   ]},
   organization: { title: "سازمان", columns: [
-    { key: "id", header: "ID", sortable: true, filterable: true, align: "left" },
+    { key: "id", header: "شناسه", sortable: true, filterable: true, align: "left" },
     { key: "code", header: "کد", align: "left" }, { key: "name", header: "نام", sortable: true, filterable: true },
     { key: "org_type", header: "نوع", type: "badge", badgeLabels: { company: "شرکت", region: "منطقه", management: "مدیریت", unit: "واحد" }, badgeColors: { company: "bg-indigo-100 text-indigo-700", region: "bg-blue-100 text-blue-700", management: "bg-purple-100 text-purple-700", unit: "bg-slate-100 text-slate-700" } },
     { key: "contractor_phone", header: "تلفن", align: "left" }, { key: "status", header: "وضعیت", type: "status" },

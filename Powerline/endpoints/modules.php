@@ -231,7 +231,7 @@ function registerModuleRoutes(Router $router): void
         $fields=[];$params=[]; foreach(['name','sort_order'] as $f){if(array_key_exists($f,$b)){$fields[]="`$f`=?";$params[]=$b[$f];}}
         if(array_key_exists('status',$b)){list($statusCol,$statusVal)=$towerRefStatusValue($pdo,'tower_structures',$b['status']);$fields[]="`$statusCol`=?";$params[]=$statusVal;}
         if(!$fields) Response::error(400,'فیلدی برای ویرایش ارسال نشده'); $params[]=(int)$id;
-        try{Database::getInstance()->execute("UPDATE tower_structures SET ".implode(',',$fields).",updated_at=NOW() WHERE id=?",$params);}catch(PDOException $e){Response::error(409,'ویرایش ساختار انجام نشد: '.$e->getMessage());}
+        try{Database::getInstance()->execute("UPDATE tower_structures SET ".implode(',',$fields).",updated_at=NOW() WHERE id=?",$params);}catch(PDOException $e){Response::error(409,'ویرایش ساختار انجام نشد: '.fa_db_error($e));}
         Response::success(null,'ساختار دکل ویرایش شد');
     });
     $router->delete('tower-structures/{id}', function($id){
@@ -399,7 +399,7 @@ function registerModuleRoutes(Router $router): void
             $stmt->execute([$code, $title, $contractorId, $body['organization_id'] ?? null, $type, $start, $end, (float)($body['amount'] ?? 0), $status, $body['notes'] ?? null]);
         } catch (\PDOException $e) {
             if ($e->getCode() === '23000') Response::error(409, 'کد قرارداد تکراری است یا ارتباط پیمانکار/سازمان معتبر نیست.');
-            Response::error(500, 'ثبت قرارداد ناموفق بود: ' . $e->getMessage());
+            Response::error(500, 'ثبت قرارداد ناموفق بود: ' . fa_db_error($e));
         }
         Response::success(['id' => (int)$pdo->lastInsertId(), 'contract_code' => $code], 'قرارداد ایجاد شد', 201);
     });
@@ -423,7 +423,7 @@ function registerModuleRoutes(Router $router): void
             $pdo->prepare("UPDATE contracts SET " . implode(', ', $updates) . " WHERE id = ?")->execute($params);
         } catch (PDOException $e) {
             if ((string)$e->getCode() === '23000') Response::error(409, 'کد قرارداد تکراری است یا ارتباط یکی از اطلاعات مرتبط معتبر نیست.');
-            Response::error(500, 'ویرایش قرارداد ناموفق بود: ' . $e->getMessage());
+            Response::error(500, 'ویرایش قرارداد ناموفق بود: ' . fa_db_error($e));
         }
         Response::success(null, 'قرارداد ویرایش شد');
     });
@@ -566,62 +566,57 @@ function registerModuleRoutes(Router $router): void
     // ============================================================
     //  پرسنل (Personnel) — CRUD کامل
     // ============================================================
-    $router->get('personnel', function () {
+    $router->get('personnel', function () use ($personnelPositionCol) {
         Auth::authenticate();
         Auth::requirePermissionSoft('personnel.view');
         $pdo = Database::getInstance()->getConnection();
         $page = Helpers::getPage(); $pageSize = Helpers::getPageSize(); $offset = Helpers::getOffset();
         $search = Helpers::getSearch();
-        // فیلتر پرسنل — برای کمبوباکس‌های سرپرست اکیپ/کارشناس خط
+        // v3.0.0: فیلتر نوع پرسنل — برای کمبوباکس‌های سرپرست اکیپ/کارشناس خط
         $contractId = Helpers::getContractId();
         $where = '1=1'; $params = [];
         if ($contractId === 0) { $where .= ' AND p.contract_id IS NULL'; } elseif ($contractId !== null) { $where .= ' AND p.contract_id = ?'; $params[] = $contractId; }
         if (!empty($search)) { $where .= ' AND (p.personnel_code LIKE ? OR p.first_name LIKE ? OR p.last_name LIKE ? OR p.position LIKE ? OR p.national_id LIKE ?)'; $sp = "%$search%"; $params[] = $sp; $params[] = $sp; $params[] = $sp; $params[] = $sp; $params[] = $sp; }
         $countStmt = $pdo->prepare("SELECT COUNT(*) FROM personnel p WHERE $where"); $countStmt->execute($params); $total = (int)$countStmt->fetchColumn();
-        $stmt = $pdo->prepare("SELECT p.*, u.username, c.title AS contract_title FROM personnel p LEFT JOIN users u ON u.id = p.user_id LEFT JOIN contracts c ON c.id = p.contract_id WHERE $where ORDER BY p.id DESC LIMIT $pageSize OFFSET $offset");
+        $posCol = $personnelPositionCol($pdo);
+        $posSel = $posCol === 'position' ? 'p.position' : 'p.personnel_type AS position';
+        $stmt = $pdo->prepare("SELECT p.*, u.username, c.title AS contract_title, $posSel FROM personnel p LEFT JOIN users u ON u.id = p.user_id LEFT JOIN contracts c ON c.id = p.contract_id WHERE $where ORDER BY p.id DESC LIMIT $pageSize OFFSET $offset");
         $stmt->execute($params);
         Response::paginated($stmt->fetchAll(), $page, $pageSize, $total);
     });
 
-    $router->post('personnel', function () {
+    // v4.3.69: ستون «سمت» پرسنل در نسخه‌های مختلف دیتابیس یا position است یا
+    // personnel_type — کوئری‌ها با ستون واقعی ساخته می‌شوند تا import روی
+    // هر دو ساختار بدون خطای «Unknown column» کار کند.
+    $personnelPositionCol = function (PDO $pdo): string {
+        foreach ($pdo->query('SHOW COLUMNS FROM personnel')->fetchAll() as $c) {
+            if (($c['Field'] ?? null) === 'position') return 'position';
+        }
+        return 'personnel_type';
+    };
+
+    $router->post('personnel', function () use ($personnelPositionCol) {
         Auth::authenticate();
         Auth::requirePermissionSoft('personnel.create');
         $body = Helpers::getJsonBody();
         if (empty($body['first_name'])) Response::error(400, 'نام الزامی است');
         $pdo = Database::getInstance()->getConnection();
         $code = $body['personnel_code'] ?? ('P-' . str_pad((string)random_int(0, 9999), 4, '0', STR_PAD_LEFT));
-        $hireDateRaw = trim((string)($body['hire_date'] ?? ''));
-        $hireDate = preg_match('/^\d{4}\/\d{1,2}\/\d{1,2}$/', $hireDateRaw)
-            ? Helpers::jalaliToGregorian($hireDateRaw)
-            : ($hireDateRaw !== '' ? $hireDateRaw : date('Y-m-d'));
-        $stmt = $pdo->prepare("INSERT INTO personnel (organization_id, user_id, personnel_code, first_name, last_name, national_id, position, father_name, mobile, email, hire_date, supervisor_name, contract_id, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', NOW())");
-        $stmt->execute([
-            $body['organization_id'] ?? 1, $body['user_id'] ?? null, $code,
-            $body['first_name'], $body['last_name'] ?? '', $body['national_id'] ?? null,
-            $body['position'] ?? null, $body['father_name'] ?? null, $body['mobile'] ?? null,
-            $body['email'] ?? null, $hireDate, $body['supervisor_name'] ?? null,
-            $body['contract_id'] ?? null,
-        ]);
+        $posCol = $personnelPositionCol($pdo);
+        $stmt = $pdo->prepare("INSERT INTO personnel (organization_id, user_id, personnel_code, first_name, last_name, national_id, $posCol, phone, mobile, email, hire_date, contract_id, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, NOW())");
+        $stmt->execute([$body['organization_id'] ?? 1, $body['user_id'] ?? null, $code, $body['first_name'], $body['last_name'] ?? '', $body['national_id'] ?? null, $body['position'] ?? null, $body['phone'] ?? null, $body['mobile'] ?? null, $body['email'] ?? null, $body['hire_date'] ?? date('Y-m-d'), $body['contract_id'] ?? null]);
         Response::success(['id' => (int)$pdo->lastInsertId(), 'personnel_code' => $code], 'پرسنل ایجاد شد', 201);
     });
 
-    $router->put('personnel/{id}', function ($id) {
+    $router->put('personnel/{id}', function ($id) use ($personnelPositionCol) {
         Auth::authenticate();
         Auth::requirePermissionSoft('personnel.update');
         $body = Helpers::getJsonBody(); $pdo = Database::getInstance()->getConnection();
-        $fields = ['first_name', 'last_name', 'national_id', 'position', 'mobile', 'email', 'hire_date', 'contract_id', 'status', 'father_name', 'supervisor_name'];
+        $posCol = $personnelPositionCol($pdo);
+        if ($posCol !== 'position' && array_key_exists('position', $body)) { $body[$posCol] = $body['position']; unset($body['position']); }
+        $fields = ['first_name', 'last_name', 'national_id', $posCol, 'phone', 'mobile', 'email', 'hire_date', 'contract_id', 'status', 'father_name', 'supervisor_name', 'collaboration_start'];
         $updates = []; $params = [];
-        foreach ($fields as $f) {
-            if (array_key_exists($f, $body)) {
-                $value = $body[$f];
-                if ($f === 'hire_date') {
-                    $raw = trim((string)$value);
-                    $value = preg_match('/^\d{4}\/\d{1,2}\/\d{1,2}$/', $raw) ? Helpers::jalaliToGregorian($raw) : ($raw !== '' ? $raw : null);
-                }
-                $updates[] = "`$f` = ?";
-                $params[] = $value;
-            }
-        }
+        foreach ($fields as $f) { if (array_key_exists($f, $body)) { $updates[] = "`$f` = ?"; $params[] = $body[$f]; } }
         if (empty($updates)) Response::error(400, 'هیچ فیلدی ارسال نشده');
         $params[] = (int)$id;
         $pdo->prepare("UPDATE personnel SET " . implode(', ', $updates) . " WHERE id = ?")->execute($params);
@@ -716,7 +711,7 @@ function registerModuleRoutes(Router $router): void
         } catch (\PDOException $e) {
             if ($pdo->inTransaction()) $pdo->rollBack();
             Logger::error("Personnel bulk-delete failed", ['error' => $e->getMessage()]);
-            Response::error(500, 'حذف انبوه پرسنل ناموفق بود: ' . $e->getMessage());
+            Response::error(500, 'حذف انبوه پرسنل ناموفق بود: ' . fa_db_error($e));
         }
 
         Logger::info('Personnel bulk-deleted', ['count' => $deleted, 'skipped' => $skipped, 'user_id' => $user['id']]);
@@ -724,7 +719,7 @@ function registerModuleRoutes(Router $router): void
     });
 
     // ورود انبوه پرسنل — v3.1.0: درج یا ویرایش بر اساس کد ملی / کد پرسنلی
-    $router->post('personnel/bulk-import', function () {
+    $router->post('personnel/bulk-import', function () use ($personnelPositionCol) {
         $user = Auth::authenticate();
         Auth::requirePermissionSoft('personnel.create');
         $body = Helpers::getJsonBody();
@@ -745,9 +740,10 @@ function registerModuleRoutes(Router $router): void
                 if (!empty($r['personnel_code'])) $byCode[trim((string) $r['personnel_code'])] = (int) $r['id'];
             }
 
-            $ins = $pdo->prepare("INSERT INTO personnel (organization_id, personnel_code, first_name, last_name, national_id, father_name, position, mobile, email, supervisor_name, hire_date, status, created_at)
-                                   VALUES (4, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, NOW())");
-            $upd = $pdo->prepare("UPDATE personnel SET first_name = ?, last_name = ?, national_id = ?, father_name = ?, position = ?, mobile = ?, email = ?, supervisor_name = ?, hire_date = ? WHERE id = ?");
+            $posCol = $personnelPositionCol($pdo);
+            $ins = $pdo->prepare("INSERT INTO personnel (organization_id, personnel_code, first_name, last_name, national_id, father_name, $posCol, phone, mobile, email, supervisor_name, collaboration_start, status, created_at)
+                                   VALUES (4, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, NOW())");
+            $upd = $pdo->prepare("UPDATE personnel SET first_name = ?, last_name = ?, national_id = ?, father_name = ?, $posCol = ?, phone = ?, mobile = ?, email = ?, supervisor_name = ?, collaboration_start = ? WHERE id = ?");
 
             foreach ($rows as $i => $r) {
                 try {
@@ -758,10 +754,6 @@ function registerModuleRoutes(Router $router): void
                     $nat = isset($r['national_id']) && $r['national_id'] !== '' ? trim((string) $r['national_id']) : null;
                     $father = isset($r['father_name']) && $r['father_name'] !== '' ? $r['father_name'] : null;
                     $position = isset($r['position']) && $r['position'] !== '' ? $r['position'] : null;
-                    $hireDateRaw = isset($r['hire_date']) && $r['hire_date'] !== '' ? trim((string)$r['hire_date']) : null;
-                    $hireDate = $hireDateRaw && preg_match('/^\d{4}\/\d{1,2}\/\d{1,2}$/', $hireDateRaw)
-                        ? Helpers::jalaliToGregorian($hireDateRaw)
-                        : $hireDateRaw;
 
                     // تشخیص ردیف موجود
                     $existingId = null;
@@ -771,14 +763,14 @@ function registerModuleRoutes(Router $router): void
 
                     if ($existingId) {
                         $upd->execute([$first, $last, $nat, $father, $position,
-                            $r['mobile'] ?? null, $r['email'] ?? null,
-                            $r['supervisor_name'] ?? null, $hireDate, $existingId]);
+                            $r['phone'] ?? null, $r['mobile'] ?? null, $r['email'] ?? null,
+                            $r['supervisor_name'] ?? null, $r['collaboration_start'] ?? null, $existingId]);
                         $updated++; $statuses[] = 'updated'; $errors[] = null;
                     } else {
                         $code = !empty($r['personnel_code']) ? $r['personnel_code'] : ('P-' . str_pad((string) random_int(0, 9999), 4, '0', STR_PAD_LEFT));
                         $ins->execute([$code, $first, $last, $nat, $father, $position,
-                            $r['mobile'] ?? null, $r['email'] ?? null,
-                            $r['supervisor_name'] ?? null, $hireDate]);
+                            $r['phone'] ?? null, $r['mobile'] ?? null, $r['email'] ?? null,
+                            $r['supervisor_name'] ?? null, $r['collaboration_start'] ?? null]);
                         $newId = (int) $pdo->lastInsertId();
                         if ($nat) $byNat[$nat] = $newId;
                         if (!empty($code)) $byCode[$code] = $newId;
@@ -793,7 +785,7 @@ function registerModuleRoutes(Router $router): void
             $pdo->commit();
         } catch (\PDOException $e) {
             if ($pdo->inTransaction()) $pdo->rollBack();
-            Response::error(500, 'ورود انبوه پرسنل ناموفق بود: ' . $e->getMessage());
+            Response::error(500, 'ورود انبوه پرسنل ناموفق بود: ' . fa_db_error($e));
         }
 
         Response::success([
@@ -917,7 +909,7 @@ function registerModuleRoutes(Router $router): void
             $pdo->commit();
         } catch (\PDOException $e) {
             if ($pdo->inTransaction()) $pdo->rollBack();
-            Response::error(500, 'حذف انبوه سیم‌ها ناموفق بود: ' . $e->getMessage());
+            Response::error(500, 'حذف انبوه سیم‌ها ناموفق بود: ' . fa_db_error($e));
         }
         Response::success(['deleted' => $deleted], "{$deleted} سیم حذف شد");
     });
@@ -969,7 +961,7 @@ function registerModuleRoutes(Router $router): void
             $pdo->commit();
         } catch (\PDOException $e) {
             if ($pdo->inTransaction()) $pdo->rollBack();
-            Response::error(500, 'ورود انبوه سیم‌ها ناموفق بود: ' . $e->getMessage());
+            Response::error(500, 'ورود انبوه سیم‌ها ناموفق بود: ' . fa_db_error($e));
         }
         Response::success([
             'inserted' => $inserted, 'updated' => $updated, 'failed' => $failed,
@@ -1075,7 +1067,7 @@ function registerModuleRoutes(Router $router): void
         } catch (\PDOException $e) {
             if ($pdo->inTransaction()) $pdo->rollBack();
             Logger::error("Circuits bulk-delete failed", ['error' => $e->getMessage()]);
-            Response::error(500, 'حذف انبوه مدارها ناموفق بود: ' . $e->getMessage());
+            Response::error(500, 'حذف انبوه مدارها ناموفق بود: ' . fa_db_error($e));
         }
         Logger::info('Circuits bulk-deleted', ['count' => $deleted, 'user_id' => $user['id']]);
         Response::success(['deleted' => $deleted], "{$deleted} مدار حذف شد");
@@ -1133,7 +1125,7 @@ function registerModuleRoutes(Router $router): void
             $pdo->commit();
         } catch (\PDOException $e) {
             if ($pdo->inTransaction()) $pdo->rollBack();
-            Response::error(500, 'ورود انبوه مدارها ناموفق بود: ' . $e->getMessage());
+            Response::error(500, 'ورود انبوه مدارها ناموفق بود: ' . fa_db_error($e));
         }
 
         Response::success([
@@ -1199,7 +1191,7 @@ function registerModuleRoutes(Router $router): void
             ]);
         } catch (\PDOException $e) {
             if ($e->getCode() === '23000') Response::error(409, 'کد پیمانکار تکراری است.');
-            Response::error(500, 'ثبت پیمانکار ناموفق بود: ' . $e->getMessage());
+            Response::error(500, 'ثبت پیمانکار ناموفق بود: ' . fa_db_error($e));
         }
         Response::success(['id' => (int)$pdo->lastInsertId(), 'contractor_code' => $code], 'پیمانکار ایجاد شد', 201);
     });
@@ -1226,7 +1218,7 @@ function registerModuleRoutes(Router $router): void
             $pdo->prepare("UPDATE contractors SET " . implode(', ', $updates) . " WHERE id = ?")->execute($params);
         } catch (\PDOException $e) {
             if ($e->getCode() === '23000') Response::error(409, 'کد پیمانکار تکراری است.');
-            Response::error(500, 'ویرایش پیمانکار ناموفق بود: ' . $e->getMessage());
+            Response::error(500, 'ویرایش پیمانکار ناموفق بود: ' . fa_db_error($e));
         }
         Response::success(null, 'پیمانکار ویرایش شد');
     });

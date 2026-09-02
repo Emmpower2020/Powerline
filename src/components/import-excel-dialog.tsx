@@ -422,8 +422,15 @@ export function ImportExcelDialog({
       }
     }
 
-    // هدر: ردیف | علت خطا | کلیدهای ردیف اصلی
-    const headers = ["ردیف در فایل اکسل", "علت خطا", ...rowKeys];
+    // v4.3.69: هدر ستون‌ها فارسی — نام انگلیسی فقط دیتابیس می‌ماند.
+    // ترتیب جستجو: برعکس headerMap → برچسب templateColumns → خود کلید
+    const reverseMap: Record<string, string> = {};
+    if (headerMap) for (const [fa, key] of Object.entries(headerMap)) reverseMap[key] = fa;
+    if (templateColumns) for (const c of templateColumns) reverseMap[c.key] = c.header;
+    const keyLabel = (k: string) => reverseMap[k] || k;
+
+    // هدر: ردیف | علت خطا | کلیدهای ردیف اصلی (فارسی)
+    const headers = ["ردیف در فایل اکسل", "علت خطا", ...rowKeys.map(keyLabel)];
     const headerRow = ws.addRow(headers);
     headerRow.height = 28;
     headerRow.eachCell((cell) => {
