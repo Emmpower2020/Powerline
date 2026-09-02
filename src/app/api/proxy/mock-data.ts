@@ -753,8 +753,7 @@ export async function handleMockRequest(request: NextRequest): Promise<NextRespo
         MOCK_PERSONNEL.push({
           id: newId, personnel_code: r.personnel_code || ("P-" + (2000 + newId)),
           first_name: r.first_name, last_name: r.last_name || "",
-          national_id: nat, father_name: r.father_name || null,
-          personnel_type: r.personnel_type || "employee", position: r.position || null,
+          national_id: nat, father_name: r.father_name || null, position: r.position || null,
           mobile: r.mobile || null, supervisor_name: r.supervisor_name || null,
           collaboration_start: r.collaboration_start || null, status: "active",
         });
@@ -947,9 +946,7 @@ export async function handleMockRequest(request: NextRequest): Promise<NextRespo
     const page = parseInt(search.get("page") || "1");
     const pageSize = parseInt(search.get("page_size") || "20");
     const q = search.get("search")?.toLowerCase().trim() || "";
-    const type = search.get("personnel_type") || "";
     let filtered = MOCK_PERSONNEL;
-    if (type) filtered = filtered.filter(p => p.personnel_type === type);
     if (q) filtered = filtered.filter(p =>
       String(p.personnel_code).includes(q) ||
       String(p.first_name).includes(q) ||
@@ -972,8 +969,7 @@ export async function handleMockRequest(request: NextRequest): Promise<NextRespo
     MOCK_PERSONNEL.push({
       id: newId, personnel_code: code,
       first_name: body.first_name || "", last_name: body.last_name || "",
-      national_id: body.national_id || null, father_name: body.father_name || null,
-      personnel_type: body.personnel_type || "employee", position: body.position || null,
+      national_id: body.national_id || null, father_name: body.father_name || null, position: body.position || null,
       phone: body.phone || null, mobile: body.mobile || null, email: body.email || null,
       supervisor_name: body.supervisor_name || null, collaboration_start: body.collaboration_start || null,
       status: "active",

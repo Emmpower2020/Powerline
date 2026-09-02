@@ -162,7 +162,6 @@ CREATE TABLE IF NOT EXISTS `personnel` (
     `first_name`       VARCHAR(100) NOT NULL,
     `last_name`        VARCHAR(100) NOT NULL,
     `national_id`      VARCHAR(20)  NULL,                          -- کد ملی
-    `personnel_type`   ENUM('employee','contractor','operator','guard') NOT NULL DEFAULT 'employee',
     `position`         VARCHAR(200) NULL,
     `phone`            VARCHAR(50)  NULL,
     `mobile`           VARCHAR(50)  NULL,
@@ -174,7 +173,6 @@ CREATE TABLE IF NOT EXISTS `personnel` (
     `updated_at`       TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     INDEX `idx_pers_org`  (`organization_id`),
     INDEX `idx_pers_user` (`user_id`),
-    INDEX `idx_pers_type` (`personnel_type`),
     CONSTRAINT `fk_pers_org`  FOREIGN KEY (`organization_id`) REFERENCES `organization`(`id`)
         ON DELETE RESTRICT ON UPDATE CASCADE,
     CONSTRAINT `fk_pers_user` FOREIGN KEY (`user_id`) REFERENCES `users`(`id`)

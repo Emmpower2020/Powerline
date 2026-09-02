@@ -10,7 +10,6 @@ import { Label } from "@/components/ui/label";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
-import { SearchableSelect } from "@/components/searchable-select";
 import { ContractSelect } from "@/components/contract-select";
 import { DataTable, type DataTableColumn, type DataTableHandle } from "@/components/data-table";
 import { ImportExcelDialog } from "@/components/import-excel-dialog";
@@ -29,9 +28,7 @@ import { Loader2, Plus, HardHat, UserCog, Cog, Users, Car, Wrench } from "lucide
  * سورت/فیلتر/جستجو + چیدمان ستون per-user + خروجی/چاپ + نوار آمار
  * (کل پرسنل، سرپرست اکیپ، کارشناس خط، سیمبان، سایر)
  *
- * نوع پرسنل مطابق enum جدید دیتابیس (بعد از اجرای import_v3.0.0.sql):
- * سرپرست‌های اکیپ و کارشناس‌های خط در فرم‌های خطوط/دکل‌ها به‌صورت کمبوباکس
- * قابل جستجو نمایش داده می‌شوند.
+ * سمت در فرم‌های خطوط/دکل‌ها به‌عنوان منبع تشخیص سرپرست و کارشناس خط استفاده می‌شود.
  */
 
 interface Person {
@@ -42,7 +39,6 @@ interface Person {
   last_name: string;
   national_id?: string | null;
   father_name?: string | null;
-  personnel_type?: string | null;
   position?: string | null;
   phone?: string | null;
   mobile?: string | null;
@@ -51,21 +47,6 @@ interface Person {
   collaboration_start?: string | null;
   status?: string;
 }
-
-const PERSONNEL_TYPES: { value: string; label: string; color: string; icon: React.ReactNode; iconClass: string; cardClass: string }[] = [
-  { value: "crew_supervisor", label: "سرپرست اکیپ", color: "bg-indigo-100 text-indigo-700 hover:bg-indigo-100", icon: <UserCog className="w-5 h-5 text-white" />, iconClass: "from-indigo-500 to-indigo-600", cardClass: "from-indigo-50 via-white to-indigo-100/60" },
-  { value: "line_expert", label: "کارشناس خط", color: "bg-purple-100 text-purple-700 hover:bg-purple-100", icon: <Cog className="w-5 h-5 text-white" />, iconClass: "from-purple-500 to-purple-600", cardClass: "from-purple-50 via-white to-purple-100/60" },
-  { value: "lineman", label: "سیمبان", color: "bg-blue-100 text-blue-700 hover:bg-blue-100", icon: <Wrench className="w-5 h-5 text-white" />, iconClass: "from-blue-500 to-blue-600", cardClass: "from-blue-50 via-white to-blue-100/60" },
-  { value: "employee", label: "کارمند", color: "bg-slate-100 text-slate-700 hover:bg-slate-100", icon: <Users className="w-5 h-5 text-white" />, iconClass: "from-slate-500 to-slate-600", cardClass: "from-slate-50 via-white to-slate-100/60" },
-  { value: "driver", label: "راننده", color: "bg-amber-100 text-amber-700 hover:bg-amber-100", icon: <Car className="w-5 h-5 text-white" />, iconClass: "from-amber-500 to-amber-600", cardClass: "from-amber-50 via-white to-amber-100/60" },
-  { value: "contractor", label: "پیمانکار", color: "bg-orange-100 text-orange-700 hover:bg-orange-100", icon: <HardHat className="w-5 h-5 text-white" />, iconClass: "from-orange-500 to-orange-600", cardClass: "from-orange-50 via-white to-orange-100/60" },
-  { value: "operator", label: "اپراتور", color: "bg-teal-100 text-teal-700 hover:bg-teal-100", icon: <Cog className="w-5 h-5 text-white" />, iconClass: "from-teal-500 to-teal-600", cardClass: "from-teal-50 via-white to-teal-100/60" },
-  { value: "guard", label: "نگهبان", color: "bg-slate-100 text-slate-600 hover:bg-slate-100", icon: <Users className="w-5 h-5 text-white" />, iconClass: "from-slate-400 to-slate-500", cardClass: "from-slate-50 via-white to-slate-100/60" },
-  { value: "manager", label: "مدیر", color: "bg-rose-100 text-rose-700 hover:bg-rose-100", icon: <Users className="w-5 h-5 text-white" />, iconClass: "from-rose-500 to-rose-600", cardClass: "from-rose-50 via-white to-rose-100/60" },
-  { value: "safety_expert", label: "کارشناس ایمنی", color: "bg-green-100 text-green-700 hover:bg-green-100", icon: <Users className="w-5 h-5 text-white" />, iconClass: "from-green-500 to-green-600", cardClass: "from-green-50 via-white to-green-100/60" },
-];
-
-const typeMeta = (t?: string | null) => PERSONNEL_TYPES.find(x => x.value === t) || null;
 
 export function PersonnelPage() {
   const { toast } = useToast();
@@ -116,13 +97,6 @@ export function PersonnelPage() {
     return () => clearTimeout(d);
   }, [load, refreshKey]);
 
-  // آمار بر اساس نوع
-  const byType: Record<string, number> = {};
-  for (const p of data) {
-    const k = p.personnel_type || "";
-    byType[k] = (byType[k] || 0) + 1;
-  }
-
   const columns: DataTableColumn<Person>[] = [
     { key: "personnel_code", header: "کد پرسنلی", sortable: true, filterable: true, align: "right" },
     { key: "contract_title", header: "قرارداد", sortable: true, filterable: true, wrap: true, align: "right" },
@@ -130,11 +104,6 @@ export function PersonnelPage() {
     { key: "last_name", header: "نام خانوادگی", sortable: true, filterable: true, align: "right" },
     { key: "national_id", header: "کد ملی", align: "right" },
     { key: "father_name", header: "نام پدر", filterable: true, align: "right" },
-    {
-      key: "personnel_type", header: "نوع", sortable: true, filterable: true, type: "badge", align: "right",
-      badgeLabels: Object.fromEntries(PERSONNEL_TYPES.map(t => [t.value, t.label])),
-      badgeColors: Object.fromEntries(PERSONNEL_TYPES.map(t => [t.value, t.color])),
-    },
     { key: "position", header: "سمت", sortable: true, filterable: true, align: "right" },
     { key: "mobile", header: "موبایل", align: "right" },
     { key: "supervisor_name", header: "سرپرست", filterable: true, align: "right" },
@@ -168,7 +137,6 @@ export function PersonnelPage() {
       last_name: row.last_name || "",
       national_id: row.national_id || null,
       father_name: row.father_name || null,
-      personnel_type: (row.personnel_type as string) || undefined,
       position: row.position || null,
       phone: row.phone || null,
       mobile: row.mobile || null,
@@ -204,7 +172,6 @@ export function PersonnelPage() {
     "نام پدر": "father_name",
     "پست": "position",
     "سمت": "position",
-    "نوع": "personnel_type",
     "تاریخ شروع همکاری": "collaboration_start",
     "شماره همراه": "mobile",
     "موبایل": "mobile",
@@ -345,7 +312,7 @@ function PersonnelDialog({ open, editRow, duplicateFrom, onClose, onSaved }: {
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState({
     first_name: "", last_name: "", national_id: "", father_name: "",
-    personnel_type: "", position: "", mobile: "", phone: "",
+    position: "", mobile: "", phone: "",
     supervisor_name: "", collaboration_start: "", contract_id: "",
   });
 
@@ -360,7 +327,6 @@ function PersonnelDialog({ open, editRow, duplicateFrom, onClose, onSaved }: {
         last_name: sourceRow?.last_name || "",
         national_id: duplicateFrom ? "" : (sourceRow?.national_id || ""),
         father_name: sourceRow?.father_name || "",
-        personnel_type: sourceRow?.personnel_type || "",
         position: sourceRow?.position || "",
         mobile: sourceRow?.mobile || "",
         phone: sourceRow?.phone || "",
@@ -368,24 +334,12 @@ function PersonnelDialog({ open, editRow, duplicateFrom, onClose, onSaved }: {
         collaboration_start: sourceRow?.collaboration_start || "",
         contract_id: sourceRow?.contract_id != null ? String(sourceRow.contract_id) : "",
       });
-      // اگر نوع خالی بود ولی position فارسی معتبر داشت، خودکار map شود
-      if (!sourceRow?.personnel_type && sourceRow?.position) {
-        const mapped = PERSONNEL_TYPES.find(t => t.label === sourceRow.position);
-        if (mapped) setForm(f => ({ ...f, personnel_type: mapped.value }));
-      }
     }
   }, [open, sourceRow, duplicateFrom]);
-
-  // با تغییر نوع، سمت فارسی هماهنگ پر می‌شود
-  const setType = (v: string) => {
-    const meta = typeMeta(v);
-    setForm(f => ({ ...f, personnel_type: v, position: meta?.label || f.position }));
-  };
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.first_name.trim()) { setError("نام الزامی است"); return; }
-    if (!form.personnel_type) { setError("نوع پرسنل الزامی است"); return; }
     setSubmitting(true); setError(null);
     try {
       const payload = {
@@ -393,7 +347,6 @@ function PersonnelDialog({ open, editRow, duplicateFrom, onClose, onSaved }: {
         last_name: form.last_name.trim(),
         national_id: form.national_id.trim() || null,
         father_name: form.father_name.trim() || null,
-        personnel_type: form.personnel_type,
         position: form.position.trim() || null,
         mobile: form.mobile.trim() || null,
         phone: form.phone.trim() || null,
@@ -459,15 +412,6 @@ function PersonnelDialog({ open, editRow, duplicateFrom, onClose, onSaved }: {
             <div className="space-y-2">
               <Label className="text-right block">قرارداد</Label>
               <ContractSelect value={form.contract_id} onChange={v => setForm({ ...form, contract_id: v })} />
-            </div>
-            <div className="space-y-2">
-              <Label className="text-right block">نوع پرسنل (اجباری)</Label>
-              <SearchableSelect
-                value={form.personnel_type}
-                onChange={setType}
-                options={PERSONNEL_TYPES.map(t => ({ value: t.value, label: t.label }))}
-                placeholder="انتخاب نوع..."
-              />
             </div>
             <div className="space-y-2">
               <Label className="text-right block">سمت</Label>

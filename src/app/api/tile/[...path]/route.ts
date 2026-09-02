@@ -74,7 +74,7 @@ export async function GET(
     const upstream = await fetch(tileUrl, {
       headers: {
         // اضافه کردن User-Agent برای سرورهایی که نیاز دارند (OSM)
-        "User-Agent": "Powerline-Map/4.2 (https://jibimarket.com)",
+        "User-Agent": "Powerline-Map/4.2 (https://sabadgame.com)",
         "Accept": "image/*,*/*;q=0.8",
       },
       // زمان‌برندگی منطقی برای کاشی

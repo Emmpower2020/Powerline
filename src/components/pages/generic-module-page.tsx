@@ -37,7 +37,7 @@ const FIELD_LABELS: Record<string, string> = {
   contract_id: "قرارداد", contractor_id: "پیمانکار", contract_type: "نوع قرارداد",
   contract_code: "کد قرارداد", title: "عنوان", start_date: "تاریخ شروع", end_date: "تاریخ پایان",
   amount: "مبلغ (ریال)", status: "وضعیت", notes: "یادداشت",
-  first_name: "نام", last_name: "نام خانوادگی", personnel_type: "نوع پرسنل", position: "سمت",
+  first_name: "نام", last_name: "نام خانوادگی", position: "سمت",
   phone: "تلفن", mobile: "موبایل", email: "ایمیل", hire_date: "تاریخ استخدام",
   incident_type: "نوع حادثه", severity: "شدت", description: "توضیحات",
   location_desc: "محل وقوع", occurred_at: "تاریخ وقوع", line_id: "خط", tower_id: "دکل",
@@ -135,12 +135,11 @@ const configs: Record<string, GenericConfig> = {
     { key: "occurred_at", header: "تاریخ", type: "date", sortable: true },
     { key: "status", header: "وضعیت", type: "badge", badgeLabels: { reported: "گزارش شده", under_investigation: "در حال بررسی", resolved: "حل شده", closed: "بسته شده" }, badgeColors: { reported: "bg-blue-100 text-blue-700", resolved: "bg-green-100 text-green-700", closed: "bg-slate-100 text-slate-500" } },
   ]},
-  personnel: { title: "پرسنل", activityStatus: true, editKeys: ["contract_id","first_name","last_name","personnel_type","position","phone","mobile","email","status"], importKeys: ["contract_id","first_name","last_name","personnel_type","position","phone","mobile","email","status"], columns: [
+  personnel: { title: "پرسنل", activityStatus: true, editKeys: ["contract_id","first_name","last_name","position","phone","mobile","email","status"], importKeys: ["contract_id","first_name","last_name","position","phone","mobile","email","status"], columns: [
     { key: "personnel_code", header: "کد", sortable: true, filterable: true, align: "left" },
     { key: "contract_title", header: "قرارداد", sortable: true, filterable: true, wrap: true },
     { key: "first_name", header: "نام", sortable: true, filterable: true },
     { key: "last_name", header: "نام خانوادگی", sortable: true, filterable: true },
-    { key: "personnel_type", header: "نوع", type: "badge", badgeLabels: { employee: "کارمند", contractor: "پیمانکار", operator: "اپراتور", guard: "نگهبان", manager: "مدیر", line_expert: "کارشناس خط", safety_expert: "کارشناس ایمنی", crew_supervisor: "سرپرست", lineman: "سیمبان", driver: "راننده" }, badgeColors: { employee: "bg-blue-100 text-blue-700", contractor: "bg-amber-100 text-amber-700", operator: "bg-purple-100 text-purple-700" } },
     { key: "position", header: "سمت", sortable: true, filterable: true },
     { key: "mobile", header: "موبایل", align: "left" },
   ]},
@@ -273,7 +272,6 @@ function EditorDialog({
               : k === "contract_type" ? <Select value={form[k] || "maintenance"} onValueChange={v => setForm({...form, [k]: v})}><SelectTrigger className="w-full"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="maintenance">نگهداری</SelectItem><SelectItem value="construction">ساخت</SelectItem><SelectItem value="inspection">بازدید</SelectItem></SelectContent></Select>
               : k === "incident_type" ? <Select value={form[k] || "near_miss"} onValueChange={v => setForm({...form, [k]: v})}><SelectTrigger className="w-full"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="accident">حادثه</SelectItem><SelectItem value="near_miss">Near Miss</SelectItem><SelectItem value="unsafe_act">عمل ناایمن</SelectItem><SelectItem value="unsafe_condition">شرایط ناایمن</SelectItem><SelectItem value="environmental">محیط زیست</SelectItem></SelectContent></Select>
               : k === "severity" ? <Select value={form[k] || "none"} onValueChange={v => setForm({...form, [k]: v})}><SelectTrigger className="w-full"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="none">بدون آسیب</SelectItem><SelectItem value="minor">جزئی</SelectItem><SelectItem value="moderate">متوسط</SelectItem><SelectItem value="serious">جدی</SelectItem><SelectItem value="fatal">مرگبار</SelectItem></SelectContent></Select>
-              : k === "personnel_type" ? <Select value={form[k] || "employee"} onValueChange={v => setForm({...form, [k]: v})}><SelectTrigger className="w-full"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="employee">کارمند</SelectItem><SelectItem value="contractor">پیمانکار</SelectItem><SelectItem value="operator">اپراتور</SelectItem><SelectItem value="guard">نگهبان</SelectItem><SelectItem value="manager">مدیر</SelectItem><SelectItem value="line_expert">کارشناس خط</SelectItem><SelectItem value="safety_expert">کارشناس ایمنی</SelectItem><SelectItem value="crew_supervisor">سرپرست</SelectItem><SelectItem value="lineman">سیمبان</SelectItem><SelectItem value="driver">راننده</SelectItem></SelectContent></Select>
               : k === "notes" || k === "description" || k === "address" ? <Textarea rows={1} value={form[k] || ""} onChange={e => setForm({...form,[k]:e.target.value})} className={`resize-none py-2 ${moduleKey === "contracts" && k === "notes" ? "h-24 min-h-24" : "h-9 min-h-9"}`} />
               : isJalaliDate ? (
                 <div className="space-y-1">

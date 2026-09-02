@@ -288,7 +288,7 @@ function registerModuleRoutes(Router $router): void
         if (Auth::canAccess('personnel.view')) {
             try {
                 $result['personnel'] = $pdo->query(
-                    "SELECT id, personnel_code, first_name, last_name, personnel_type, position
+                    "SELECT id, personnel_code, first_name, last_name, position
                      FROM personnel ORDER BY first_name, last_name"
                 )->fetchAll();
             } catch (Exception $e) {
@@ -573,12 +573,10 @@ function registerModuleRoutes(Router $router): void
         $page = Helpers::getPage(); $pageSize = Helpers::getPageSize(); $offset = Helpers::getOffset();
         $search = Helpers::getSearch();
         // v3.0.0: فیلتر نوع پرسنل — برای کمبوباکس‌های سرپرست اکیپ/کارشناس خط
-        $type = Helpers::query('personnel_type');
         $contractId = Helpers::getContractId();
         $where = '1=1'; $params = [];
         if ($contractId === 0) { $where .= ' AND p.contract_id IS NULL'; } elseif ($contractId !== null) { $where .= ' AND p.contract_id = ?'; $params[] = $contractId; }
         if (!empty($search)) { $where .= ' AND (p.personnel_code LIKE ? OR p.first_name LIKE ? OR p.last_name LIKE ? OR p.position LIKE ? OR p.national_id LIKE ?)'; $sp = "%$search%"; $params[] = $sp; $params[] = $sp; $params[] = $sp; $params[] = $sp; $params[] = $sp; }
-        if (!empty($type)) { $where .= ' AND p.personnel_type = ?'; $params[] = $type; }
         $countStmt = $pdo->prepare("SELECT COUNT(*) FROM personnel p WHERE $where"); $countStmt->execute($params); $total = (int)$countStmt->fetchColumn();
         $stmt = $pdo->prepare("SELECT p.*, u.username, c.title AS contract_title FROM personnel p LEFT JOIN users u ON u.id = p.user_id LEFT JOIN contracts c ON c.id = p.contract_id WHERE $where ORDER BY p.id DESC LIMIT $pageSize OFFSET $offset");
         $stmt->execute($params);
@@ -592,8 +590,8 @@ function registerModuleRoutes(Router $router): void
         if (empty($body['first_name'])) Response::error(400, 'نام الزامی است');
         $pdo = Database::getInstance()->getConnection();
         $code = $body['personnel_code'] ?? ('P-' . str_pad((string)random_int(0, 9999), 4, '0', STR_PAD_LEFT));
-        $stmt = $pdo->prepare("INSERT INTO personnel (organization_id, user_id, personnel_code, first_name, last_name, national_id, personnel_type, position, phone, mobile, email, hire_date, contract_id, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, NOW())");
-        $stmt->execute([$body['organization_id'] ?? 1, $body['user_id'] ?? null, $code, $body['first_name'], $body['last_name'] ?? '', $body['national_id'] ?? null, $body['personnel_type'] ?? 'employee', $body['position'] ?? null, $body['phone'] ?? null, $body['mobile'] ?? null, $body['email'] ?? null, $body['hire_date'] ?? date('Y-m-d'), $body['contract_id'] ?? null]);
+        $stmt = $pdo->prepare("INSERT INTO personnel (organization_id, user_id, personnel_code, first_name, last_name, national_id, position, phone, mobile, email, hire_date, contract_id, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, NOW())");
+        $stmt->execute([$body['organization_id'] ?? 1, $body['user_id'] ?? null, $code, $body['first_name'], $body['last_name'] ?? '', $body['national_id'] ?? null, $body['position'] ?? null, $body['phone'] ?? null, $body['mobile'] ?? null, $body['email'] ?? null, $body['hire_date'] ?? date('Y-m-d'), $body['contract_id'] ?? null]);
         Response::success(['id' => (int)$pdo->lastInsertId(), 'personnel_code' => $code], 'پرسنل ایجاد شد', 201);
     });
 
@@ -601,7 +599,7 @@ function registerModuleRoutes(Router $router): void
         Auth::authenticate();
         Auth::requirePermissionSoft('personnel.update');
         $body = Helpers::getJsonBody(); $pdo = Database::getInstance()->getConnection();
-        $fields = ['first_name', 'last_name', 'national_id', 'personnel_type', 'position', 'phone', 'mobile', 'email', 'hire_date', 'contract_id', 'status', 'father_name', 'supervisor_name', 'collaboration_start'];
+        $fields = ['first_name', 'last_name', 'national_id', 'position', 'phone', 'mobile', 'email', 'hire_date', 'contract_id', 'status', 'father_name', 'supervisor_name', 'collaboration_start'];
         $updates = []; $params = [];
         foreach ($fields as $f) { if (array_key_exists($f, $body)) { $updates[] = "`$f` = ?"; $params[] = $body[$f]; } }
         if (empty($updates)) Response::error(400, 'هیچ فیلدی ارسال نشده');
@@ -718,15 +716,6 @@ function registerModuleRoutes(Router $router): void
         $inserted = 0; $updated = 0; $failed = 0; $firstError = '';
         $statuses = []; $errors = [];
 
-        // نگاشت سمت فارسی به مقدار enum — اگر personnel_type فارسی یا خالی ارسال شود
-        $typeByLabel = [
-            'کارمند' => 'employee', 'پیمانکار' => 'contractor', 'اپراتور' => 'operator', 'نگهبان' => 'guard',
-            'مدیر' => 'manager', 'مدیر عامل شرکت' => 'manager', 'کارشناس خط' => 'line_expert',
-            'کارشناس ایمنی' => 'safety_expert', 'سرپرست اکیپ' => 'crew_supervisor',
-            'سیمبان' => 'lineman', 'راننده' => 'driver',
-        ];
-        $validTypes = ['employee','contractor','operator','guard','manager','line_expert','safety_expert','crew_supervisor','lineman','driver'];
-
         try {
             $pdo->beginTransaction();
             // کش بر اساس کد ملی و کد پرسنلی
@@ -736,9 +725,9 @@ function registerModuleRoutes(Router $router): void
                 if (!empty($r['personnel_code'])) $byCode[trim((string) $r['personnel_code'])] = (int) $r['id'];
             }
 
-            $ins = $pdo->prepare("INSERT INTO personnel (organization_id, personnel_code, first_name, last_name, national_id, father_name, personnel_type, position, phone, mobile, email, supervisor_name, collaboration_start, status, created_at)
-                                   VALUES (4, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, NOW())");
-            $upd = $pdo->prepare("UPDATE personnel SET first_name = ?, last_name = ?, national_id = ?, father_name = ?, personnel_type = ?, position = ?, phone = ?, mobile = ?, email = ?, supervisor_name = ?, collaboration_start = ? WHERE id = ?");
+            $ins = $pdo->prepare("INSERT INTO personnel (organization_id, personnel_code, first_name, last_name, national_id, father_name, position, phone, mobile, email, supervisor_name, collaboration_start, status, created_at)
+                                   VALUES (4, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, NOW())");
+            $upd = $pdo->prepare("UPDATE personnel SET first_name = ?, last_name = ?, national_id = ?, father_name = ?, position = ?, phone = ?, mobile = ?, email = ?, supervisor_name = ?, collaboration_start = ? WHERE id = ?");
 
             foreach ($rows as $i => $r) {
                 try {
@@ -748,19 +737,7 @@ function registerModuleRoutes(Router $router): void
 
                     $nat = isset($r['national_id']) && $r['national_id'] !== '' ? trim((string) $r['national_id']) : null;
                     $father = isset($r['father_name']) && $r['father_name'] !== '' ? $r['father_name'] : null;
-
-                    // نوع پرسنل: مقدار enum، یا نگاشت از سمت فارسی
-                    $type = trim((string) ($r['personnel_type'] ?? ''));
-                    if ($type === '' || !in_array($type, $validTypes, true)) {
-                        $type = $typeByLabel[$r['personnel_type'] ?? ''] ?? $typeByLabel[$r['position'] ?? ''] ?? 'employee';
-                    }
-                    // v3.2.1: سمت پیش‌فرض از نوع — array_search با چک صریح false (اندیس 0 نباید null شود)
-                    if (isset($r['position']) && $r['position'] !== '') {
-                        $position = $r['position'];
-                    } else {
-                        $pos = array_search($type, $typeByLabel, true);
-                        $position = ($pos === false || $pos === null) ? null : $pos;
-                    }
+                    $position = isset($r['position']) && $r['position'] !== '' ? $r['position'] : null;
 
                     // تشخیص ردیف موجود
                     $existingId = null;
@@ -769,13 +746,13 @@ function registerModuleRoutes(Router $router): void
                     elseif (!empty($r['personnel_code']) && isset($byCode[trim((string) $r['personnel_code'])])) $existingId = $byCode[trim((string) $r['personnel_code'])];
 
                     if ($existingId) {
-                        $upd->execute([$first, $last, $nat, $father, $type, $position,
+                        $upd->execute([$first, $last, $nat, $father, $position,
                             $r['phone'] ?? null, $r['mobile'] ?? null, $r['email'] ?? null,
                             $r['supervisor_name'] ?? null, $r['collaboration_start'] ?? null, $existingId]);
                         $updated++; $statuses[] = 'updated'; $errors[] = null;
                     } else {
                         $code = !empty($r['personnel_code']) ? $r['personnel_code'] : ('P-' . str_pad((string) random_int(0, 9999), 4, '0', STR_PAD_LEFT));
-                        $ins->execute([$code, $first, $last, $nat, $father, $type, $position,
+                        $ins->execute([$code, $first, $last, $nat, $father, $position,
                             $r['phone'] ?? null, $r['mobile'] ?? null, $r['email'] ?? null,
                             $r['supervisor_name'] ?? null, $r['collaboration_start'] ?? null]);
                         $newId = (int) $pdo->lastInsertId();

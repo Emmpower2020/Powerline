@@ -11,8 +11,7 @@ import type { SearchableOption } from "@/components/searchable-select";
  * خطوط/دکل‌ها به‌صورت کمبوباکس (قابل جستجو) نمایش داده شوند.
  *
  * سازگار با هر دو حالت داده:
- *  - جدید: personnel_type = crew_supervisor / line_expert (بعد از اجرای import_v3.0.0.sql)
- *  - قدیمی: position = 'سرپرست اکیپ' / 'کارشناس خط' (داده فعلی هاست قبل از مهاجرت)
+ *  - منبع اصلی تشخیص افراد واجد شرایط، فیلد position است.
  *
  * نام‌ها یکتا (dedupe) می‌شوند چون خطوط فقط نام (نه شناسه) ذخیره می‌کنند.
  *
@@ -24,7 +23,6 @@ export interface PersonnelPerson {
   personnel_code?: string;
   first_name: string;
   last_name: string;
-  personnel_type?: string | null;
   position?: string | null;
   full_name?: string;
 }
@@ -54,8 +52,7 @@ export function usePersonnelOptions() {
     const seen = new Set<string>();
     const out: SearchableOption[] = [];
     for (const p of personnel) {
-      const typeOk = p.personnel_type === "crew_supervisor" || p.position === "سرپرست اکیپ";
-      if (!typeOk) continue;
+      if (p.position !== "سرپرست اکیپ") continue;
       const fn = (p.first_name || "").trim();
       const ln = (p.last_name || "").trim();
       const full = `${fn} ${ln}`.trim();
@@ -71,8 +68,7 @@ export function usePersonnelOptions() {
     const seen = new Set<string>();
     const out: SearchableOption[] = [];
     for (const p of personnel) {
-      const typeOk = p.personnel_type === "line_expert" || p.position === "کارشناس خط";
-      if (!typeOk) continue;
+      if (p.position !== "کارشناس خط") continue;
       const fn = (p.first_name || "").trim();
       const ln = (p.last_name || "").trim();
       const full = `${fn} ${ln}`.trim();
