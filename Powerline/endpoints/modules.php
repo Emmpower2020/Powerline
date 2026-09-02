@@ -287,9 +287,14 @@ function registerModuleRoutes(Router $router): void
         // پرسنل — فقط فیلدهای لازم برای کمبوباکس‌ها (سبک)
         if (Auth::canAccess('personnel.view')) {
             try {
+                $pCols = array_column($pdo->query('SHOW COLUMNS FROM personnel')->fetchAll(), 'Field');
+                $pSel = ['id', 'personnel_code', 'first_name', 'last_name'];
+                if (in_array('position', $pCols, true)) $pSel[] = 'position';
+                elseif (in_array('personnel_type', $pCols, true)) $pSel[] = 'personnel_type AS position';
+                else $pSel[] = 'NULL AS position';
+                if (in_array('supervisor_name', $pCols, true)) $pSel[] = 'supervisor_name';
                 $result['personnel'] = $pdo->query(
-                    "SELECT id, personnel_code, first_name, last_name, position
-                     FROM personnel ORDER BY first_name, last_name"
+                    'SELECT ' . implode(', ', $pSel) . ' FROM personnel ORDER BY first_name, last_name'
                 )->fetchAll();
             } catch (Exception $e) {
                 $errors['personnel'] = 'در دسترس نیست';
@@ -566,7 +571,7 @@ function registerModuleRoutes(Router $router): void
     // ============================================================
     //  پرسنل (Personnel) — CRUD کامل
     // ============================================================
-    $router->get('personnel', function () use ($personnelPositionCol) {
+    $router->get('personnel', function () use ($personnelPositionCol, $personnelCols) {
         Auth::authenticate();
         Auth::requirePermissionSoft('personnel.view');
         $pdo = Database::getInstance()->getConnection();
@@ -576,10 +581,17 @@ function registerModuleRoutes(Router $router): void
         $contractId = Helpers::getContractId();
         $where = '1=1'; $params = [];
         if ($contractId === 0) { $where .= ' AND p.contract_id IS NULL'; } elseif ($contractId !== null) { $where .= ' AND p.contract_id = ?'; $params[] = $contractId; }
-        if (!empty($search)) { $where .= ' AND (p.personnel_code LIKE ? OR p.first_name LIKE ? OR p.last_name LIKE ? OR p.position LIKE ? OR p.national_id LIKE ?)'; $sp = "%$search%"; $params[] = $sp; $params[] = $sp; $params[] = $sp; $params[] = $sp; $params[] = $sp; }
+        if (!empty($search)) {
+            $searchCols = ['personnel_code', 'first_name', 'last_name', 'national_id', 'supervisor_name', 'father_name'];
+            $posCol0 = $personnelPositionCol($pdo);
+            if ($posCol0) $searchCols[] = $posCol0;
+            $parts = [];
+            foreach ($searchCols as $sc) { $parts[] = "p.`$sc` LIKE ?"; $params[] = "%$search%"; }
+            $where .= ' AND (' . implode(' OR ', $parts) . ')';
+        }
         $countStmt = $pdo->prepare("SELECT COUNT(*) FROM personnel p WHERE $where"); $countStmt->execute($params); $total = (int)$countStmt->fetchColumn();
         $posCol = $personnelPositionCol($pdo);
-        $posSel = $posCol === 'position' ? 'p.position' : 'p.personnel_type AS position';
+        $posSel = $posCol ? "p.`$posCol` AS position" : 'NULL AS position';
         $stmt = $pdo->prepare("SELECT p.*, u.username, c.title AS contract_title, $posSel FROM personnel p LEFT JOIN users u ON u.id = p.user_id LEFT JOIN contracts c ON c.id = p.contract_id WHERE $where ORDER BY p.id DESC LIMIT $pageSize OFFSET $offset");
         $stmt->execute($params);
         Response::paginated($stmt->fetchAll(), $page, $pageSize, $total);
@@ -588,33 +600,64 @@ function registerModuleRoutes(Router $router): void
     // v4.3.69: ستون «سمت» پرسنل در نسخه‌های مختلف دیتابیس یا position است یا
     // personnel_type — کوئری‌ها با ستون واقعی ساخته می‌شوند تا import روی
     // هر دو ساختار بدون خطای «Unknown column» کار کند.
-    $personnelPositionCol = function (PDO $pdo): string {
+    // v4.3.70: جدول personnel در نسخه‌های مختلف دیتابیس ستون‌های متفاوتی دارد
+    // (position / personnel_type / phone / collaboration_start ممکن است نباشند).
+    // کوئری‌ها فقط با ستون‌های واقعی موجود ساخته می‌شوند تا هیچ‌وقت
+    // «Unknown column» و خطای ۵۰۰ رخ ندهد.
+    $personnelCols = function (PDO $pdo): array {
+        $cols = [];
         foreach ($pdo->query('SHOW COLUMNS FROM personnel')->fetchAll() as $c) {
-            if (($c['Field'] ?? null) === 'position') return 'position';
+            if (isset($c['Field'])) $cols[$c['Field']] = true;
         }
-        return 'personnel_type';
+        return $cols;
+    };
+    $personnelPositionCol = function (PDO $pdo) use ($personnelCols) {
+        $cols = $personnelCols($pdo);
+        if (isset($cols['position'])) return 'position';
+        if (isset($cols['personnel_type'])) return 'personnel_type';
+        return null; // هیچ ستون سمدی وجود ندارد
     };
 
-    $router->post('personnel', function () use ($personnelPositionCol) {
+    $router->post('personnel', function () use ($personnelPositionCol, $personnelCols) {
         Auth::authenticate();
         Auth::requirePermissionSoft('personnel.create');
         $body = Helpers::getJsonBody();
         if (empty($body['first_name'])) Response::error(400, 'نام الزامی است');
         $pdo = Database::getInstance()->getConnection();
         $code = $body['personnel_code'] ?? ('P-' . str_pad((string)random_int(0, 9999), 4, '0', STR_PAD_LEFT));
+        // درج فقط با ستون‌های واقعی جدول — ستون‌های نبودِن نادیده گرفته می‌شوند
+        $cols = $personnelCols($pdo);
+        $insCols = [
+            'organization_id' => $body['organization_id'] ?? 1,
+            'user_id' => $body['user_id'] ?? null,
+            'personnel_code' => $code,
+            'first_name' => $body['first_name'],
+            'last_name' => $body['last_name'] ?? '',
+            'national_id' => $body['national_id'] ?? null,
+        ];
+        foreach (['father_name', 'supervisor_name', 'phone', 'mobile', 'email', 'hire_date', 'collaboration_start', 'contract_id'] as $opt) {
+            if (isset($cols[$opt])) $insCols[$opt] = $body[$opt] ?? null;
+        }
         $posCol = $personnelPositionCol($pdo);
-        $stmt = $pdo->prepare("INSERT INTO personnel (organization_id, user_id, personnel_code, first_name, last_name, national_id, $posCol, phone, mobile, email, hire_date, contract_id, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, NOW())");
-        $stmt->execute([$body['organization_id'] ?? 1, $body['user_id'] ?? null, $code, $body['first_name'], $body['last_name'] ?? '', $body['national_id'] ?? null, $body['position'] ?? null, $body['phone'] ?? null, $body['mobile'] ?? null, $body['email'] ?? null, $body['hire_date'] ?? date('Y-m-d'), $body['contract_id'] ?? null]);
+        if ($posCol !== null) $insCols[$posCol] = $body['position'] ?? null;
+        if (isset($cols['status'])) $insCols['status'] = 'active';
+        $colNames = implode(', ', array_map(fn($k) => "`$k`", array_keys($insCols)));
+        $ph = implode(', ', array_fill(0, count($insCols), '?'));
+        $stmt = $pdo->prepare("INSERT INTO personnel ($colNames, created_at) VALUES ($ph, NOW())");
+        $stmt->execute(array_values($insCols));
         Response::success(['id' => (int)$pdo->lastInsertId(), 'personnel_code' => $code], 'پرسنل ایجاد شد', 201);
     });
 
-    $router->put('personnel/{id}', function ($id) use ($personnelPositionCol) {
+    $router->put('personnel/{id}', function ($id) use ($personnelPositionCol, $personnelCols) {
         Auth::authenticate();
         Auth::requirePermissionSoft('personnel.update');
         $body = Helpers::getJsonBody(); $pdo = Database::getInstance()->getConnection();
+        $cols = $personnelCols($pdo);
         $posCol = $personnelPositionCol($pdo);
-        if ($posCol !== 'position' && array_key_exists('position', $body)) { $body[$posCol] = $body['position']; unset($body['position']); }
-        $fields = ['first_name', 'last_name', 'national_id', $posCol, 'phone', 'mobile', 'email', 'hire_date', 'contract_id', 'status', 'father_name', 'supervisor_name', 'collaboration_start'];
+        if ($posCol !== null && $posCol !== 'position' && array_key_exists('position', $body)) { $body[$posCol] = $body['position']; unset($body['position']); }
+        $fields = ['first_name', 'last_name', 'national_id', 'phone', 'mobile', 'email', 'hire_date', 'contract_id', 'status', 'father_name', 'supervisor_name', 'collaboration_start'];
+        if ($posCol !== null) $fields[] = $posCol;
+        $fields = array_values(array_filter($fields, fn($f) => isset($cols[$f])));
         $updates = []; $params = [];
         foreach ($fields as $f) { if (array_key_exists($f, $body)) { $updates[] = "`$f` = ?"; $params[] = $body[$f]; } }
         if (empty($updates)) Response::error(400, 'هیچ فیلدی ارسال نشده');
@@ -719,7 +762,7 @@ function registerModuleRoutes(Router $router): void
     });
 
     // ورود انبوه پرسنل — v3.1.0: درج یا ویرایش بر اساس کد ملی / کد پرسنلی
-    $router->post('personnel/bulk-import', function () use ($personnelPositionCol) {
+    $router->post('personnel/bulk-import', function () use ($personnelPositionCol, $personnelCols) {
         $user = Auth::authenticate();
         Auth::requirePermissionSoft('personnel.create');
         $body = Helpers::getJsonBody();
@@ -740,10 +783,26 @@ function registerModuleRoutes(Router $router): void
                 if (!empty($r['personnel_code'])) $byCode[trim((string) $r['personnel_code'])] = (int) $r['id'];
             }
 
+            $cols = $personnelCols($pdo);
             $posCol = $personnelPositionCol($pdo);
-            $ins = $pdo->prepare("INSERT INTO personnel (organization_id, personnel_code, first_name, last_name, national_id, father_name, $posCol, phone, mobile, email, supervisor_name, collaboration_start, status, created_at)
-                                   VALUES (4, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, NOW())");
-            $upd = $pdo->prepare("UPDATE personnel SET first_name = ?, last_name = ?, national_id = ?, father_name = ?, $posCol = ?, phone = ?, mobile = ?, email = ?, supervisor_name = ?, collaboration_start = ? WHERE id = ?");
+            // ساخت پویا بر اساس ستون‌های واقعی جدول
+            $insMap = ['organization_id' => 4, 'personnel_code' => null, 'first_name' => null, 'last_name' => null,
+                       'national_id' => null, 'father_name' => null, 'phone' => null, 'mobile' => null,
+                       'email' => null, 'supervisor_name' => null, 'collaboration_start' => null];
+            if ($posCol !== null) $insMap[$posCol] = null;
+            if (isset($cols['status'])) $insMap['status'] = 1;
+            $insKeys = array_keys(array_filter($insMap, fn($k) => isset($cols[$k]), ARRAY_FILTER_USE_KEY));
+            $insPh = implode(', ', array_map(fn($k) => $k === 'organization_id' ? '4' : ($k === 'status' ? '1' : '?'), $insKeys));
+            $ins = $pdo->prepare('INSERT INTO personnel (' . implode(',', array_map(fn($k) => "`$k`", $insKeys)) . ", created_at) VALUES ($insPh, NOW())");
+            // ترتیب پارامترها = کلیدهای به‌جز organization_id/status
+            $insParamKeys = array_values(array_filter($insKeys, fn($k) => $k !== 'organization_id' && $k !== 'status'));
+
+            $updMap = ['first_name' => null, 'last_name' => null, 'national_id' => null, 'father_name' => null,
+                       'phone' => null, 'mobile' => null, 'email' => null, 'supervisor_name' => null, 'collaboration_start' => null];
+            if ($posCol !== null) $updMap[$posCol] = null;
+            $updKeys = array_keys(array_filter($updMap, fn($k) => isset($cols[$k]), ARRAY_FILTER_USE_KEY));
+            $upd = $pdo->prepare('UPDATE personnel SET ' . implode(', ', array_map(fn($k) => "`$k` = ?", $updKeys)) . ' WHERE id = ?');
+            $updParamKeys = $updKeys;
 
             foreach ($rows as $i => $r) {
                 try {
@@ -761,16 +820,17 @@ function registerModuleRoutes(Router $router): void
                     elseif ($nat && isset($byNat[$nat])) $existingId = $byNat[$nat];
                     elseif (!empty($r['personnel_code']) && isset($byCode[trim((string) $r['personnel_code'])])) $existingId = $byCode[trim((string) $r['personnel_code'])];
 
+                    $vals = ['first_name' => $first, 'last_name' => $last, 'national_id' => $nat, 'father_name' => $father,
+                        'phone' => $r['phone'] ?? null, 'mobile' => $r['mobile'] ?? null, 'email' => $r['email'] ?? null,
+                        'supervisor_name' => $r['supervisor_name'] ?? null, 'collaboration_start' => $r['collaboration_start'] ?? null,
+                        'position' => $position];
+                    if ($posCol !== null && $posCol !== 'position') { $vals[$posCol] = $position; }
                     if ($existingId) {
-                        $upd->execute([$first, $last, $nat, $father, $position,
-                            $r['phone'] ?? null, $r['mobile'] ?? null, $r['email'] ?? null,
-                            $r['supervisor_name'] ?? null, $r['collaboration_start'] ?? null, $existingId]);
+                        $upd->execute([...array_map(fn($k) => $vals[$k] ?? null, $updParamKeys), $existingId]);
                         $updated++; $statuses[] = 'updated'; $errors[] = null;
                     } else {
                         $code = !empty($r['personnel_code']) ? $r['personnel_code'] : ('P-' . str_pad((string) random_int(0, 9999), 4, '0', STR_PAD_LEFT));
-                        $ins->execute([$code, $first, $last, $nat, $father, $position,
-                            $r['phone'] ?? null, $r['mobile'] ?? null, $r['email'] ?? null,
-                            $r['supervisor_name'] ?? null, $r['collaboration_start'] ?? null]);
+                        $ins->execute(array_map(fn($k) => $k === 'personnel_code' ? $code : ($vals[$k] ?? null), $insParamKeys));
                         $newId = (int) $pdo->lastInsertId();
                         if ($nat) $byNat[$nat] = $newId;
                         if (!empty($code)) $byCode[$code] = $newId;

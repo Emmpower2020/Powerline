@@ -60,6 +60,14 @@ export function usePersonnelOptions() {
       seen.add(full);
       out.push({ value: full, label: full }); // v3.4.0: بدون description — همه سرپرست‌اند، لازم نیست تکرار شود
     }
+    // v4.3.70: اگر جدول پرسنل ستون «سمت» نداشته باشد (ساختار قدیمی دیتابیس)،
+    // سرپرست‌ها از نام سرپرست ثبت‌شدهٔ هر پرسنل استخراج می‌شوند.
+    if (out.length === 0) {
+      for (const p of personnel as Array<PersonnelPerson & { supervisor_name?: string | null }>) {
+        const sup = (p.supervisor_name || "").trim();
+        if (sup && !seen.has(sup)) { seen.add(sup); out.push({ value: sup, label: sup }); }
+      }
+    }
     return out;
   }, [personnel]);
 
