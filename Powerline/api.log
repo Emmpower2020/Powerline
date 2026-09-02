@@ -30,3 +30,16 @@
 [2026-09-02 22:22:20] [INFO] [IP:127.0.0.1] [PUT /api.php/personnel/327] API request Context: {"method":"PUT","uri":"/api.php/personnel/327"}
 [2026-09-02 22:22:20] [INFO] [IP:127.0.0.1] [PUT /api.php/personnel/327] API request Context: {"method":"PUT","uri":"/api.php/personnel/327"}
 [2026-09-02 22:22:20] [INFO] [IP:127.0.0.1] [PUT /api.php/personnel/327] API request Context: {"method":"PUT","uri":"/api.php/personnel/327"}
+[2026-09-02 22:54:32] [INFO] [IP:127.0.0.1] [GET /api.php/backend-version] API request Context: {"method":"GET","uri":"/api.php/backend-version"}
+[2026-09-02 22:54:34] [INFO] [IP:127.0.0.1] [POST /api.php/personnel/bulk-update] API request Context: {"method":"POST","uri":"/api.php/personnel/bulk-update"}
+[2026-09-02 22:54:35] [INFO] [IP:127.0.0.1] [POST /api.php/personnel/bulk-update] API request Context: {"method":"POST","uri":"/api.php/personnel/bulk-update"}
+[2026-09-02 22:54:35] [INFO] [IP:127.0.0.1] [PUT /api.php/personnel/327] API request Context: {"method":"PUT","uri":"/api.php/personnel/327"}
+[2026-09-02 22:54:35] [INFO] [IP:127.0.0.1] [POST /api.php/personnel] API request Context: {"method":"POST","uri":"/api.php/personnel"}
+[2026-09-02 22:54:35] [INFO] [IP:127.0.0.1] [POST /api.php/personnel] API request Context: {"method":"POST","uri":"/api.php/personnel"}
+[2026-09-02 22:57:12] [INFO] [IP:127.0.0.1] [POST /api.php/personnel/bulk-update] API request Context: {"method":"POST","uri":"/api.php/personnel/bulk-update"}
+[2026-09-02 22:57:12] [INFO] [IP:127.0.0.1] [POST /api.php/personnel/bulk-update] Personnel bulk-updated Context: {"count":7,"user_id":1}
+[2026-09-02 22:57:12] [INFO] [IP:127.0.0.1] [PUT /api.php/personnel/327] API request Context: {"method":"PUT","uri":"/api.php/personnel/327"}
+[2026-09-02 22:57:12] [INFO] [IP:127.0.0.1] [POST /api.php/personnel] API request Context: {"method":"POST","uri":"/api.php/personnel"}
+[2026-09-02 22:57:12] [INFO] [IP:127.0.0.1] [POST /api.php/personnel] API request Context: {"method":"POST","uri":"/api.php/personnel"}
+[2026-09-02 22:57:12] [ERROR] [IP:127.0.0.1] [POST /api.php/personnel] Route handler error: SQLSTATE[23000]: Integrity constraint violation: 1062 Duplicate entry 'P-MANUAL-1' for key 'uniq_personnel_code' Context: {"path":"personnel","trace":"#0 C:\\Users\\Every One\\.zcode\\workspace\\default\\base68\\Powerline\\endpoints\\modules.php(654): PDOStatement->execute(Array)\n#1 C:\\Users\\Every One\\.zcode\\workspace\\default\\base68\\Powerline\\lib\\Router.php(120): {closure}()\n#2 C:\\Users\\Every One\\.zcode\\workspace\\default\\base68\\Powerline\\api.php(102): Router->dispatch()\n#3 {main}"}
+[2026-09-02 23:27:20] [INFO] [IP:127.0.0.1] [POST /api.php/personnel] API request Context: {"method":"POST","uri":"/api.php/personnel"}

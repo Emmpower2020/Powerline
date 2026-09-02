@@ -651,7 +651,14 @@ function registerModuleRoutes(Router $router): void
         $colNames = implode(', ', array_map(fn($k) => "`$k`", array_keys($insCols)));
         $ph = implode(', ', array_fill(0, count($insCols), '?'));
         $stmt = $pdo->prepare("INSERT INTO personnel ($colNames, created_at) VALUES ($ph, NOW())");
-        $stmt->execute(array_values($insCols));
+        try {
+            $stmt->execute(array_values($insCols));
+        } catch (PDOException $e) {
+            // کد پرسنلی/کد ملی یکتاست — پیام فارسی به‌جای خطای خام
+            Response::error(409, str_contains($e->getMessage(), 'Duplicate') || str_contains($e->getMessage(), 'uniq_')
+                ? 'این کد پرسنلی یا کد ملی قبلاً برای پرسنل دیگری ثبت شده است'
+                : 'ثبت پرسنل ناموفق بود: ' . fa_db_error($e));
+        }
         Response::success(['id' => (int)$pdo->lastInsertId(), 'personnel_code' => $code], 'پرسنل ایجاد شد', 201);
     });
 
@@ -662,7 +669,7 @@ function registerModuleRoutes(Router $router): void
         $cols = $personnelCols($pdo);
         $posCol = $personnelPositionCol($pdo);
         if ($posCol !== null && $posCol !== 'position' && array_key_exists('position', $body)) { $body[$posCol] = $body['position']; unset($body['position']); }
-        $fields = ['first_name', 'last_name', 'national_id', 'phone', 'mobile', 'email', 'hire_date', 'contract_id', 'status', 'father_name', 'supervisor_name', 'collaboration_start'];
+        $fields = ['first_name', 'last_name', 'national_id', 'phone', 'mobile', 'email', 'hire_date', 'contract_id', 'status', 'father_name', 'supervisor_name', 'collaboration_start', 'personnel_code'];
         if ($posCol !== null) $fields[] = $posCol;
         $fields = array_values(array_filter($fields, fn($f) => isset($cols[$f])));
         $updates = []; $params = [];
@@ -766,6 +773,50 @@ function registerModuleRoutes(Router $router): void
 
         Logger::info('Personnel bulk-deleted', ['count' => $deleted, 'skipped' => $skipped, 'user_id' => $user['id']]);
         Response::success(['deleted' => $deleted, 'skipped' => $skipped], "{$deleted} پرسنل حذف شد" . ($skipped > 0 ? " ({$skipped} مورد به‌دلیل ثبت عیب رد شد)" : ''));
+    });
+
+    // ویرایش گروهی پرسنل — v4.3.73: حداکثر ۱۰۰ ردیف در هر درخواست با یک UPDATE
+    // (درخواست‌های موازی زیاد روی هاست اشتراکی مسدود می‌شدند و فعال‌کردن گروهی خطا می‌داد)
+    // بدنه: {"ids":[...], "patch":{"status":"active", "position":"...", "supervisor_name":"...", "contract_id":2|null}}
+    $router->post('personnel/bulk-update', function () use ($personnelPositionCol, $personnelCols) {
+        $user = Auth::authenticate();
+        Auth::requirePermissionSoft('personnel.update');
+
+        $body = Helpers::getJsonBody();
+        $ids = $body['ids'] ?? [];
+        $patch = $body['patch'] ?? [];
+        if (!is_array($ids) || count($ids) === 0) Response::error(400, 'لیست شناسه‌ها ارسال نشده');
+        if (count($ids) > 100) Response::error(400, 'حداکثر ۱۰۰ پرسنل در هر درخواست');
+        if (!is_array($patch) || count($patch) === 0) Response::error(400, 'مقدار ویرایش ارسال نشده');
+
+        $ids = array_values(array_unique(array_filter(array_map('intval', $ids), fn($v) => $v > 0)));
+        if (count($ids) === 0) Response::error(400, 'شناسه معتبر ارسال نشده');
+
+        // فقط فیلدهای مجاز که در این دیتابیس واقعاً وجود دارند
+        $cols = $personnelCols($pdo = Database::getInstance()->getConnection());
+        $allowed = ['status', 'supervisor_name', 'contract_id'];
+        $posCol = $personnelPositionCol($pdo);
+        if ($posCol !== null) $allowed[] = $posCol;
+
+        $updates = []; $params = [];
+        foreach ($allowed as $field) {
+            if (array_key_exists($field, $patch)) {
+                $updates[] = "`$field` = ?";
+                $params[] = $patch[$field];
+            }
+        }
+        if (!$updates) Response::error(400, 'هیچ فیلد مجازی برای ویرایش ارسال نشده');
+
+        $ph = implode(',', array_fill(0, count($ids), '?'));
+        try {
+            $stmt = $pdo->prepare('UPDATE personnel SET ' . implode(', ', $updates) . ', updated_at = NOW() WHERE id IN (' . $ph . ')');
+            $stmt->execute(array_merge($params, $ids));
+            $updated = $stmt->rowCount();
+        } catch (PDOException $e) {
+            Response::error(500, 'ویرایش گروهی پرسنل ناموفق بود: ' . fa_db_error($e));
+        }
+        Logger::info('Personnel bulk-updated', ['count' => $updated, 'user_id' => $user['id']]);
+        Response::success(['updated' => $updated], "{$updated} پرسنل ویرایش شد");
     });
 
     // ورود انبوه پرسنل — v3.1.0: درج یا ویرایش بر اساس کد ملی / کد پرسنلی

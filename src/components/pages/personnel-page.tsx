@@ -334,7 +334,7 @@ function PersonnelDialog({ open, editRow, duplicateFrom, onClose, onSaved }: {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState({
-    first_name: "", last_name: "", national_id: "", father_name: "",
+    personnel_code: "", first_name: "", last_name: "", national_id: "", father_name: "",
     position: "", mobile: "", phone: "",
     supervisor_name: "", collaboration_start: "", contract_id: "",
   });
@@ -346,6 +346,7 @@ function PersonnelDialog({ open, editRow, duplicateFrom, onClose, onSaved }: {
     if (open) {
       setError(null);
       setForm({
+        personnel_code: sourceRow?.personnel_code || "",
         first_name: sourceRow?.first_name || "",
         last_name: sourceRow?.last_name || "",
         national_id: duplicateFrom ? "" : (sourceRow?.national_id || ""),
@@ -366,6 +367,7 @@ function PersonnelDialog({ open, editRow, duplicateFrom, onClose, onSaved }: {
     setSubmitting(true); setError(null);
     try {
       const payload = {
+        personnel_code: form.personnel_code.trim() || null,
         first_name: form.first_name.trim(),
         last_name: form.last_name.trim(),
         national_id: form.national_id.trim() || null,
@@ -405,7 +407,16 @@ function PersonnelDialog({ open, editRow, duplicateFrom, onClose, onSaved }: {
         <form onSubmit={submit} className="space-y-4">
           {error && <div className="bg-red-50 dark:bg-red-950 text-red-600 text-sm p-3 rounded-lg text-right">{error}</div>}
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="space-y-2">
+              <Label className="text-right block">کد پرسنلی</Label>
+              <Input
+                value={form.personnel_code}
+                onChange={e => setForm({ ...form, personnel_code: e.target.value })}
+                placeholder="خالی = خودکار"
+                className="text-right"
+              />
+            </div>
             <div className="space-y-2">
               <Label className="text-right block">نام (اجباری)</Label>
               <Input value={form.first_name} onChange={e => setForm({ ...form, first_name: e.target.value })} className="text-right" autoFocus />

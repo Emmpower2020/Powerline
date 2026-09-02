@@ -77,19 +77,25 @@ export function BulkPersonnelActions({ getSelection, onApplied, positionOptions 
   const applyPatch = async () => {
     if (!pendingOperation) return;
     const { rows: targetRows, patch, label: successText } = pendingOperation;
-    const CHUNK = 10;
+    // v4.3.73: بسته‌های ۱۰۰تایی با یک درخواست (personnel/bulk-update) —
+    // درخواست‌های موازی زیاد روی هاست اشتراکی مسدود می‌شدند و خطا می‌دادند
+    const BATCH = 100;
     setApplying(true);
     let success = 0;
     const errors: string[] = [];
     try {
-      for (let i = 0; i < targetRows.length; i += CHUNK) {
-        const chunk = targetRows.slice(i, i + CHUNK);
-        const results = await Promise.allSettled(
-          chunk.map((row) => apiClient.put(`${API_ENDPOINTS.personnel}/${row.id}`, patch)),
-        );
-        success += results.filter((r) => r.status === "fulfilled").length;
-        errors.push(...results.filter((r) => r.status === "rejected").map((r) => (r as any).reason?.message || "خطا"));
-        setProgress({ completed: Math.min(i + CHUNK, targetRows.length), total: targetRows.length, success, failed: errors.length });
+      for (let i = 0; i < targetRows.length; i += BATCH) {
+        const batch = targetRows.slice(i, i + BATCH);
+        try {
+          const res = await apiClient.post<any>("personnel/bulk-update", {
+            ids: batch.map((row: any) => row.id),
+            patch,
+          }, { timeoutMs: 60_000 });
+          success += Number(res?.data?.updated ?? batch.length);
+        } catch (err: any) {
+          errors.push(`بسته ${Math.floor(i / BATCH) + 1}: ${err?.message || "خطای نامشخص"}`);
+        }
+        setProgress({ completed: Math.min(i + BATCH, targetRows.length), total: targetRows.length, success, failed: errors.length });
       }
       onApplied();
       setOperationOpen(false);
