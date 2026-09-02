@@ -36,6 +36,7 @@ export interface DataTableColumn<T> {
 export interface DataTableHandle {
   clearSelection: () => void;
   getSelectedRows: () => number[];
+  getSelectedRowObjects: () => any[];
 }
 
 type SortState = "none" | "asc" | "desc";
@@ -137,6 +138,9 @@ function DataTableInner<T extends { id: number }>({
   const [pendingFilters, setPendingFilters] = useState<Record<string, PendingFilter>>({});
   const [openFilterCol, setOpenFilterCol] = useState<string | null>(null);
   const [selectedRows, setSelectedRows] = useState<Set<number>>(new Set());
+  const [selectedRowCache, setSelectedRowCache] = useState<Map<number, T>>(new Map());
+  const [selectingAll, setSelectingAll] = useState(false);
+  const [selectionAllActive, setSelectionAllActive] = useState(false);
   const [columnOrder, setColumnOrder] = useState<string[]>(
     () => {
       const def = columns.map(c => c.key);
@@ -184,13 +188,14 @@ function DataTableInner<T extends { id: number }>({
   useEffect(() => {
     if (tableRef) {
       tableRef.current = {
-        clearSelection: () => setSelectedRows(new Set()),
+        clearSelection: () => { setSelectedRows(new Set()); setSelectedRowCache(new Map()); setSelectionAllActive(false); },
         getSelectedRows: () => Array.from(selectedRows),
+        getSelectedRowObjects: () => Array.from(selectedRowCache.values()),
       };
     }
-  }, [selectedRows, tableRef]);
+  }, [selectedRows, selectedRowCache, tableRef]);
 
-  const clearSelection = () => setSelectedRows(new Set());
+  const clearSelection = () => { setSelectedRows(new Set()); setSelectedRowCache(new Map()); setSelectionAllActive(false); };
 
   // سلامت داده به‌صورت پیش‌فرض در همه جدول‌ها نمایش داده می‌شود.
   const effectiveColumns = useMemo<DataTableColumn<T>[]>(() => {
@@ -383,17 +388,37 @@ function DataTableInner<T extends { id: number }>({
       return n;
     });
   };
-  const toggleRowSelection = (id: number) => setSelectedRows(prev => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n; });
-  // انتخاب همه = تمام رکوردهای قابل مشاهده پس از فیلتر، نه فقط صفحه فعلی.
-  // به این ترتیب با رفتن به صفحات بعدی، همه رکوردهای انتخاب‌شده همچنان انتخاب می‌مانند.
+  const toggleRowSelection = (id: number) => {
+    setSelectionAllActive(false);
+    setSelectedRows(prev => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n; });
+    const row = data.find(r => r.id === id);
+    if (row) setSelectedRowCache(prev => { const n = new Map(prev); if (n.has(id)) n.delete(id); else n.set(id, row); return n; });
+  };
+  // انتخاب همه باید واقعاً همه رکوردهای نتیجه را انتخاب کند، نه فقط ۱۵ رکورد صفحه فعلی.
   const filteredIds = filtered.map(r => r.id);
   const allFilteredSelected = filteredIds.length > 0 && filteredIds.every(id => selectedRows.has(id));
   const someFilteredSelected = filteredIds.some(id => selectedRows.has(id));
-  const toggleSelectAll = () => {
-    const next = new Set(selectedRows);
-    if (allFilteredSelected) filteredIds.forEach(id => next.delete(id));
-    else filteredIds.forEach(id => next.add(id));
-    setSelectedRows(next);
+  const toggleSelectAll = async () => {
+    if (selectingAll) return;
+    if (selectionAllActive || allFilteredSelected) {
+      setSelectedRows(new Set());
+      setSelectedRowCache(new Map());
+      setSelectionAllActive(false);
+      return;
+    }
+    setSelectingAll(true);
+    try {
+      const rows = onLoadAllRows ? await onLoadAllRows() : filtered;
+      const eligible = rows || [];
+      setSelectedRows(new Set(eligible.map(r => r.id)));
+      setSelectedRowCache(new Map(eligible.map(r => [r.id, r])));
+      setSelectionAllActive(true);
+      toast({ title: "انتخاب همه انجام شد", description: `${eligible.length.toLocaleString("fa-IR")} ردیف انتخاب شد` });
+    } catch (err: any) {
+      toast({ title: "انتخاب همه ناموفق بود", description: err?.message || "دریافت همه رکوردها انجام نشد", variant: "destructive" });
+    } finally {
+      setSelectingAll(false);
+    }
   };
   const getSortIcon = (key: string) => { if (sortKey !== key || sortDir === "none") return <ChevronsUpDown className="w-3 h-3 opacity-40" />; return sortDir === "asc" ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />; };
 
@@ -571,7 +596,7 @@ function DataTableInner<T extends { id: number }>({
   // Selection is intentionally allowed to persist across pages for bulk operations.
   // Edit/duplicate, however, must only evaluate rows that are currently visible after search/filter.
   // This prevents a stale selection from another page/filter from blocking a single-row edit.
-  const visibleSelectedRows = paginated.filter(r => selectedRows.has(r.id));
+  const visibleSelectedRows = Array.from(selectedRowCache.values()).filter(r => selectedRows.has(r.id));
   const selCount = visibleSelectedRows.length;
 
   const handleEditClick = () => {
@@ -647,7 +672,7 @@ function DataTableInner<T extends { id: number }>({
           )}
 
           {/* عنصر اضافه ماژول (مثل دکمه عملیات گروهی) — همان ردیف دکمه‌های اصلی */}
-          {typeof toolbarExtra === "function" ? toolbarExtra(filtered.filter(r => selectedRows.has(r.id))) : toolbarExtra}
+          {typeof toolbarExtra === "function" ? toolbarExtra(visibleSelectedRows) : toolbarExtra}
 
           {onImport && (
             <Button variant="outline" size="icon" onClick={onImport} title="وارد کردن از اکسل" className="h-9 w-9 text-green-600 hover:bg-green-50 border-green-200">
@@ -764,9 +789,10 @@ function DataTableInner<T extends { id: number }>({
                       type="checkbox"
                       checked={allFilteredSelected}
                       ref={(el) => { if (el) el.indeterminate = !allFilteredSelected && someFilteredSelected; }}
-                      onChange={toggleSelectAll}
+                      onChange={() => { void toggleSelectAll(); }}
+                      disabled={selectingAll}
                       className="w-4 h-4 cursor-pointer"
-                      title="انتخاب/لغو انتخاب تمام ردیف‌های قابل مشاهده در همه صفحات"
+                      title="انتخاب/لغو انتخاب تمام ردیف‌ها در همه صفحات"
                     />
                   </th>
                 )}

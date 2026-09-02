@@ -257,7 +257,10 @@ export function GenericModulePage({ moduleKey, endpoint }: { moduleKey: string; 
       onCopy={() => {}}
       onDelete={deleteRows}
       onImport={() => inputRef.current?.click()}
-      onLoadAllRows={async () => data}
+      onLoadAllRows={async () => {
+        const result = await apiClient.get<PaginatedResponse<GenericItem>>(endpoint, { page: 1, page_size: 100000 });
+        return result?.data || [];
+      }}
       toolbarExtra={(rows) => <GenericBulkActions rows={rows} endpoint={endpoint} entityName={config.title.replace("ها","")} onApplied={() => setRefreshKey(k => k + 1)} canToggleStatus={!!config.activityStatus} canChangeContract={!!config.editKeys?.includes("contract_id")} />}
     />
     {renderCreate()}

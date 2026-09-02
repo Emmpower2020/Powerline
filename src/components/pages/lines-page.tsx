@@ -136,9 +136,8 @@ export function LinesPage() {
 
   // ردیف‌های انتخاب‌شدهٔ فعلی جدول — برای عملیات گروهی (مورد ۴)
   const getSelection = useCallback((): any[] => {
-    const ids = tableRef.current?.getSelectedRows() || [];
-    return ids.map(id => filteredData.find(r => r.id === id)).filter(Boolean) as any[];
-  }, [filteredData]);
+    return tableRef.current?.getSelectedRowObjects?.() || [];
+  }, []);
 
   // بعد از عملیات گروهی: refresh + پاک کردن انتخاب‌ها
   const handleBulkApplied = useCallback(() => {

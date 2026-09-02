@@ -121,11 +121,14 @@ class ApiClient {
 
     // v4.3.39: Scope سراسری قرارداد برای ماژول‌های عملیاتی.
     // Endpointهای مرجع/قراردادها عمداً از این فیلتر مستثنا هستند.
+    // endpointها در API_CONFIG با / شروع می‌شوند؛ مقایسه را نرمال می‌کنیم
+    // تا Scope قرارداد واقعاً روی همه ماژول‌های عملیاتی اعمال شود.
+    const normalizedEndpoint = endpoint.replace(/^\/+/, "");
     const contractScoped = method === "GET" && [
       "lines", "towers", "circuits", "personnel", "equipment",
       "inspections", "defects", "work-orders", "safety-incidents",
       "price-lists", "invoices", "dashboard/stats", "dashboard/recent-defects",
-    ].some((name) => endpoint === name || endpoint.startsWith(`${name}/`));
+    ].some((name) => normalizedEndpoint === name || normalizedEndpoint.startsWith(`${name}/`));
     const scopedParams = contractScoped && typeof window !== "undefined"
       ? { ...(params || {}), contract_id: params?.contract_id ?? (() => {
           const selected = localStorage.getItem("powerline_selected_contract");

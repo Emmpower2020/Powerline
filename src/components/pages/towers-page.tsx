@@ -138,9 +138,8 @@ export function TowersPage() {
 
   // ردیف‌های انتخاب‌شدهٔ فعلی جدول — برای عملیات گروهی
   const getSelection = useCallback((): any[] => {
-    const ids = tableRef.current?.getSelectedRows() || [];
-    return ids.map(id => filteredData.find(r => r.id === id)).filter(Boolean) as any[];
-  }, [filteredData]);
+    return tableRef.current?.getSelectedRowObjects?.() || [];
+  }, []);
 
   // v2.4.1: کش خطوط برای import — فقط تطابق دقیق (نرمال‌شده) با نام/کد خط دیتابیس
   const linesCacheRef = useRef<Map<string, { id: number; line_code: string; name: string }> | null>(null);

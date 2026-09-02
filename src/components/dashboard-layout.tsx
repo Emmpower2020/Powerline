@@ -341,7 +341,7 @@ export function DashboardLayout({ children, currentPage, onNavigate, title, subt
           </div>
         </header>
         {/* v2.8.0: padding کم‌تر برای main (p-4 lg:p-6 → p-3 lg:p-4) */}
-        <main className="flex-1 p-3 lg:p-4 bg-slate-50 dark:bg-slate-950"><div key={selectedContract}>{children}</div></main>
+        <main className="flex-1 p-3 lg:p-4 bg-slate-50 dark:bg-slate-950"><div key={`${currentPage}-${selectedContract}`}>{children}</div></main>
       </div>
     </div>
   );
