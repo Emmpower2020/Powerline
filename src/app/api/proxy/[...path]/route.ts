@@ -19,12 +19,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { handleMockRequest } from "../mock-data";
 
-const API_BASE_URL = "https://sabadgame.com/Powerline/api.php";
+const API_BASE_URL = "https://jibimarket.com/Powerline/api.php";
 const DEV_MODE = process.env.NODE_ENV !== "production";
 
 /**
  * v3.5.1 — حل خودکار چالش ضد DDoS هاست:
- * هاست sabadgame.com بعد از چند درخواست پشت‌سرهم، به‌جای JSON صفحه HTML می‌فرستد که
+ * هاست jibimarket.com بعد از چند درخواست پشت‌سرهم، به‌جای JSON صفحه HTML می‌فرستد که
  * فقط یک کوکی `_dgjsc` ست می‌کند و رفرش می‌شود. چون مقدار کوکی (hval) داخل خود HTML هست،
  * پراکسی می‌تواند آن را بردارد، کوکی را نگه دارد و درخواست را با کوکی تکرار کند —
  * بدون نیاز به اجرای JavaScript. کوکی تا انقضای آن برای درخواست‌های بعدی نگه داشته می‌شود.
@@ -289,7 +289,7 @@ async function handleRequest(request: NextRequest) {
         success: false,
         error: {
           code: 503,
-          message: "سرور دیتابیس (sabadgame.com) موقتاً در دسترس نیست — داده‌های شما سالم است؛ چند لحظه بعد دوباره تلاش کنید یا دکمه بروزرسانی را بزنید",
+          message: "سرور دیتابیس (jibimarket.com) موقتاً در دسترس نیست — داده‌های شما سالم است؛ چند لحظه بعد دوباره تلاش کنید یا دکمه بروزرسانی را بزنید",
         },
       },
       { status: 503 }
