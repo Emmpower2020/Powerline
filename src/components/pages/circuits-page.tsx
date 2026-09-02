@@ -11,6 +11,7 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
 import { SearchableSelect } from "@/components/searchable-select";
+import { FormSection } from "@/components/form-section";
 import { DataTable, type DataTableColumn, type DataTableHandle } from "@/components/data-table";
 import { ImportExcelDialog } from "@/components/import-excel-dialog";
 import { BulkDeleteDialog } from "@/components/bulk-delete-dialog";
@@ -370,6 +371,7 @@ function CircuitDialog({ open, editRow, duplicateFrom, existingCodes, onClose, o
         </DialogHeader>
         <form onSubmit={submit} className="space-y-4">
           {error && <div className="bg-red-50 dark:bg-red-950 text-red-600 text-sm p-3 rounded-lg text-right">{error}</div>}
+          <FormSection title="مشخصات مدار">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="space-y-2">
               <Label className="text-right block">کد دیسپاچینگ (اجباری)</Label>
@@ -413,6 +415,7 @@ function CircuitDialog({ open, editRow, duplicateFrom, existingCodes, onClose, o
               {submitting ? <><Loader2 className="w-4 h-4 ml-2 animate-spin" />در حال ثبت...</> : editRow ? "اعمال ویرایش" : "ثبت مدار"}
             </Button>
           </DialogFooter>
+          </FormSection>
         </form>
       </DialogContent>
     </Dialog>

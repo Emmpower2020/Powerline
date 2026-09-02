@@ -17,6 +17,7 @@ import { Loader2 } from "lucide-react";
 import { JalaliDatePicker } from "@/components/jalali-date-picker";
 import { fromJalali, fromPersianNumber } from "@/lib/jalali";
 import { ContractSelect } from "@/components/contract-select";
+import { FormSection } from "@/components/form-section";
 
 // قرارداد
 export function CreateContractDialog({ open, onClose, onCreated }: { open: boolean; onClose: () => void; onCreated: () => void }) {
@@ -64,7 +65,7 @@ export function CreateContractDialog({ open, onClose, onCreated }: { open: boole
   };
 
   return (
-    <Shell open={open} onClose={onClose} title="قرارداد جدید" submitting={submitting} error={error} onSubmit={submit}>
+    <Shell open={open} onClose={onClose} boxTitle="اطلاعات قرارداد" title="قرارداد جدید" submitting={submitting} error={error} onSubmit={submit}>
       <Field label="کد قرارداد (اجباری)"><Input value={form.contract_code} onChange={e => setForm({ ...form, contract_code: e.target.value })} dir="ltr" className="text-left" /></Field>
       <Field label="عنوان (اجباری)"><Input value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} className="text-right" /></Field>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -103,7 +104,7 @@ export function CreateSafetyDialog({ open, onClose, onCreated }: { open: boolean
   };
 
   return (
-    <Shell open={open} onClose={onClose} title="ثبت حادثه ایمنی" submitting={submitting} error={error} onSubmit={submit}>
+    <Shell open={open} onClose={onClose} boxTitle="اطلاعات حادثه" title="ثبت حادثه ایمنی" submitting={submitting} error={error} onSubmit={submit}>
       <Field label="عنوان (اجباری)"><Input value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} className="text-right" /></Field>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <Field label="نوع حادثه"><Select value={form.incident_type} onValueChange={v => setForm({ ...form, incident_type: v })}><SelectTrigger className="w-full"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="accident">حادثه</SelectItem><SelectItem value="near_miss">Near Miss</SelectItem><SelectItem value="unsafe_act">عمل ناایمن</SelectItem></SelectContent></Select></Field>
@@ -131,7 +132,7 @@ export function CreatePersonnelDialog({ open, onClose, onCreated }: { open: bool
   };
 
   return (
-    <Shell open={open} onClose={onClose} title="ثبت پرسنل جدید" submitting={submitting} error={error} onSubmit={submit}>
+    <Shell open={open} onClose={onClose} boxTitle="مشخصات پرسنل" title="ثبت پرسنل جدید" submitting={submitting} error={error} onSubmit={submit}>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <Field label="نام (اجباری)"><Input value={form.first_name} onChange={e => setForm({ ...form, first_name: e.target.value })} className="text-right" /></Field>
         <Field label="نام خانوادگی"><Input value={form.last_name} onChange={e => setForm({ ...form, last_name: e.target.value })} className="text-right" /></Field>
@@ -164,7 +165,7 @@ export function CreateContractorDialog({ open, onClose, onCreated }: { open: boo
     } catch (err) { setError(err instanceof Error ? err.message : "خطا"); } finally { setSubmitting(false); }
   };
   return (
-    <Shell open={open} onClose={onClose} title="ثبت پیمانکار جدید" submitting={submitting} error={error} onSubmit={submit}>
+    <Shell open={open} onClose={onClose} boxTitle="مشخصات پیمانکار" title="ثبت پیمانکار جدید" submitting={submitting} error={error} onSubmit={submit}>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <Field label="کد پیمانکار"><Input value={form.contractor_code} onChange={e => setForm({ ...form, contractor_code: e.target.value })} dir="ltr" className="text-left" /></Field>
         <Field label="نام پیمانکار (اجباری)"><Input value={form.contractor_name} onChange={e => setForm({ ...form, contractor_name: e.target.value })} className="text-right" /></Field>
@@ -205,7 +206,7 @@ export function CreateEquipmentDialog({ open, onClose, onCreated }: { open: bool
   };
 
   return (
-    <Shell open={open} onClose={onClose} title="ثبت تجهیز جدید" submitting={submitting} error={error} onSubmit={submit}>
+    <Shell open={open} onClose={onClose} boxTitle="مشخصات تجهیز" title="ثبت تجهیز جدید" submitting={submitting} error={error} onSubmit={submit}>
       <Field label="قرارداد"><ContractSelect value={form.contract_id} onChange={v => setForm({ ...form, contract_id: v })} /></Field>
       <Field label="گروه تجهیز (اجباری)"><Select value={form.equipment_class_id} onValueChange={v => setForm({ ...form, equipment_class_id: v })}><SelectTrigger className="w-full"><SelectValue placeholder="انتخاب..." /></SelectTrigger><SelectContent className="max-h-60">{classes.map(c => <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>)}</SelectContent></Select></Field>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -234,7 +235,7 @@ export function CreateInspectionDialog({ open, onClose, onCreated }: { open: boo
   };
 
   return (
-    <Shell open={open} onClose={onClose} title="ثبت بازدید جدید" submitting={submitting} error={error} onSubmit={submit}>
+    <Shell open={open} onClose={onClose} boxTitle="اطلاعات بازدید" title="ثبت بازدید جدید" submitting={submitting} error={error} onSubmit={submit}>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <Field label="تاریخ بازدید (اجباری)"><JalaliDatePicker value={form.inspection_date} onChange={v => setForm({ ...form, inspection_date: v })} /></Field>
         <Field label="اولویت"><Select value={form.priority} onValueChange={v => setForm({ ...form, priority: v })}><SelectTrigger className="w-full"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="routine">معمول</SelectItem><SelectItem value="emergency">اضطراری</SelectItem></SelectContent></Select></Field>
@@ -271,7 +272,7 @@ export function CreateWorkOrderDialog({ open, onClose, onCreated }: { open: bool
   };
 
   return (
-    <Shell open={open} onClose={onClose} title="دستورکار جدید" submitting={submitting} error={error} onSubmit={submit}>
+    <Shell open={open} onClose={onClose} boxTitle="اطلاعات دستورکار" title="دستورکار جدید" submitting={submitting} error={error} onSubmit={submit}>
       <Field label="عنوان (اجباری)"><Input value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} className="text-right" /></Field>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <Field label="اولویت"><Select value={form.priority} onValueChange={v => setForm({ ...form, priority: v })}><SelectTrigger className="w-full"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="critical">بحرانی</SelectItem><SelectItem value="high">بالا</SelectItem><SelectItem value="medium">متوسط</SelectItem><SelectItem value="low">پایین</SelectItem></SelectContent></Select></Field>
@@ -289,11 +290,13 @@ export function CreateWorkOrderDialog({ open, onClose, onCreated }: { open: bool
 }
 
 // Shared
-function Shell({ open, onClose, title, submitting, error, onSubmit, children }: { open: boolean; onClose: () => void; title: string; submitting: boolean; error: string | null; onSubmit: (e: React.FormEvent) => void; children: React.ReactNode }) {
+function Shell({ open, onClose, title, submitting, error, onSubmit, children, boxTitle = "مشخصات" }: { open: boolean; onClose: () => void; title: string; submitting: boolean; error: string | null; onSubmit: (e: React.FormEvent) => void; children: React.ReactNode; boxTitle?: string }) {
   return (<Dialog open={open} onOpenChange={(o) => !o && onClose()}><DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto"><DialogHeader><DialogTitle className="text-right">{title}</DialogTitle></DialogHeader>
     <form onSubmit={onSubmit} className="space-y-4">
       {error && <div className="bg-red-50 dark:bg-red-950 text-red-600 text-sm p-3 rounded-lg text-right">{error}</div>}
+      <FormSection title={boxTitle}>
       {children}
+      </FormSection>
       <DialogFooter><Button type="button" variant="outline" onClick={onClose}>انصراف</Button>
         <Button type="submit" disabled={submitting} className="bg-indigo-600 hover:bg-indigo-700">{submitting ? <><Loader2 className="w-4 h-4 ml-2 animate-spin" />در حال ثبت...</> : "ثبت"}</Button>
       </DialogFooter>

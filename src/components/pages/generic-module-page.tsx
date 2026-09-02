@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Loader2 } from "lucide-react";
 import { ContractSelect } from "@/components/contract-select";
 import { SearchableSelect } from "@/components/searchable-select";
+import { FormSection } from "@/components/form-section";
 import { DataTable, type DataTableColumn } from "@/components/data-table";
 import type { PaginatedResponse } from "@/lib/types";
 import { GenericBulkActions } from "@/components/generic-bulk-actions";
@@ -252,7 +253,8 @@ function EditorDialog({
     <DialogContent className="max-w-2xl" dir="rtl">
       <DialogHeader><DialogTitle className="text-right">{mode === "edit" ? `ویرایش ${title}` : `ثبت ${title} جدید`}</DialogTitle></DialogHeader>
       <form onSubmit={save}>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[60vh] overflow-y-auto p-1">
+        <FormSection title={mode === "edit" ? `مشخصات ${title}` : `ثبت ${title} جدید`} className="max-h-[60vh] overflow-y-auto">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {visibleKeys.map(k => {
             const label = FIELD_LABELS[k] || k;
             const isJalaliDate = DATE_FIELDS.has(k);
@@ -283,6 +285,7 @@ function EditorDialog({
             </div>;
           })}
         </div>
+        </FormSection>
         {error && <p className="mt-3 text-sm text-red-600 whitespace-pre-line">{error}</p>}
         <DialogFooter className="mt-4 gap-2"><Button type="button" variant="outline" onClick={onClose}>انصراف</Button><Button type="submit" disabled={saving}>{saving ? <Loader2 className="w-4 h-4 animate-spin" /> : "ذخیره"}</Button></DialogFooter>
       </form>

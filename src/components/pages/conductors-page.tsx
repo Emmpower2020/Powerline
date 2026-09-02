@@ -11,6 +11,7 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
 import { SearchableSelect } from "@/components/searchable-select";
+import { FormSection } from "@/components/form-section";
 import { DataTable, type DataTableColumn, type DataTableHandle } from "@/components/data-table";
 import { ImportExcelDialog } from "@/components/import-excel-dialog";
 import { BulkDeleteDialog } from "@/components/bulk-delete-dialog";
@@ -432,6 +433,7 @@ function ConductorDialog({ open, editRow, duplicateFrom, onClose, onSaved }: {
         </DialogHeader>
         <form onSubmit={submit} className="space-y-4">
           {error && <div className="bg-red-50 dark:bg-red-950 text-red-600 text-sm p-3 rounded-lg text-right">{error}</div>}
+          <FormSection title="مشخصات سیم">
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div className="space-y-2">
@@ -503,6 +505,7 @@ function ConductorDialog({ open, editRow, duplicateFrom, onClose, onSaved }: {
               {submitting ? <><Loader2 className="w-4 h-4 ml-2 animate-spin" />در حال ثبت...</> : editRow ? "اعمال ویرایش" : "ثبت سیم"}
             </Button>
           </DialogFooter>
+          </FormSection>
         </form>
       </DialogContent>
     </Dialog>

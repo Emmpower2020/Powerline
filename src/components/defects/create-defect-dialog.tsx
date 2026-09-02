@@ -12,6 +12,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { SearchableSelect } from "@/components/searchable-select";
 import { ContractSelect } from "@/components/contract-select";
+import { FormSection } from "@/components/form-section";
 import { Loader2, Sparkles } from "lucide-react";
 
 /**
@@ -193,6 +194,7 @@ export function CreateDefectDialog({ open, onClose, onCreated, editRow, duplicat
         </DialogHeader>
         <form onSubmit={submit} className="space-y-4">
           {error && <div className="bg-red-50 dark:bg-red-950 text-red-600 text-sm p-3 rounded-lg text-right">{error}</div>}
+          <FormSection title="مشخصات عیب">
 
           {/* v3.3.0: انتخاب زنجیره‌ای — اول دسته کلی (۲۴ دسته)، بعد عیب همان دسته */}
           <div className="space-y-2 p-3 bg-indigo-50/50 dark:bg-indigo-950/20 rounded-lg border border-indigo-100 dark:border-indigo-900">
@@ -333,6 +335,7 @@ export function CreateDefectDialog({ open, onClose, onCreated, editRow, duplicat
                 : isEdit ? "اعمال ویرایش" : "ثبت عیب"}
             </Button>
           </DialogFooter>
+          </FormSection>
         </form>
       </DialogContent>
     </Dialog>

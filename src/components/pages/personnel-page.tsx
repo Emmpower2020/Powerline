@@ -18,6 +18,7 @@ import { useBulkDelete } from "@/hooks/use-bulk-delete";
 import { useToast } from "@/hooks/use-toast";
 import { useStatsVisible } from "@/hooks/use-stats-visible";
 import { BulkPersonnelActions } from "@/components/personnel/bulk-personnel-actions";
+import { FormSection } from "@/components/form-section";
 import { logError } from "@/lib/error-log";
 import { Loader2, Plus, HardHat, UserCog, Cog, Users, Car, Wrench } from "lucide-react";
 
@@ -406,6 +407,7 @@ function PersonnelDialog({ open, editRow, duplicateFrom, onClose, onSaved }: {
         </DialogHeader>
         <form onSubmit={submit} className="space-y-4">
           {error && <div className="bg-red-50 dark:bg-red-950 text-red-600 text-sm p-3 rounded-lg text-right">{error}</div>}
+          <FormSection title="مشخصات پرسنل">
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div className="space-y-2">
@@ -474,6 +476,7 @@ function PersonnelDialog({ open, editRow, duplicateFrom, onClose, onSaved }: {
               {submitting ? <><Loader2 className="w-4 h-4 ml-2 animate-spin" />در حال ثبت...</> : editRow ? "اعمال ویرایش" : "ثبت پرسنل"}
             </Button>
           </DialogFooter>
+          </FormSection>
         </form>
       </DialogContent>
     </Dialog>
