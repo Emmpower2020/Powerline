@@ -1,4 +1,4 @@
-# Powerline Web — v4.3.58 (2026-09-02)
+# Powerline Web — v4.3.59 (2026-09-02)
 
 ## اصلاحات این نسخه
 
@@ -29,4 +29,4 @@
 - `package.json` / `package-lock.json`
 
 ## نسخه
-`v4.3.58`
+`v4.3.59`

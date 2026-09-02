@@ -244,7 +244,9 @@ export function DashboardLayout({ children, currentPage, onNavigate, title, subt
             <DataStatusBadge />
             <div className="hidden lg:flex items-center gap-2 min-w-[260px] max-w-[360px]">
               <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 whitespace-nowrap">قرارداد جاری</span>
-              <ContractSelect value={selectedContract} onChange={onContractChange} disabled={contractsLoading} className="min-w-0 flex-1" preserveUnknownValue />
+              <div className="min-w-0 flex-1 rounded-lg transition-colors bg-indigo-50/70 hover:bg-indigo-100/80 dark:bg-indigo-950/35 dark:hover:bg-indigo-900/50 px-1 py-0.5">
+                <ContractSelect value={selectedContract} onChange={onContractChange} disabled={contractsLoading} className="min-w-0 flex-1" preserveUnknownValue />
+              </div>
             </div>
             {/* v2.8.0: اطلاعات کاربر با آیکون UserCog زیبا‌تر */}
             <DropdownMenu>

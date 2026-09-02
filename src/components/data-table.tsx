@@ -19,6 +19,7 @@ import {
   DropdownMenuTrigger, DropdownMenuSeparator, DropdownMenuLabel,
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
+import { toJalali } from "@/lib/jalali";
 import { ExportDialog, type ExportOptions, type ExportScope } from "@/components/export-dialog";
 import { PrintDialog, type PrintScope as PrintScopeType } from "@/components/print-dialog";
 import { IssuesBadge } from "@/components/issues-badge";
@@ -203,13 +204,14 @@ function DataTableInner<T extends { id: number }>({
 
   // هر بار دادهٔ جدول تازه از والد دریافت می‌شود (مثلاً بعد از حذف، ویرایش یا رفرش)،
   // انتخاب‌های قبلی نباید به رکوردهای جدید منتقل شوند و شمارندهٔ انتخاب نباید باقی بماند.
-  const previousDataRef = useRef<T[] | null>(null);
+  const previousDataSignatureRef = useRef<string | null>(null);
+  const dataSelectionSignature = useMemo(() => data.map(r => String(r.id)).join(","), [data]);
   useEffect(() => {
-    if (previousDataRef.current !== data) {
-      previousDataRef.current = data;
+    if (previousDataSignatureRef.current !== dataSelectionSignature) {
+      previousDataSignatureRef.current = dataSelectionSignature;
       clearSelection();
     }
-  }, [data, clearSelection]);
+  }, [dataSelectionSignature, clearSelection]);
 
   // سلامت داده به‌صورت پیش‌فرض در همه جدول‌ها نمایش داده می‌شود.
   const effectiveColumns = useMemo<DataTableColumn<T>[]>(() => {
@@ -619,7 +621,9 @@ function DataTableInner<T extends { id: number }>({
     if (col.type === "badge") { const v = String(value); return <Badge className={col.badgeColors?.[v] || "bg-slate-100 text-slate-700"} variant="secondary">{col.badgeLabels?.[v] || v}</Badge>; }
     if (col.type === "boolean") return value ? <Badge className="bg-green-100 text-green-700">بله</Badge> : <Badge className="bg-slate-100 text-slate-500">خیر</Badge>;
     if (col.type === "status") return String(value) === "active" ? <Badge className="bg-green-100 text-green-700">فعال</Badge> : <Badge className="bg-red-100 text-red-700">غیرفعال</Badge>;
-    if (col.type === "date") { try { return new Date(String(value)).toLocaleDateString("fa-IR"); } catch { return String(value); } }
+    if (col.type === "date") {
+      try { return toJalali(String(value)); } catch { return String(value); }
+    }
     if (col.type === "number") return <span className="nums-fa">{Number(value).toLocaleString("fa-IR")}</span>;
     return String(value);
   };
@@ -656,52 +660,40 @@ function DataTableInner<T extends { id: number }>({
     if (row && onDuplicate) onDuplicate(row);
   };
 
+  const actionButton = (button: ReactNode, title: string, disabled = false) =>
+    disabled ? <span title={title} className="inline-flex cursor-not-allowed">{button}</span> : button;
+
   return (
     <div className="space-y-3" dir="rtl">
       {/* Toolbar */}
       <div className="flex flex-wrap items-center gap-2 justify-between">
         <div className="flex items-center gap-1 flex-wrap">
           {onAdd && <Button onClick={onAdd} className="bg-green-600 hover:bg-green-700 h-9 w-9 p-0" title="افزودن"><Plus className="w-4 h-4" /></Button>}
-          {onEdit && (
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={handleEditClick}
-              disabled={selCount === 0}
-              title={selCount === 0 ? "ابتدا یک ردیف انتخاب کنید" : selCount > 1 ? "فقط یک ردیف باید انتخاب شود" : "ویرایش ردیف انتخاب شده"}
-              className="h-9 w-9 text-indigo-600 hover:bg-indigo-50 border-indigo-200"
-            >
+          {onEdit && actionButton(
+            <Button variant="outline" size="icon" onClick={handleEditClick} disabled={selCount === 0} title={selCount === 0 ? "ابتدا یک ردیف انتخاب کنید" : selCount > 1 ? "فقط یک ردیف باید انتخاب شود" : "ویرایش ردیف انتخاب شده"} className="h-9 w-9 text-indigo-600 hover:bg-indigo-50 border-indigo-200">
               <Pencil className="w-4 h-4" />
-            </Button>
+            </Button>,
+            selCount === 0 ? "ابتدا یک ردیف انتخاب کنید" : selCount > 1 ? "فقط یک ردیف باید انتخاب شود" : "ویرایش ردیف انتخاب شده",
+            selCount === 0
           )}
-          {onDuplicate && (
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={handleDuplicateClick}
-              disabled={selCount !== 1}
-              title={selCount !== 1 ? "ابتدا دقیقاً یک ردیف انتخاب کنید" : "کپی به‌عنوان خط جدید"}
-              className="h-9 w-9 text-emerald-600 hover:bg-emerald-50 border-emerald-200"
-            >
+          {onDuplicate && actionButton(
+            <Button variant="outline" size="icon" onClick={handleDuplicateClick} disabled={selCount !== 1} title={selCount !== 1 ? "ابتدا دقیقاً یک ردیف انتخاب کنید" : "کپی به‌عنوان ردیف جدید"} className="h-9 w-9 text-emerald-600 hover:bg-emerald-50 border-emerald-200">
               <CopyPlus className="w-4 h-4" />
-            </Button>
+            </Button>,
+            selCount !== 1 ? "ابتدا دقیقاً یک ردیف انتخاب کنید" : "کپی به‌عنوان ردیف جدید",
+            selCount !== 1
           )}
           {onCopy && (
             <Button variant="outline" size="icon" onClick={handleCopy} title="کپی برای اکسل" className="h-9 w-9">
               <Copy className="w-4 h-4" />
             </Button>
           )}
-          {onDelete && (
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={handleDelete}
-              disabled={selCount === 0}
-              title="حذف ردیف‌های انتخاب‌شده"
-              className="h-9 w-9 text-red-600 hover:bg-red-50 border-red-200"
-            >
+          {onDelete && actionButton(
+            <Button variant="outline" size="icon" onClick={handleDelete} disabled={selCount === 0} title={selCount === 0 ? "ابتدا یک یا چند ردیف انتخاب کنید" : "حذف ردیف‌های انتخاب‌شده"} className="h-9 w-9 text-red-600 hover:bg-red-50 border-red-200">
               <Trash2 className="w-4 h-4" />
-            </Button>
+            </Button>,
+            selCount === 0 ? "ابتدا یک یا چند ردیف انتخاب کنید" : "حذف ردیف‌های انتخاب‌شده",
+            selCount === 0
           )}
 
           {/* عنصر اضافه ماژول (مثل دکمه عملیات گروهی) — همان ردیف دکمه‌های اصلی */}

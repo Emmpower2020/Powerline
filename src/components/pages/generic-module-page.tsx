@@ -18,7 +18,7 @@ import { GenericBulkActions } from "@/components/generic-bulk-actions";
 import { ImportExcelDialog } from "@/components/import-excel-dialog";
 import { BulkDeleteDialog } from "@/components/bulk-delete-dialog";
 import { useToast } from "@/hooks/use-toast";
-import { fromJalali, fromPersianNumber, toJalali } from "@/lib/jalali";
+import { fromJalali, fromPersianNumber, looksLikeLegacyJalaliStoredAsGregorian, toJalali } from "@/lib/jalali";
 
 interface GenericItem { id: number; [key: string]: unknown }
 
@@ -62,6 +62,11 @@ const JALALI_DATE_RE = /^\d{4}\/(0?[1-9]|1[0-2])\/(0?[1-9]|[12]\d|3[01])$/;
 /** تبدیل مقدار تاریخ DB (ISO) به متن شمسی برای نمایش در فرم */
 const isoToJalaliText = (v: string): string => {
   if (!v) return "";
+  // رکوردهای قدیمی که شمسی را مستقیم داخل DATE ذخیره کرده‌اند، همان مقدار شمسی را نشان بده.
+  if (looksLikeLegacyJalaliStoredAsGregorian(v)) {
+    const m = String(v).match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+    if (m) return `${m[1]}/${m[2].padStart(2, "0")}/${m[3].padStart(2, "0")}`;
+  }
   return toJalali(v);
 };
 /** تبدیل متن شمسی کاربر به ISO برای ذخیره — در صورت فرمت نامعتبر null برمی‌گرداند */
@@ -237,12 +242,16 @@ function EditorDialog({
     ? [{ value: "active", label: "فعال" }, { value: "inactive", label: "غیرفعال" }]
     : (STATUS_OPTIONS[moduleKey] || null);
 
+  const visibleKeys = moduleKey === "contracts"
+    ? ["title", "contractor_id", "contract_type", "amount", "start_date", "end_date", "status", "notes"].filter(k => keys.includes(k))
+    : keys;
+
   return <Dialog open={open} onOpenChange={v => !v && onClose()}>
     <DialogContent className="max-w-2xl" dir="rtl">
       <DialogHeader><DialogTitle className="text-right">{mode === "edit" ? `ویرایش ${title}` : `ثبت ${title} جدید`}</DialogTitle></DialogHeader>
       <form onSubmit={save}>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[60vh] overflow-y-auto p-1">
-          {keys.map(k => {
+          {visibleKeys.map(k => {
             const label = FIELD_LABELS[k] || k;
             const isJalaliDate = DATE_FIELDS.has(k);
             return <div key={k} className="space-y-1">
@@ -262,7 +271,7 @@ function EditorDialog({
               : k === "incident_type" ? <Select value={form[k] || "near_miss"} onValueChange={v => setForm({...form, [k]: v})}><SelectTrigger className="w-full"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="accident">حادثه</SelectItem><SelectItem value="near_miss">Near Miss</SelectItem><SelectItem value="unsafe_act">عمل ناایمن</SelectItem><SelectItem value="unsafe_condition">شرایط ناایمن</SelectItem><SelectItem value="environmental">محیط زیست</SelectItem></SelectContent></Select>
               : k === "severity" ? <Select value={form[k] || "none"} onValueChange={v => setForm({...form, [k]: v})}><SelectTrigger className="w-full"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="none">بدون آسیب</SelectItem><SelectItem value="minor">جزئی</SelectItem><SelectItem value="moderate">متوسط</SelectItem><SelectItem value="serious">جدی</SelectItem><SelectItem value="fatal">مرگبار</SelectItem></SelectContent></Select>
               : k === "personnel_type" ? <Select value={form[k] || "employee"} onValueChange={v => setForm({...form, [k]: v})}><SelectTrigger className="w-full"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="employee">کارمند</SelectItem><SelectItem value="contractor">پیمانکار</SelectItem><SelectItem value="operator">اپراتور</SelectItem><SelectItem value="guard">نگهبان</SelectItem><SelectItem value="manager">مدیر</SelectItem><SelectItem value="line_expert">کارشناس خط</SelectItem><SelectItem value="safety_expert">کارشناس ایمنی</SelectItem><SelectItem value="crew_supervisor">سرپرست</SelectItem><SelectItem value="lineman">سیمبان</SelectItem><SelectItem value="driver">راننده</SelectItem></SelectContent></Select>
-              : k === "notes" || k === "description" || k === "address" ? <Textarea value={form[k] || ""} onChange={e => setForm({...form,[k]:e.target.value})} />
+              : k === "notes" || k === "description" || k === "address" ? <Textarea rows={1} value={form[k] || ""} onChange={e => setForm({...form,[k]:e.target.value})} className="h-9 min-h-9 resize-none py-1.5" />
               : isJalaliDate ? (
                 <div className="space-y-1">
                   <Input value={form[k] || ""} onChange={e => setForm({...form, [k]: e.target.value})} placeholder="1405/05/30" dir="ltr" className="text-left bg-white" />

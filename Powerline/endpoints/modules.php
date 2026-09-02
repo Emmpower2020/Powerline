@@ -37,9 +37,10 @@ function registerModuleRoutes(Router $router): void
             : ['is_active', $inactive ? 0 : 1];
     };
 
-    // v4.3.58: حذف هوشمند و توضیح‌دار رکوردهای دارای وابستگی FK.
-    // فقط روابطی که واقعاً DELETE را منع می‌کنند (RESTRICT / NO ACTION) مانع حذف می‌شوند.
-    // روابط SET NULL / CASCADE طبق قواعد خود دیتابیس بدون خطا مدیریت خواهند شد.
+    // v4.3.59: حذف ایمن و توضیح‌دار رکوردهای حساس.
+    // قرارداد و پیمانکارِ فعال هرگز حذف نمی‌شوند. همچنین برای این دو موجودیت،
+    // وجود هر وابستگی مستقیم در هر جدول (حتی SET NULL/CASCADE) مانع حذف است تا
+    // حذف ناخواسته باعث پاک‌شدن زنجیره‌ای اطلاعات نشود.
     $guardedDelete = function (string $table, string $label, int $id, array $guards = []): void {
         $db = Database::getInstance();
         $pdo = $db->getConnection();
@@ -68,6 +69,21 @@ function registerModuleRoutes(Router $router): void
         };
 
         $blockers = [];
+
+        // رکورد هنوز وجود دارد؟ و برای موجودیت‌های حساس، وضعیت فعال را بررسی کن.
+        $rowStmt = $pdo->prepare("SELECT * FROM `$table` WHERE id = ? LIMIT 1");
+        $rowStmt->execute([$id]);
+        $row = $rowStmt->fetch(PDO::FETCH_ASSOC);
+        if (!$row) {
+            Response::error(404, "$label پیدا نشد یا قبلاً حذف شده است");
+        }
+        if (in_array($table, ['contracts', 'contractors'], true) && strtolower((string)($row['status'] ?? '')) === 'active') {
+            $specific = $table === 'contracts'
+                ? 'قرارداد فعال است و برای جلوگیری از حذف ناخواسته تا زمانی که وضعیت آن را به «غیرفعال/منقضی/تکمیل» تغییر ندهید، حذف نمی‌شود.'
+                : 'پیمانکار فعال است و برای جلوگیری از حذف ناخواسته تا زمانی که وضعیت آن را به «غیرفعال» تغییر ندهید، حذف نمی‌شود.';
+            Response::error(409, "حذف $label انجام نشد.\n\n$specific");
+        }
+
         try {
             $sql = "
                 SELECT DISTINCT kcu.TABLE_NAME AS child_table, kcu.COLUMN_NAME AS child_column,
@@ -88,7 +104,9 @@ function registerModuleRoutes(Router $router): void
                 $childTable = (string)$fk['child_table'];
                 $childColumn = (string)$fk['child_column'];
                 $rule = strtoupper((string)$fk['delete_rule']);
-                if (in_array($rule, ['SET NULL', 'CASCADE', 'SET DEFAULT'], true)) {
+                // برای قرارداد و پیمانکار هیچ وابستگی مستقیمی نادیده گرفته نمی‌شود؛
+                // حتی اگر FK در DB با SET NULL/CASCADE تعریف شده باشد.
+                if (!in_array($table, ['contracts', 'contractors'], true) && in_array($rule, ['SET NULL', 'CASCADE', 'SET DEFAULT'], true)) {
                     continue;
                 }
                 $cntStmt = $pdo->prepare("SELECT COUNT(*) FROM `$childTable` WHERE `$childColumn` = ?");
@@ -138,7 +156,7 @@ function registerModuleRoutes(Router $router): void
             }
             $detail = implode("\n", $lines);
             $name = $label === 'پیمانکار' ? 'این پیمانکار' : "این $label";
-            $message = "$name قابل حذف نیست چون در رکوردهای زیر استفاده شده است:\n$detail\n\nابتدا این وابستگی‌ها را مدیریت/حذف کنید و سپس دوباره تلاش کنید.";
+            $message = "$name قابل حذف نیست چون هنوز در بخش‌های دیگر سیستم استفاده شده است:\n$detail\n\nابتدا ارتباط $label را از این بخش‌ها بردارید (یا رکوردهای مرتبط را مدیریت کنید) و بعد دوباره برای حذف تلاش کنید. با این کنترل، حذف $label باعث حذف زنجیره‌ای اطلاعات مرتبط نمی‌شود.";
             Response::error(409, $message, [
                 'entity' => $table,
                 'entity_id' => $id,
