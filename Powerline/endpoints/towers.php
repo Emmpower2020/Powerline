@@ -385,8 +385,20 @@ function registerTowerRoutes(Router $router): void
             'tower_structure', 'tower_type', 'tower_type_code',
             'insulator_r1', 'insulator_s1', 'insulator_t1',
             'insulator_r2', 'insulator_s2', 'insulator_t2',
-            'line_supervisor', 'contract_id', 'status',
+            'line_supervisor', 'contract_id', 'status', 'line_id',
         ];
+
+        // line_id باید به خط واقعی اشاره کند (اتصال گروهی دکل‌ها به خط)
+        if (array_key_exists('line_id', $patch)) {
+            $lineIdVal = $patch['line_id'];
+            if ($lineIdVal !== null && (!$lineIdVal || (int)$lineIdVal <= 0)) {
+                Response::error(400, 'شناسه خط نامعتبر است');
+            }
+            if ($lineIdVal !== null) {
+                $lineExists = $db->fetchOne('SELECT id FROM `lines` WHERE id = ?', [(int)$lineIdVal]);
+                if (!$lineExists) Response::error(400, 'خط موردنظر پیدا نشد');
+            }
+        }
 
         $updates = [];
         $params = [];
@@ -400,6 +412,13 @@ function registerTowerRoutes(Router $router): void
 
         $idPlaceholders = implode(',', array_fill(0, count($ids), '?'));
         $affectedLines = [];
+        if (array_key_exists('line_id', $patch)) {
+            // خطوط قدیمی دکل‌های جابه‌جاشده + خط مقصد؛ ساختار هر دو باید از نو محاسبه شود
+            foreach ($db->fetchAll("SELECT DISTINCT line_id FROM towers WHERE id IN ($idPlaceholders) AND line_id IS NOT NULL", $ids) as $lr) {
+                $affectedLines[(int)$lr['line_id']] = true;
+            }
+            if ($patch['line_id'] !== null) $affectedLines[(int)$patch['line_id']] = true;
+        }
         if (array_key_exists('tower_structure', $patch)) {
             $lineRows = $db->fetchAll("SELECT DISTINCT line_id FROM towers WHERE id IN ($idPlaceholders) AND line_id IS NOT NULL", $ids);
             foreach ($lineRows as $lr) { $affectedLines[(int)$lr['line_id']] = true; }

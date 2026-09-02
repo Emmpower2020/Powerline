@@ -528,7 +528,10 @@ function DataTableInner<T extends { id: number }>({
     const rowsToCopy = selectedRows.size > 0
       ? filtered.filter(r => selectedRows.has(r.id))
       : filtered;
-    if (rowsToCopy.length === 0) return;
+    if (rowsToCopy.length === 0) {
+      toast({ title: "هیچ ردیفی برای کپی نیست", description: "ابتدا ردیف(های) مورد نظر را انتخاب کنید" });
+      return;
+    }
 
     // Build TSV string with tab-separated values
     // Replace newlines/tabs inside values to avoid breaking format
@@ -547,9 +550,15 @@ function DataTableInner<T extends { id: number }>({
     );
     const tsv = headerLine + "\n" + dataLines.join("\n");
 
-    // Try clipboard API with text/plain mimetype
-    const onSuccess = () => {
-      // Show toast via parent (we don't have toast here, but we can show count)
+    // بازخورد کپی اینجا و به‌صورت متمرکز نمایش داده می‌شود تا در همه صفحات یکسان باشد
+    const showSuccess = () => {
+      toast({
+        title: "کپی شد",
+        description: `${rowsToCopy.length.toLocaleString("fa-IR")} ردیف به‌صورت TSV کپی شد — آماده پیست در اکسل`,
+      });
+    };
+    const showError = () => {
+      toast({ title: "کپی ناموفق", description: "مرورگر اجازه دسترسی به کلیپ‌بورد را نداد — دوباره تلاش کنید", variant: "destructive" });
     };
     const onError = (err: unknown) => {
       console.error("Copy failed:", err);
@@ -560,18 +569,18 @@ function DataTableInner<T extends { id: number }>({
       textarea.style.left = "-9999px";
       document.body.appendChild(textarea);
       textarea.select();
-      try { document.execCommand("copy"); } catch (e) { console.error(e); }
+      let ok = false;
+      try { ok = document.execCommand("copy"); } catch (e) { console.error(e); }
       document.body.removeChild(textarea);
+      if (ok) showSuccess();
+      else showError();
     };
 
     if (navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard.writeText(tsv).then(onSuccess).catch(onError);
+      navigator.clipboard.writeText(tsv).then(showSuccess).catch(onError);
     } else {
       onError(new Error("Clipboard API not available"));
     }
-
-    // If parent passed onCopy, also call it (for toast notifications etc.)
-    if (onCopy) onCopy(rowsToCopy);
   };
 
   const handleDelete = () => {

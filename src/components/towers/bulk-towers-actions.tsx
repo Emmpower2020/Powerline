@@ -109,6 +109,9 @@ export function BulkTowersActions({ getSelection, onApplied }: BulkTowersActions
   // ویرایش گروهی ابتدا تأیید می‌شود؛ همان پنجره در زمان اجرا نوار پیشرفت را نمایش می‌دهد.
   const requestPatch = (targetRows: any[], patch: Record<string, unknown>, successText: string) => {
     if (targetRows.length === 0) return;
+    // ابتدا دیالوگ انتخاب مقدار بسته می‌شود تا با دیالوگ تأیید عملیات گروهی هم‌زمان
+    // باز نباشد؛ هم‌پوشانی دو Dialog رادیکس باعث خطای کلاینت می‌شود (مثل نسخه خطوط).
+    setFieldAction(null);
     setPendingOperation({ rows: targetRows, patch, label: successText });
     setProgress({ completed: 0, total: targetRows.length, success: 0, failed: 0 });
     setOperationOpen(true);
@@ -170,7 +173,8 @@ export function BulkTowersActions({ getSelection, onApplied }: BulkTowersActions
       case "tower_type":           patch = { tower_type: value }; break;
       case "line_supervisor":      patch = { line_supervisor: value.trim() }; break;
       case "line_id":              patch = { line_id: Number(value) }; break;
-      case "contract":             patch = { contract_id: Number(value) }; break;
+      // «نامشخص» → پاک شدن قرارداد (NULL)؛ بک‌اند contract_id=null را می‌پذیرد
+      case "contract":             patch = { contract_id: value === "__unknown__" ? null : Number(value) }; break;
       case "insulator_all":
         // یک نوع مقره روی هر ۶ فاز/مدار اعمال می‌شود
         patch = {
@@ -233,25 +237,6 @@ export function BulkTowersActions({ getSelection, onApplied }: BulkTowersActions
               {fieldAction ? actionMeta[fieldAction].title : ""}
             </DialogTitle>
           </DialogHeader>
-          {applying && (
-            <div className="rounded-xl border border-indigo-100 bg-indigo-50/70 dark:border-indigo-900/50 dark:bg-indigo-950/30 p-4 space-y-3">
-              <div className="flex items-center justify-between text-sm">
-                <span className="font-medium text-indigo-800 dark:text-indigo-200">در حال اعمال تغییرات گروهی...</span>
-                <span className="font-bold nums-fa text-indigo-700 dark:text-indigo-300">{progress.completed.toLocaleString("fa-IR")} / {progress.total.toLocaleString("fa-IR")}</span>
-              </div>
-              <div className="h-2.5 w-full overflow-hidden rounded-full bg-indigo-100 dark:bg-indigo-950">
-                <div
-                  className="h-full rounded-full bg-indigo-600 transition-all duration-300"
-                  style={{ width: `${progress.total ? (progress.completed / progress.total) * 100 : 0}%` }}
-                />
-              </div>
-              <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
-                <span>بسته {progress.batch.toLocaleString("fa-IR")} از {progress.totalBatches.toLocaleString("fa-IR")}</span>
-                <span>{progress.total ? Math.round((progress.completed / progress.total) * 100).toLocaleString("fa-IR") : 0}%</span>
-              </div>
-              <p className="text-[11px] text-slate-500 text-right">هر درخواست حداکثر ۱۰۰ دکل را پردازش می‌کند.</p>
-            </div>
-          )}
           <div className="space-y-3">
             <p className="text-sm text-slate-500 text-right">
               این مقدار روی <span className="font-bold text-indigo-600 nums-fa">{rows.length.toLocaleString("fa-IR")}</span> دکل انتخاب‌شده اعمال می‌شود.
@@ -260,7 +245,7 @@ export function BulkTowersActions({ getSelection, onApplied }: BulkTowersActions
             {fieldAction === "contract" ? (
               <div className="space-y-2">
                 <Label className="text-right block">قرارداد</Label>
-                <ContractSelect value={value} onChange={setValue} />
+                <ContractSelect value={value} onChange={setValue} preserveUnknownValue />
               </div>
             ) : fieldAction === "line_id" ? (
               <div className="space-y-2">

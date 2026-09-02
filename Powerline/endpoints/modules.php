@@ -255,6 +255,32 @@ function registerModuleRoutes(Router $router): void
         Response::success(['id' => (int)$pdo->lastInsertId(), 'invoice_code' => $code], 'صورت‌وضعیت ایجاد شد', 201);
     });
 
+    $router->put('invoices/{id}', function ($id) {
+        Auth::authenticate();
+        Auth::requirePermission('financial.update');
+        $body = Helpers::getJsonBody(); $pdo = Database::getInstance()->getConnection();
+
+        $existing = $pdo->prepare('SELECT id FROM invoices WHERE id = ?');
+        $existing->execute([(int)$id]);
+        if (!$existing->fetch()) Response::error(404, 'صورت‌وضعیت پیدا نشد');
+
+        $fields = ['contract_id', 'contractor_id', 'period_start', 'period_end', 'total_amount', 'status'];
+        $updates = []; $params = [];
+        foreach ($fields as $f) { if (array_key_exists($f, $body)) { $updates[] = "`$f` = ?"; $params[] = $body[$f]; } }
+        if (!$updates) Response::error(400, 'هیچ فیلدی ارسال نشده');
+
+        // اگر مبلغ کل تغییر کرد، مالیات و مبلغ نهایی از نو محاسبه می‌شوند
+        if (array_key_exists('total_amount', $body)) {
+            $total = (float)($body['total_amount'] ?? 0);
+            $updates[] = '`tax_amount` = ?'; $params[] = $total * 0.1;
+            $updates[] = '`final_amount` = ?'; $params[] = $total * 1.1;
+        }
+
+        $params[] = (int)$id;
+        $pdo->prepare('UPDATE invoices SET ' . implode(', ', $updates) . ' WHERE id = ?')->execute($params);
+        Response::success(null, 'صورت‌وضعیت ویرایش شد');
+    });
+
     $router->post('invoices/{id}/approve', function ($id) {
         $user = Auth::authenticate(); Auth::requirePermission('financial.approve');
         $pdo = Database::getInstance()->getConnection();
@@ -1017,7 +1043,7 @@ function registerModuleRoutes(Router $router): void
         Auth::authenticate();
         Auth::requirePermissionSoft('equipment.update');
         $body = Helpers::getJsonBody(); $pdo = Database::getInstance()->getConnection();
-        $fields = ['serial_number', 'manufacturer', 'model', 'install_date', 'warranty_expiry', 'status'];
+        $fields = ['serial_number', 'manufacturer', 'model', 'install_date', 'warranty_expiry', 'contract_id', 'status'];
         $updates = []; $params = [];
         foreach ($fields as $f) { if (array_key_exists($f, $body)) { $updates[] = "`$f` = ?"; $params[] = $body[$f]; } }
         if (empty($updates)) Response::error(400, 'هیچ فیلدی ارسال نشده');

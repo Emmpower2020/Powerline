@@ -86,7 +86,12 @@ export function GenericBulkActions({
       return;
     }
     setContractOpen(false);
-    requestRun({ contract_id: Number(contractId) }, "منتقل به قرارداد انتخاب‌شده");
+    // «نامشخص» → قرارداد ردیف‌ها پاک می‌شود (NULL)
+    const isUnknown = contractId === "__unknown__";
+    requestRun(
+      { contract_id: isUnknown ? null : Number(contractId) },
+      isUnknown ? "به «نامشخص» منتقل" : "منتقل به قرارداد انتخاب‌شده",
+    );
   };
 
   return <>
@@ -116,8 +121,8 @@ export function GenericBulkActions({
       <DialogContent className="max-w-md" dir="rtl">
         <DialogHeader><DialogTitle className="text-right">تغییر گروهی قرارداد</DialogTitle></DialogHeader>
         <div className="space-y-3">
-          <p className="text-sm text-slate-500 text-right">قرارداد انتخاب‌شده روی <span className="font-bold text-indigo-600 nums-fa">{rows.length.toLocaleString("fa-IR")}</span> ردیف اعمال می‌شود.</p>
-          <ContractSelect value={contractId} onChange={setContractId} />
+          <p className="text-sm text-slate-500 text-right">قرارداد انتخاب‌شده روی <span className="font-bold text-indigo-600 nums-fa">{rows.length.toLocaleString("fa-IR")}</span> ردیف اعمال می‌شود. برای پاک کردن قرارداد «نامشخص» را انتخاب کنید.</p>
+          <ContractSelect value={contractId} onChange={setContractId} preserveUnknownValue />
         </div>
         <DialogFooter>
           <Button type="button" variant="outline" onClick={() => setContractOpen(false)} disabled={busy}>انصراف</Button>
