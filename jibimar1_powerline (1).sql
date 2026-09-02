@@ -1528,14 +1528,10 @@ CREATE TABLE `personnel` (
   `national_id` varchar(20) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `father_name` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT 'نام پدر',
   `personnel_type` enum('employee','contractor','operator','guard','manager','line_expert','safety_expert','crew_supervisor','lineman','driver') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'employee',
-  `position` varchar(200) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `supervisor_name` varchar(200) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT 'سرپرست',
-  `phone` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `mobile` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `email` varchar(200) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `hire_date` date DEFAULT NULL,
-  `collaboration_start` varchar(20) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT 'تاریخ شروع همکاری (شمسی)',
-  `contract_end_date` date DEFAULT NULL,
   `status` varchar(30) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'active',
   `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -1546,15 +1542,15 @@ CREATE TABLE `personnel` (
 -- Dumping data for table `personnel`
 --
 
-INSERT INTO `personnel` (`id`, `organization_id`, `user_id`, `personnel_code`, `first_name`, `last_name`, `national_id`, `father_name`, `personnel_type`, `position`, `supervisor_name`, `phone`, `mobile`, `email`, `hire_date`, `collaboration_start`, `contract_end_date`, `status`, `created_at`, `updated_at`, `contract_id`) VALUES
-(320, 4, NULL, 'P-2001', 'یادگار', 'میری', '3333333330', 'مراد', 'crew_supervisor', 'سرپرست اکیپ', 'هادی توحیدی', NULL, '09189356966', NULL, NULL, '1404/02/01', NULL, 'inactive', '2026-08-23 15:15:45', '2026-09-01 22:36:42', NULL),
-(321, 4, NULL, 'P-2002', 'محسن', 'ذهبی', '3333333331', 'مراد', 'crew_supervisor', 'سرپرست اکیپ', 'هادی توحیدی', NULL, '09189356966', NULL, NULL, '1404/02/02', NULL, 'inactive', '2026-08-23 15:15:45', '2026-09-01 22:36:42', NULL),
-(322, 4, NULL, 'P-2003', 'رضا', 'قاسمی', '3333333332', 'مراد', 'crew_supervisor', 'سرپرست اکیپ', 'هادی توحیدی', NULL, '09189356966', NULL, NULL, '1404/02/03', NULL, 'inactive', '2026-08-23 15:15:45', '2026-09-01 22:36:42', NULL),
-(323, 4, NULL, 'P-2004', 'علی', 'نورآیند', '3333333333', 'مراد', 'crew_supervisor', 'سرپرست اکیپ', 'هادی توحیدی', NULL, '09189356966', NULL, NULL, '1404/02/04', NULL, 'inactive', '2026-08-23 15:15:45', '2026-09-01 22:36:42', NULL),
-(324, 4, NULL, 'P-2005', 'مجتبی', 'ملک خطابی', '3333333334', 'مراد', 'lineman', 'سیمبان', 'رضا قاسمی', NULL, '09189356966', NULL, NULL, '1404/02/05', NULL, 'inactive', '2026-08-23 15:15:45', '2026-09-01 22:36:42', NULL),
-(325, 4, NULL, 'P-2006', 'نامدار', 'شهیدی', '3333333335', 'مراد', 'lineman', 'سیمبان', 'رضا قاسمی', NULL, '09189356966', NULL, NULL, '1404/02/06', NULL, 'inactive', '2026-08-23 15:15:45', '2026-09-01 22:36:42', NULL),
-(326, 4, NULL, 'P-2007', 'ساسان', 'امیری', '3333333336', 'مراد', 'line_expert', 'کارشناس خط', 'هادی توحیدی', NULL, '09189356966', NULL, NULL, '1404/02/07', NULL, 'inactive', '2026-08-23 15:15:45', '2026-09-01 22:36:42', NULL),
-(327, 4, NULL, 'P-2008', 'رامین', 'رشیدی', '3333333337', 'مراد', 'line_expert', 'کارشناس خط', 'هادی توحیدی', NULL, '09189356966', NULL, NULL, '1404/02/08', NULL, 'inactive', '2026-08-23 15:15:45', '2026-09-01 22:36:42', NULL);
+INSERT INTO `personnel` (`id`, `organization_id`, `user_id`, `personnel_code`, `first_name`, `last_name`, `national_id`, `father_name`, `personnel_type`, `supervisor_name`, `mobile`, `email`, `hire_date`, `status`, `created_at`, `updated_at`, `contract_id`) VALUES
+(320, 4, NULL, 'P-2001', 'یادگار', 'میری', '3333333330', 'مراد', 'crew_supervisor', 'هادی توحیدی', '09189356966', NULL, NULL, 'inactive', '2026-08-23 15:15:45', '2026-09-01 22:36:42', NULL),
+(321, 4, NULL, 'P-2002', 'محسن', 'ذهبی', '3333333331', 'مراد', 'crew_supervisor', 'هادی توحیدی', '09189356966', NULL, NULL, 'inactive', '2026-08-23 15:15:45', '2026-09-01 22:36:42', NULL),
+(322, 4, NULL, 'P-2003', 'رضا', 'قاسمی', '3333333332', 'مراد', 'crew_supervisor', 'هادی توحیدی', '09189356966', NULL, NULL, 'inactive', '2026-08-23 15:15:45', '2026-09-01 22:36:42', NULL),
+(323, 4, NULL, 'P-2004', 'علی', 'نورآیند', '3333333333', 'مراد', 'crew_supervisor', 'هادی توحیدی', '09189356966', NULL, NULL, 'inactive', '2026-08-23 15:15:45', '2026-09-01 22:36:42', NULL),
+(324, 4, NULL, 'P-2005', 'مجتبی', 'ملک خطابی', '3333333334', 'مراد', 'lineman', 'رضا قاسمی', '09189356966', NULL, NULL, 'inactive', '2026-08-23 15:15:45', '2026-09-01 22:36:42', NULL),
+(325, 4, NULL, 'P-2006', 'نامدار', 'شهیدی', '3333333335', 'مراد', 'lineman', 'رضا قاسمی', '09189356966', NULL, NULL, 'inactive', '2026-08-23 15:15:45', '2026-09-01 22:36:42', NULL),
+(326, 4, NULL, 'P-2007', 'ساسان', 'امیری', '3333333336', 'مراد', 'line_expert', 'هادی توحیدی', '09189356966', NULL, NULL, 'inactive', '2026-08-23 15:15:45', '2026-09-01 22:36:42', NULL),
+(327, 4, NULL, 'P-2008', 'رامین', 'رشیدی', '3333333337', 'مراد', 'line_expert', 'هادی توحیدی', '09189356966', NULL, NULL, 'inactive', '2026-08-23 15:15:45', '2026-09-01 22:36:42', NULL);
 
 -- --------------------------------------------------------
 

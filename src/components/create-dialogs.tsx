@@ -121,13 +121,13 @@ export function CreateSafetyDialog({ open, onClose, onCreated }: { open: boolean
 export function CreatePersonnelDialog({ open, onClose, onCreated }: { open: boolean; onClose: () => void; onCreated: () => void }) {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [form, setForm] = useState({ first_name: "", last_name: "", personnel_type: "employee", position: "", phone: "", contractor_phone: "", mobile: "", email: "", hire_date: "", contract_id: "" });
+  const [form, setForm] = useState({ first_name: "", last_name: "", personnel_type: "employee", mobile: "", email: "", hire_date: "", contract_id: "" });
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.first_name) { setError("نام الزامی است"); return; }
     setSubmitting(true); setError(null);
-    try { await apiClient.post(API_ENDPOINTS.personnel, { first_name: form.first_name, last_name: form.last_name, personnel_type: form.personnel_type, position: form.position || null, phone: form.contractor_phone || form.phone || null, mobile: form.mobile || null, email: form.email || null, hire_date: form.hire_date || null, contract_id: form.contract_id ? Number(form.contract_id) : null }); setForm({ first_name: "", last_name: "", personnel_type: "employee", position: "", phone: "", contractor_phone: "", mobile: "", email: "", hire_date: "", contract_id: "" }); onCreated(); } catch (err) { setError(err instanceof Error ? err.message : "خطا"); } finally { setSubmitting(false); }
+    try { await apiClient.post(API_ENDPOINTS.personnel, { first_name: form.first_name, last_name: form.last_name, personnel_type: form.personnel_type, mobile: form.mobile || null, email: form.email || null, hire_date: form.hire_date || null, contract_id: form.contract_id ? Number(form.contract_id) : null }); setForm({ first_name: "", last_name: "", personnel_type: "employee", mobile: "", email: "", hire_date: "", contract_id: "" }); onCreated(); } catch (err) { setError(err instanceof Error ? err.message : "خطا"); } finally { setSubmitting(false); }
   };
 
   return (
@@ -137,15 +137,13 @@ export function CreatePersonnelDialog({ open, onClose, onCreated }: { open: bool
         <Field label="نام خانوادگی"><Input value={form.last_name} onChange={e => setForm({ ...form, last_name: e.target.value })} className="text-right" /></Field>
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <Field label="نوع پرسنل"><Select value={form.personnel_type} onValueChange={v => setForm({ ...form, personnel_type: v })}><SelectTrigger className="w-full"><SelectValue /></SelectTrigger><SelectContent>
+        <Field label="سمت"><Select value={form.personnel_type} onValueChange={v => setForm({ ...form, personnel_type: v })}><SelectTrigger className="w-full"><SelectValue /></SelectTrigger><SelectContent>
           <SelectItem value="employee">کارمند</SelectItem><SelectItem value="contractor">پیمانکار</SelectItem><SelectItem value="operator">اپراتور</SelectItem>
           <SelectItem value="guard">نگهبان</SelectItem><SelectItem value="manager">مدیر عامل شرکت</SelectItem><SelectItem value="line_expert">کارشناس خط</SelectItem>
           <SelectItem value="safety_expert">کارشناس ایمنی</SelectItem><SelectItem value="crew_supervisor">سرپرست اکیپ</SelectItem><SelectItem value="lineman">سیمبان</SelectItem><SelectItem value="driver">راننده</SelectItem>
         </SelectContent></Select></Field>
-        <Field label="سمت"><Input value={form.position} onChange={e => setForm({ ...form, position: e.target.value })} className="text-right" /></Field>
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        <Field label="تلفن"><Input value={form.contractor_phone} onChange={e => setForm({ ...form, contractor_phone: e.target.value })} dir="ltr" className="text-left" /></Field>
         <Field label="موبایل"><Input value={form.mobile} onChange={e => setForm({ ...form, mobile: e.target.value })} dir="ltr" className="text-left" /></Field>
         <Field label="تاریخ استخدام"><JalaliDatePicker value={form.hire_date} onChange={v => setForm({ ...form, hire_date: v })} /></Field>
       </div>
@@ -158,14 +156,14 @@ export function CreatePersonnelDialog({ open, onClose, onCreated }: { open: bool
 export function CreateContractorDialog({ open, onClose, onCreated }: { open: boolean; onClose: () => void; onCreated: () => void }) {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [form, setForm] = useState({ contractor_code: "", contractor_name: "", ceo_name: "", contractor_phone: "", mobile: "", address: "", status: "active" });
+  const [form, setForm] = useState({ contractor_code: "", contractor_name: "", ceo_name: "", mobile: "", address: "", status: "active" });
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.contractor_name.trim()) { setError("نام پیمانکار الزامی است"); return; }
     setSubmitting(true); setError(null);
     try {
       await apiClient.post(API_ENDPOINTS.contractors, { contractor_code: form.contractor_code.trim() || null, contractor_name: form.contractor_name.trim(), ceo_name: form.ceo_name.trim() || null, contractor_phone: form.contractor_phone.trim() || null, mobile: form.mobile.trim() || null, address: form.address.trim() || null, status: form.status });
-      setForm({ contractor_code: "", contractor_name: "", ceo_name: "", contractor_phone: "", mobile: "", address: "", status: "active" }); onCreated();
+      setForm({ contractor_code: "", contractor_name: "", ceo_name: "", mobile: "", address: "", status: "active" }); onCreated();
     } catch (err) { setError(err instanceof Error ? err.message : "خطا"); } finally { setSubmitting(false); }
   };
   return (
@@ -176,7 +174,6 @@ export function CreateContractorDialog({ open, onClose, onCreated }: { open: boo
       </div>
       <Field label="مدیرعامل"><Input value={form.ceo_name} onChange={e => setForm({ ...form, ceo_name: e.target.value })} className="text-right" /></Field>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <Field label="تلفن"><Input value={form.contractor_phone} onChange={e => setForm({ ...form, contractor_phone: e.target.value })} dir="ltr" className="text-left" /></Field>
         <Field label="موبایل"><Input value={form.mobile} onChange={e => setForm({ ...form, mobile: e.target.value })} dir="ltr" className="text-left" /></Field>
       </div>
       <Field label="آدرس"><Textarea value={form.address} onChange={e => setForm({ ...form, address: e.target.value })} rows={2} className="text-right" /></Field>

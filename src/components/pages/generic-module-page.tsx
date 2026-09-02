@@ -37,8 +37,8 @@ const FIELD_LABELS: Record<string, string> = {
   contract_id: "قرارداد", contractor_id: "پیمانکار", contract_type: "نوع قرارداد",
   contract_code: "کد قرارداد", title: "عنوان", start_date: "تاریخ شروع", end_date: "تاریخ پایان",
   amount: "مبلغ (ریال)", status: "وضعیت", notes: "یادداشت",
-  first_name: "نام", last_name: "نام خانوادگی", personnel_type: "نوع پرسنل", position: "سمت",
-  phone: "تلفن", mobile: "موبایل", email: "ایمیل", hire_date: "تاریخ استخدام",
+  first_name: "نام", last_name: "نام خانوادگی", personnel_type: "سمت",
+  mobile: "موبایل", email: "ایمیل", hire_date: "تاریخ استخدام",
   incident_type: "نوع حادثه", severity: "شدت", description: "توضیحات",
   location_desc: "محل وقوع", occurred_at: "تاریخ وقوع", line_id: "خط", tower_id: "دکل",
   period_start: "شروع دوره", period_end: "پایان دوره", total_amount: "مبلغ کل",
@@ -46,13 +46,13 @@ const FIELD_LABELS: Record<string, string> = {
   install_date: "تاریخ نصب", warranty_expiry: "پایان گارانتی",
   contractor_code: "کد پیمانکار", contractor_name: "نام پیمانکار", ceo_name: "مدیرعامل",
   contractor_phone: "تلفن دفتر", address: "آدرس", father_name: "نام پدر",
-  supervisor_name: "سرپرست", collaboration_start: "شروع همکاری",
+  supervisor_name: "سرپرست",
 };
 
 /** فیلدهای تاریخ — ورودی به‌صورت متن شمسی با فرمت 1405/05/30 */
 const DATE_FIELDS = new Set([
   "start_date", "end_date", "period_start", "period_end", "hire_date",
-  "install_date", "warranty_expiry", "occurred_at", "collaboration_start",
+  "install_date", "warranty_expiry", "occurred_at",
 ]);
 
 const JALALI_DATE_RE = /^\d{4}\/(0?[1-9]|1[0-2])\/(0?[1-9]|[12]\d|3[01])$/;
@@ -135,13 +135,12 @@ const configs: Record<string, GenericConfig> = {
     { key: "occurred_at", header: "تاریخ", type: "date", sortable: true },
     { key: "status", header: "وضعیت", type: "badge", badgeLabels: { reported: "گزارش شده", under_investigation: "در حال بررسی", resolved: "حل شده", closed: "بسته شده" }, badgeColors: { reported: "bg-blue-100 text-blue-700", resolved: "bg-green-100 text-green-700", closed: "bg-slate-100 text-slate-500" } },
   ]},
-  personnel: { title: "پرسنل", activityStatus: true, editKeys: ["contract_id","first_name","last_name","personnel_type","position","phone","mobile","email","status"], importKeys: ["contract_id","first_name","last_name","personnel_type","position","phone","mobile","email","status"], columns: [
+  personnel: { title: "پرسنل", activityStatus: true, editKeys: ["contract_id","first_name","last_name","personnel_type","mobile","email","status"], importKeys: ["contract_id","first_name","last_name","personnel_type","mobile","email","status"], columns: [
     { key: "personnel_code", header: "کد", sortable: true, filterable: true, align: "left" },
     { key: "contract_title", header: "قرارداد", sortable: true, filterable: true, wrap: true },
     { key: "first_name", header: "نام", sortable: true, filterable: true },
     { key: "last_name", header: "نام خانوادگی", sortable: true, filterable: true },
     { key: "personnel_type", header: "نوع", type: "badge", badgeLabels: { employee: "کارمند", contractor: "پیمانکار", operator: "اپراتور", guard: "نگهبان", manager: "مدیر", line_expert: "کارشناس خط", safety_expert: "کارشناس ایمنی", crew_supervisor: "سرپرست", lineman: "سیمبان", driver: "راننده" }, badgeColors: { employee: "bg-blue-100 text-blue-700", contractor: "bg-amber-100 text-amber-700", operator: "bg-purple-100 text-purple-700" } },
-    { key: "position", header: "سمت", sortable: true, filterable: true },
     { key: "mobile", header: "موبایل", align: "left" },
   ]},
   contractors: { title: "پیمانکاران", activityStatus: true, editKeys: ["contractor_code","contractor_name","ceo_name","contractor_phone","mobile","address","status"], importKeys: ["contractor_code","contractor_name","ceo_name","contractor_phone","mobile","address","status"], columns: [
