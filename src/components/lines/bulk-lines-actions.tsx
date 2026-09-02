@@ -100,6 +100,9 @@ export function BulkLinesActions({ getSelection, onApplied }: BulkLinesActionsPr
 
   const requestPatch = (targetRows: any[], patch: Record<string, unknown>, successText: string) => {
     if (targetRows.length === 0) return;
+    // ابتدا دیالوگ انتخاب مقدار را می‌بندیم تا با دیالوگ تأیید عملیات گروهی
+    // هم‌زمان باز نباشد؛ این کار از تداخل Radix Dialog/Popover و خطای کلاینت جلوگیری می‌کند.
+    setFieldAction(null);
     setPendingOperation({ rows: targetRows, patch, label: successText });
     setProgress({ completed: 0, total: targetRows.length, success: 0, failed: 0 });
     setOperationOpen(true);
@@ -220,7 +223,7 @@ export function BulkLinesActions({ getSelection, onApplied }: BulkLinesActionsPr
             {fieldAction === "contract" ? (
               <div className="space-y-2">
                 <Label className="text-right block">قرارداد</Label>
-                <ContractSelect value={value} onChange={setValue}  preserveUnknownValue/>
+                <ContractSelect value={value} onChange={setValue} preserveUnknownValue />
               </div>
             ) : fieldAction === "contractor" ? (
               <div className="space-y-2">
