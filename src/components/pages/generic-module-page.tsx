@@ -257,7 +257,7 @@ function EditorDialog({
           {visibleKeys.map(k => {
             const label = FIELD_LABELS[k] || k;
             const isJalaliDate = DATE_FIELDS.has(k);
-            return <div key={k} className="space-y-1">
+            return <div key={k} className={`space-y-1 ${moduleKey === "contracts" && k === "notes" ? "sm:col-span-2" : ""}`}>
               <label className="text-sm text-slate-600">{label}</label>
               {k === "contract_id" ? <ContractSelect value={form[k] || ""} onChange={v => setForm({...form, [k]: v})} />
               : k === "contractor_id" && needContractors ? (
@@ -274,7 +274,7 @@ function EditorDialog({
               : k === "incident_type" ? <Select value={form[k] || "near_miss"} onValueChange={v => setForm({...form, [k]: v})}><SelectTrigger className="w-full"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="accident">حادثه</SelectItem><SelectItem value="near_miss">Near Miss</SelectItem><SelectItem value="unsafe_act">عمل ناایمن</SelectItem><SelectItem value="unsafe_condition">شرایط ناایمن</SelectItem><SelectItem value="environmental">محیط زیست</SelectItem></SelectContent></Select>
               : k === "severity" ? <Select value={form[k] || "none"} onValueChange={v => setForm({...form, [k]: v})}><SelectTrigger className="w-full"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="none">بدون آسیب</SelectItem><SelectItem value="minor">جزئی</SelectItem><SelectItem value="moderate">متوسط</SelectItem><SelectItem value="serious">جدی</SelectItem><SelectItem value="fatal">مرگبار</SelectItem></SelectContent></Select>
               : k === "personnel_type" ? <Select value={form[k] || "employee"} onValueChange={v => setForm({...form, [k]: v})}><SelectTrigger className="w-full"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="employee">کارمند</SelectItem><SelectItem value="contractor">پیمانکار</SelectItem><SelectItem value="operator">اپراتور</SelectItem><SelectItem value="guard">نگهبان</SelectItem><SelectItem value="manager">مدیر</SelectItem><SelectItem value="line_expert">کارشناس خط</SelectItem><SelectItem value="safety_expert">کارشناس ایمنی</SelectItem><SelectItem value="crew_supervisor">سرپرست</SelectItem><SelectItem value="lineman">سیمبان</SelectItem><SelectItem value="driver">راننده</SelectItem></SelectContent></Select>
-              : k === "notes" || k === "description" || k === "address" ? <Textarea rows={1} value={form[k] || ""} onChange={e => setForm({...form,[k]:e.target.value})} className="h-9 min-h-9 resize-none py-1.5" />
+              : k === "notes" || k === "description" || k === "address" ? <Textarea rows={1} value={form[k] || ""} onChange={e => setForm({...form,[k]:e.target.value})} className={`resize-none py-2 ${moduleKey === "contracts" && k === "notes" ? "h-24 min-h-24" : "h-9 min-h-9"}`} />
               : isJalaliDate ? (
                 <div className="space-y-1">
                   <Input value={form[k] || ""} onChange={e => setForm({...form, [k]: e.target.value})} placeholder="1405/05/30" dir="ltr" className="text-left bg-white" />
@@ -384,7 +384,7 @@ export function GenericModulePage({ moduleKey, endpoint }: { moduleKey: string; 
     toast({
       title: failed ? "حذف ناقص" : "حذف انجام شد",
       description: failed
-        ? `${(rows.length - failed).toLocaleString("fa-IR")} ردیف حذف شد، ${failed.toLocaleString("fa-IR")} مورد ناموفق بود${firstError ? ` — دلیل: ${firstError}` : ""}`
+        ? `${(rows.length - failed).toLocaleString("fa-IR")} ردیف حذف شد، ${failed.toLocaleString("fa-IR")} مورد ناموفق بود${firstError ? `\nدلیل: ${firstError}` : ""}`
         : `${rows.length.toLocaleString("fa-IR")} ردیف حذف شد`,
       variant: failed ? "destructive" : undefined,
     });

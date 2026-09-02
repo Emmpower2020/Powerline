@@ -3,12 +3,12 @@
  * api.php — نقطه ورود اصلی API پلتفرم مدیریت خطوط انتقال برق
  *
  * محل قرارگیری: در فولدر Powerline روی سرور
- * مثال: https://jibimarket.com/Powerline/api.php
+ * مثال: https://sabadgame.com/Powerline/api.php
  *
  * مسیریابی:
- *   https://jibimarket.com/Powerline/api.php/auth/login
- *   https://jibimarket.com/Powerline/api.php/lines
- *   https://jibimarket.com/Powerline/api.php/towers/5
+ *   https://sabadgame.com/Powerline/api.php/auth/login
+ *   https://sabadgame.com/Powerline/api.php/lines
+ *   https://sabadgame.com/Powerline/api.php/towers/5
  *   و...
  *
  * روش استفاده از Apache:

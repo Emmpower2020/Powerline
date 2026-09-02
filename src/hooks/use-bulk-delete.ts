@@ -119,13 +119,13 @@ export function useBulkDelete<T extends { id: number }>(options: {
     } else if (skipped > 0) {
       toast({
         title: "حذف انجام شد (با رد موارد)",
-        description: `${success.toLocaleString("fa-IR")} حذف شد، ${skipped.toLocaleString("fa-IR")} مورد رد شد` + (failed > 0 ? `، ${failed.toLocaleString("fa-IR")} خطا (${lastError})` : ""),
+        description: `${success.toLocaleString("fa-IR")} حذف شد، ${skipped.toLocaleString("fa-IR")} مورد رد شد` + (failed > 0 ? `\nدلیل: ${lastError}` : ""),
         variant: "destructive",
       });
     } else {
       toast({
         title: "حذف ناقص",
-        description: `${success.toLocaleString("fa-IR")} حذف شد، ${failed.toLocaleString("fa-IR")} ناموفق (${lastError})`,
+        description: `${success.toLocaleString("fa-IR")} حذف شد، ${failed.toLocaleString("fa-IR")} مورد ناموفق بود\nدلیل: ${lastError}`,
         variant: "destructive",
       });
     }

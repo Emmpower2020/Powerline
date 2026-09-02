@@ -49,6 +49,7 @@ function registerModuleRoutes(Router $router): void
         // برچسب خوانا برای نمایش دلیل خطا؛ برای جداول ناشناخته نام خود جدول هم قابل‌فهم است.
         $labels = [
             'contracts' => 'قراردادها',
+            'circuits' => 'مدارها',
             'invoices' => 'صورت‌وضعیت‌ها',
             'crews' => 'اکیپ‌ها',
             'lines' => 'خطوط',
@@ -391,9 +392,11 @@ function registerModuleRoutes(Router $router): void
         if ($end < $start) Response::error(400, 'تاریخ پایان نمی‌تواند قبل از شروع باشد');
         $type = (string)($body['contract_type'] ?? 'maintenance');
         if (!in_array($type, ['maintenance','construction','inspection','consulting','supply'], true)) Response::error(400, 'نوع قرارداد نامعتبر است');
-        $stmt = $pdo->prepare("INSERT INTO contracts (contract_code, title, contractor_id, organization_id, contract_type, start_date, end_date, amount, currency, status, notes, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'IRR', 'draft', ?, NOW())");
+        $status = (string)($body['status'] ?? 'draft');
+        if (!in_array($status, ['draft','active','expired','completed'], true)) Response::error(400, 'وضعیت قرارداد نامعتبر است');
+        $stmt = $pdo->prepare("INSERT INTO contracts (contract_code, title, contractor_id, organization_id, contract_type, start_date, end_date, amount, currency, status, notes, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'IRR', ?, ?, NOW())");
         try {
-            $stmt->execute([$code, $title, $contractorId, $body['organization_id'] ?? null, $type, $start, $end, (float)($body['amount'] ?? 0), $body['notes'] ?? null]);
+            $stmt->execute([$code, $title, $contractorId, $body['organization_id'] ?? null, $type, $start, $end, (float)($body['amount'] ?? 0), $status, $body['notes'] ?? null]);
         } catch (\PDOException $e) {
             if ($e->getCode() === '23000') Response::error(409, 'کد قرارداد تکراری است یا ارتباط پیمانکار/سازمان معتبر نیست.');
             Response::error(500, 'ثبت قرارداد ناموفق بود: ' . $e->getMessage());
@@ -1240,6 +1243,7 @@ function registerModuleRoutes(Router $router): void
         }
         $guardedDelete('contractors', 'پیمانکار', (int)$id, [
             'contracts' => 'قراردادها',
+            'circuits' => 'مدارها',
             'invoices' => 'صورت‌وضعیت‌ها',
         ]);
     });

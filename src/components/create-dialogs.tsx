@@ -23,7 +23,7 @@ export function CreateContractDialog({ open, onClose, onCreated }: { open: boole
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [contractors, setContractors] = useState<any[]>([]);
-  const [form, setForm] = useState({ title: "", contractor_id: "", contract_type: "maintenance", start_date: "", end_date: "", amount: "", notes: "" });
+  const [form, setForm] = useState({ contract_code: "", title: "", contractor_id: "", contract_type: "maintenance", start_date: "", end_date: "", amount: "", status: "draft", notes: "" });
 
   // v2.8.1: fetch با useEffect انجام می‌شود — قبلاً به‌اشتباه useState بود که فقط یک‌بار در mount اجرا می‌شد
   // contractors پاسخ صفحه‌بندی‌شده ({data, pagination}) برمی‌گرداند
@@ -45,6 +45,7 @@ export function CreateContractDialog({ open, onClose, onCreated }: { open: boole
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!form.contract_code.trim()) { setError("کد قرارداد الزامی است و باید توسط کاربر وارد شود"); return; }
     if (!form.title.trim()) { setError("عنوان قرارداد الزامی است"); return; }
     if (!form.contractor_id) { setError("انتخاب پیمانکار الزامی است"); return; }
     // فرمت تاریخ شمسی بررسی می‌شود — خالی مجاز است
@@ -59,16 +60,18 @@ export function CreateContractDialog({ open, onClose, onCreated }: { open: boole
       if (!endIso) { setError("فرمت تاریخ پایان درست نیست — تاریخ می‌بایست با فرمت 1405/05/30 نوشته شود"); return; }
     }
     setSubmitting(true); setError(null);
-    try { await apiClient.post(API_ENDPOINTS.contracts, { title: form.title, contractor_id: form.contractor_id ? Number(form.contractor_id) : null, contract_type: form.contract_type, start_date: startIso, end_date: endIso, amount: form.amount ? Number(form.amount) : 0, notes: form.notes || null }); setForm({ title: "", contractor_id: "", contract_type: "maintenance", start_date: "", end_date: "", amount: "", notes: "" }); onCreated(); } catch (err) { setError(err instanceof Error ? err.message : "خطا"); } finally { setSubmitting(false); }
+    try { await apiClient.post(API_ENDPOINTS.contracts, { contract_code: form.contract_code.trim(), title: form.title, contractor_id: form.contractor_id ? Number(form.contractor_id) : null, contract_type: form.contract_type, start_date: startIso, end_date: endIso, amount: form.amount ? Number(form.amount) : 0, status: form.status, notes: form.notes || null }); setForm({ contract_code: "", title: "", contractor_id: "", contract_type: "maintenance", start_date: "", end_date: "", amount: "", status: "draft", notes: "" }); onCreated(); } catch (err) { setError(err instanceof Error ? err.message : "خطا"); } finally { setSubmitting(false); }
   };
 
   return (
     <Shell open={open} onClose={onClose} title="قرارداد جدید" submitting={submitting} error={error} onSubmit={submit}>
+      <Field label="کد قرارداد (اجباری)"><Input value={form.contract_code} onChange={e => setForm({ ...form, contract_code: e.target.value })} dir="ltr" className="text-left" /></Field>
       <Field label="عنوان (اجباری)"><Input value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} className="text-right" /></Field>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <Field label="پیمانکار (اجباری)"><Select value={form.contractor_id} onValueChange={v => setForm({ ...form, contractor_id: v })}><SelectTrigger className="w-full"><SelectValue placeholder="انتخاب..." /></SelectTrigger><SelectContent className="max-h-60">{contractors.map(c => <SelectItem key={c.id} value={String(c.id)}>{c.contractor_name}</SelectItem>)}</SelectContent></Select></Field>
         <Field label="نوع قرارداد"><Select value={form.contract_type} onValueChange={v => setForm({ ...form, contract_type: v })}><SelectTrigger className="w-full"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="maintenance">نگهداری</SelectItem><SelectItem value="construction">ساخت</SelectItem><SelectItem value="inspection">بازدید</SelectItem></SelectContent></Select></Field>
       </div>
+      <Field label="وضعیت"><Select value={form.status} onValueChange={v => setForm({ ...form, status: v })}><SelectTrigger className="w-full"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="draft">پیش‌نویس</SelectItem><SelectItem value="active">فعال</SelectItem><SelectItem value="expired">منقضی</SelectItem><SelectItem value="completed">تکمیل</SelectItem></SelectContent></Select></Field>
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <Field label="تاریخ شروع قرارداد">
           <Input value={form.start_date} onChange={e => setForm({ ...form, start_date: e.target.value })} placeholder="1405/05/30" dir="ltr" className="text-left bg-white" />

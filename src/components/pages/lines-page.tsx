@@ -283,7 +283,7 @@ export function LinesPage() {
     } else {
       toast({
         title: "حذف ناقص",
-        description: `${success.toLocaleString("fa-IR")} حذف شد، ${failed.toLocaleString("fa-IR")} ناموفق (${lastError})`,
+        description: `${success.toLocaleString("fa-IR")} حذف شد، ${failed.toLocaleString("fa-IR")} مورد ناموفق بود\nدلیل: ${lastError}`,
         variant: "destructive",
       });
     }

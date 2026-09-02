@@ -180,7 +180,7 @@
     cursor: pointer !important;
   }
 
-  /* اطمینان از اینکه دکمه‌های disabled نشانگر not-allowed بگیرند */
+  /* کنترل‌های غیرفعال همچنان با نشانگر عادی نمایش داده شوند. */
   button:disabled,
   [role="button"][aria-disabled="true"],
   input[type="checkbox"]:disabled,
@@ -189,7 +189,7 @@
   input[type="button"]:disabled,
   input[type="reset"]:disabled,
   select:disabled {
-    cursor: not-allowed !important;
+    cursor: default !important;
   }
 
   /* در dark mode، slate-50 و slate-900 به‌طور خودکار از CSS variables استفاده می‌کنن */
