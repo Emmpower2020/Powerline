@@ -163,11 +163,11 @@ CREATE TABLE IF NOT EXISTS `personnel` (
     `last_name`        VARCHAR(100) NOT NULL,
     `national_id`      VARCHAR(20)  NULL,                          -- کد ملی
     `position`         VARCHAR(200) NULL,
-    `phone`            VARCHAR(50)  NULL,
+    `father_name`      VARCHAR(100) NULL,
     `mobile`           VARCHAR(50)  NULL,
     `email`            VARCHAR(200) NULL,
     `hire_date`        DATE NULL,
-    `contract_end_date` DATE NULL,
+    `supervisor_name`  VARCHAR(200) NULL,
     `status`        VARCHAR(30) NOT NULL DEFAULT 'active',
     `created_at`       TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     `updated_at`       TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,

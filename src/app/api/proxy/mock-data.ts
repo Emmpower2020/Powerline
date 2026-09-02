@@ -755,7 +755,7 @@ export async function handleMockRequest(request: NextRequest): Promise<NextRespo
           first_name: r.first_name, last_name: r.last_name || "",
           national_id: nat, father_name: r.father_name || null, position: r.position || null,
           mobile: r.mobile || null, supervisor_name: r.supervisor_name || null,
-          collaboration_start: r.collaboration_start || null, status: "active",
+          hire_date: r.hire_date || null, status: "active",
         });
         statuses.push("inserted"); errors.push(null); inserted++;
       }
@@ -970,8 +970,8 @@ export async function handleMockRequest(request: NextRequest): Promise<NextRespo
       id: newId, personnel_code: code,
       first_name: body.first_name || "", last_name: body.last_name || "",
       national_id: body.national_id || null, father_name: body.father_name || null, position: body.position || null,
-      phone: body.phone || null, mobile: body.mobile || null, email: body.email || null,
-      supervisor_name: body.supervisor_name || null, collaboration_start: body.collaboration_start || null,
+      mobile: body.mobile || null, email: body.email || null, hire_date: body.hire_date || null,
+      supervisor_name: body.supervisor_name || null,
       status: "active",
     });
     return NextResponse.json({ success: true, data: { id: newId, personnel_code: code }, message: "پرسنل ایجاد شد" }, { status: 201 });

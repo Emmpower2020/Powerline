@@ -121,13 +121,13 @@ export function CreateSafetyDialog({ open, onClose, onCreated }: { open: boolean
 export function CreatePersonnelDialog({ open, onClose, onCreated }: { open: boolean; onClose: () => void; onCreated: () => void }) {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [form, setForm] = useState({ first_name: "", last_name: "", position: "", phone: "", contractor_phone: "", mobile: "", email: "", hire_date: "", contract_id: "" });
+  const [form, setForm] = useState({ first_name: "", last_name: "", position: "", mobile: "", email: "", hire_date: "", contract_id: "" });
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.first_name) { setError("نام الزامی است"); return; }
     setSubmitting(true); setError(null);
-    try { await apiClient.post(API_ENDPOINTS.personnel, { first_name: form.first_name, last_name: form.last_name, position: form.position || null, phone: form.contractor_phone || form.phone || null, mobile: form.mobile || null, email: form.email || null, hire_date: form.hire_date || null, contract_id: form.contract_id ? Number(form.contract_id) : null }); setForm({ first_name: "", last_name: "", position: "", phone: "", contractor_phone: "", mobile: "", email: "", hire_date: "", contract_id: "" }); onCreated(); } catch (err) { setError(err instanceof Error ? err.message : "خطا"); } finally { setSubmitting(false); }
+    try { await apiClient.post(API_ENDPOINTS.personnel, { first_name: form.first_name, last_name: form.last_name, position: form.position || null, mobile: form.mobile || null, email: form.email || null, hire_date: form.hire_date || null, contract_id: form.contract_id ? Number(form.contract_id) : null }); setForm({ first_name: "", last_name: "", position: "", mobile: "", email: "", hire_date: "", contract_id: "" }); onCreated(); } catch (err) { setError(err instanceof Error ? err.message : "خطا"); } finally { setSubmitting(false); }
   };
 
   return (
@@ -140,7 +140,6 @@ export function CreatePersonnelDialog({ open, onClose, onCreated }: { open: bool
         <Field label="سمت"><Input value={form.position} onChange={e => setForm({ ...form, position: e.target.value })} className="text-right" /></Field>
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        <Field label="تلفن"><Input value={form.contractor_phone} onChange={e => setForm({ ...form, contractor_phone: e.target.value })} dir="ltr" className="text-left" /></Field>
         <Field label="موبایل"><Input value={form.mobile} onChange={e => setForm({ ...form, mobile: e.target.value })} dir="ltr" className="text-left" /></Field>
         <Field label="تاریخ استخدام"><JalaliDatePicker value={form.hire_date} onChange={v => setForm({ ...form, hire_date: v })} /></Field>
       </div>
