@@ -37,6 +37,30 @@ function registerModuleRoutes(Router $router): void
             : ['is_active', $inactive ? 0 : 1];
     };
 
+    // v4.3.57: حذف محافظت‌شده — رکوردی که در جدول دیگری استفاده شده باشد
+    // با پیام فارسی دقیق (شامل تعداد و نام بخش) رد می‌شود، نه خطای خام MySQL.
+    $guardedDelete = function (string $table, string $label, int $id, array $guards): void {
+        $db = Database::getInstance();
+        foreach ($guards as $gKey => $gLabel) {
+            // کلید می‌تواند «جدول» یا «جدول.ستون» باشد (ستون پیش‌فرض: table_id)
+            $gTable = $gKey;
+            $gCol = $table . '_id';
+            if (str_contains($gKey, '.')) { [$gTable, $gCol] = explode('.', $gKey, 2); }
+            try {
+                $cnt = (int)$db->fetchOne("SELECT COUNT(*) AS c FROM `$gTable` WHERE `$gCol` = ?", [$id])['c'];
+            } catch (Throwable $e) { continue; } // جدول/ستون ارجاع‌دهنده در این دیتابیس نیست
+            if ($cnt > 0) {
+                Response::error(409, "این $label در «{$gLabel}» استفاده می‌شود ({$cnt} مورد) و حذف آن ممکن نیست.\nابتدا آن رکوردها را حذف کنید یا $label آنها را تغییر دهید.");
+            }
+        }
+        try {
+            $db->execute("DELETE FROM `$table` WHERE id = ?", [$id]);
+        } catch (PDOException $e) {
+            Response::error(409, "حذف این $label به دلیل استفاده در رکوردهای دیگر ممکن نیست");
+        }
+        Response::success(null, "$label حذف شد");
+    };
+
     // مرجع‌های دکل: ساختارهای سازه و کدهای نوع دکل از جداول مرجع خوانده می‌شوند.
     $router->get('tower-references', function () use ($towerRefUsesStatus) {
         Auth::authenticate();
@@ -265,10 +289,9 @@ function registerModuleRoutes(Router $router): void
         Response::success(null, 'قرارداد ویرایش شد');
     });
 
-    $router->delete('contracts/{id}', function ($id) {
+    $router->delete('contracts/{id}', function ($id) use ($guardedDelete) {
         Auth::authenticate(); Auth::requirePermission('contracts.delete');
-        Database::getInstance()->execute("DELETE FROM contracts WHERE id = ?", [(int)$id]);
-        Response::success(null, 'قرارداد حذف شد');
+        $guardedDelete('contracts', 'قرارداد', (int)$id, ['invoices' => 'صورت‌وضعیت‌ها']);
     });
 
     // ============================================================
@@ -440,11 +463,10 @@ function registerModuleRoutes(Router $router): void
         Response::success(null, 'پرسنل ویرایش شد');
     });
 
-    $router->delete('personnel/{id}', function ($id) {
+    $router->delete('personnel/{id}', function ($id) use ($guardedDelete) {
         Auth::authenticate();
         Auth::requirePermissionSoft('personnel.delete');
-        Database::getInstance()->execute("DELETE FROM personnel WHERE id = ?", [(int)$id]);
-        Response::success(null, 'پرسنل حذف شد');
+        $guardedDelete('personnel', 'پرسنل', (int)$id, ['defects.discovered_by' => 'عیوب (ثبت‌کننده)', 'inspections.inspector_id' => 'بازدیدها (بازرس)']);
     });
 
     // حذف انبوه پرسنل — v3.2.0: همان روش دکل‌ها/خطوط + مدیریت ارجاع‌های FK
@@ -1061,11 +1083,10 @@ function registerModuleRoutes(Router $router): void
         Response::success(null, 'پیمانکار ویرایش شد');
     });
 
-    $router->delete('contractors/{id}', function ($id) {
+    $router->delete('contractors/{id}', function ($id) use ($guardedDelete) {
         Auth::authenticate();
         Auth::requirePermissionSoft('contractors.delete');
-        Database::getInstance()->execute("DELETE FROM contractors WHERE id = ?", [(int)$id]);
-        Response::success(null, 'پیمانکار حذف شد');
+        $guardedDelete('contractors', 'پیمانکار', (int)$id, ['contracts' => 'قراردادها', 'invoices' => 'صورت‌وضعیت‌ها']);
     });
 
     // ============================================================
@@ -1111,11 +1132,10 @@ function registerModuleRoutes(Router $router): void
         Response::success(null, 'تجهیز ویرایش شد');
     });
 
-    $router->delete('equipment/{id}', function ($id) {
+    $router->delete('equipment/{id}', function ($id) use ($guardedDelete) {
         Auth::authenticate();
         Auth::requirePermissionSoft('equipment.delete');
-        Database::getInstance()->execute("DELETE FROM equipment WHERE id = ?", [(int)$id]);
-        Response::success(null, 'تجهیز حذف شد');
+        $guardedDelete('equipment', 'تجهیز', (int)$id, ['defects' => 'عیوب']);
     });
 
     // ============================================================

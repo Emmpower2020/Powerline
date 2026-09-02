@@ -353,10 +353,16 @@ export function GenericModulePage({ moduleKey, endpoint }: { moduleKey: string; 
     setDeleteProgress({ done: 0, total: rows.length });
     const CHUNK = 10;
     let failed = 0;
+    let firstError = "";
     for (let i = 0; i < rows.length; i += CHUNK) {
       const chunk = rows.slice(i, i + CHUNK);
       const results = await Promise.allSettled(chunk.map(r => apiClient.delete(`${endpoint}/${r.id}`)));
-      failed += results.filter(r => r.status === "rejected").length;
+      for (const r of results) {
+        if (r.status === "rejected") {
+          failed++;
+          if (!firstError) firstError = (r.reason as any)?.message || "";
+        }
+      }
       setDeleteProgress({ done: Math.min(i + CHUNK, rows.length), total: rows.length });
     }
     setDeleting(false);
@@ -366,7 +372,7 @@ export function GenericModulePage({ moduleKey, endpoint }: { moduleKey: string; 
     toast({
       title: failed ? "حذف ناقص" : "حذف انجام شد",
       description: failed
-        ? `${(rows.length - failed).toLocaleString("fa-IR")} ردیف حذف شد، ${failed.toLocaleString("fa-IR")} مورد ناموفق بود`
+        ? `${(rows.length - failed).toLocaleString("fa-IR")} ردیف حذف شد، ${failed.toLocaleString("fa-IR")} مورد ناموفق بود${firstError ? ` — دلیل: ${firstError}` : ""}`
         : `${rows.length.toLocaleString("fa-IR")} ردیف حذف شد`,
       variant: failed ? "destructive" : undefined,
     });
