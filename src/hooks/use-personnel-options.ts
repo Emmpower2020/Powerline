@@ -25,6 +25,7 @@ export interface PersonnelPerson {
   first_name: string;
   last_name: string;
   personnel_type?: string | null;
+  position?: string | null;
   full_name?: string;
 }
 
@@ -53,7 +54,7 @@ export function usePersonnelOptions() {
     const seen = new Set<string>();
     const out: SearchableOption[] = [];
     for (const p of personnel) {
-      const typeOk = p.personnel_type === "crew_supervisor";
+      const typeOk = p.personnel_type === "crew_supervisor" || p.position === "سرپرست اکیپ";
       if (!typeOk) continue;
       const fn = (p.first_name || "").trim();
       const ln = (p.last_name || "").trim();
@@ -70,7 +71,7 @@ export function usePersonnelOptions() {
     const seen = new Set<string>();
     const out: SearchableOption[] = [];
     for (const p of personnel) {
-      const typeOk = p.personnel_type === "line_expert";
+      const typeOk = p.personnel_type === "line_expert" || p.position === "کارشناس خط";
       if (!typeOk) continue;
       const fn = (p.first_name || "").trim();
       const ln = (p.last_name || "").trim();

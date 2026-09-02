@@ -130,7 +130,7 @@ function registerDefectRoutes(Router $router): void
             $personnelRow = $stmt->fetch();
 
             if (!$personnelRow) {
-                $stmt = $pdo->prepare("INSERT INTO personnel (organization_id, user_id, personnel_code, first_name, last_name, personnel_type, status, hire_date, created_at) VALUES (?, ?, ?, ?, '', 'employee', 'active', CURDATE(), NOW())");
+                $stmt = $pdo->prepare("INSERT INTO personnel (organization_id, user_id, personnel_code, first_name, last_name, personnel_type, position, status, hire_date, created_at) VALUES (?, ?, ?, ?, '', 'employee', 'کاربر', 'active', CURDATE(), NOW())");
                 $stmt->execute([
                     $user['organization_id'] ?? 1,
                     $user['id'],
@@ -306,7 +306,7 @@ function registerDefectRoutes(Router $router): void
         $stmt->execute([$user['id']]);
         $personnelRow = $stmt->fetch();
         if (!$personnelRow) {
-            $pdo->prepare("INSERT INTO personnel (organization_id, user_id, personnel_code, first_name, last_name, personnel_type, status, created_at) VALUES (?, ?, ?, ?, '', 'employee', 'active', NOW())")
+            $pdo->prepare("INSERT INTO personnel (organization_id, user_id, personnel_code, first_name, last_name, personnel_type, position, status, created_at) VALUES (?, ?, ?, ?, '', 'employee', 'کاربر', 'active', NOW())")
                 ->execute([$user['organization_id'] ?? 1, $user['id'], 'P-' . $user['id'], $user['full_name'] ?? 'کاربر']);
             $personnelId = (int) $pdo->lastInsertId();
         } else {

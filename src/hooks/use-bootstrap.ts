@@ -27,7 +27,7 @@ const TTL_MS = 1000 * 60 * 10; // ۱۰ دقیقه تازگی داده مرجع
 export interface BootstrapData {
   personnel: Array<{
     id: number; personnel_code?: string; first_name: string; last_name: string;
-    personnel_type?: string | null;
+    personnel_type?: string | null; position?: string | null;
   }>;
   circuits: Array<{
     id: number; dispatch_code: string; name: string | null; voltage: number | null;

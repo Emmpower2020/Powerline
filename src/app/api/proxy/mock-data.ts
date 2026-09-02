@@ -754,9 +754,9 @@ export async function handleMockRequest(request: NextRequest): Promise<NextRespo
           id: newId, personnel_code: r.personnel_code || ("P-" + (2000 + newId)),
           first_name: r.first_name, last_name: r.last_name || "",
           national_id: nat, father_name: r.father_name || null,
-          personnel_type: r.personnel_type || "employee",
+          personnel_type: r.personnel_type || "employee", position: r.position || null,
           mobile: r.mobile || null, supervisor_name: r.supervisor_name || null,
-          hire_date: r.hire_date || null, status: "active",
+          collaboration_start: r.collaboration_start || null, status: "active",
         });
         statuses.push("inserted"); errors.push(null); inserted++;
       }
@@ -954,6 +954,7 @@ export async function handleMockRequest(request: NextRequest): Promise<NextRespo
       String(p.personnel_code).includes(q) ||
       String(p.first_name).includes(q) ||
       String(p.last_name).includes(q) ||
+      String(p.position || "").includes(q) ||
       String(p.national_id || "").includes(q)
     );
     const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
@@ -972,9 +973,9 @@ export async function handleMockRequest(request: NextRequest): Promise<NextRespo
       id: newId, personnel_code: code,
       first_name: body.first_name || "", last_name: body.last_name || "",
       national_id: body.national_id || null, father_name: body.father_name || null,
-      personnel_type: body.personnel_type || "employee",
-      mobile: body.mobile || null, email: body.email || null,
-      supervisor_name: body.supervisor_name || null, hire_date: body.hire_date || null,
+      personnel_type: body.personnel_type || "employee", position: body.position || null,
+      phone: body.phone || null, mobile: body.mobile || null, email: body.email || null,
+      supervisor_name: body.supervisor_name || null, collaboration_start: body.collaboration_start || null,
       status: "active",
     });
     return NextResponse.json({ success: true, data: { id: newId, personnel_code: code }, message: "پرسنل ایجاد شد" }, { status: 201 });

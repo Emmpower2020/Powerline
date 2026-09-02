@@ -12,7 +12,6 @@ import {
 } from "@/components/ui/dialog";
 import { SearchableSelect } from "@/components/searchable-select";
 import { ContractSelect } from "@/components/contract-select";
-import { JalaliDatePicker } from "@/components/jalali-date-picker";
 import { DataTable, type DataTableColumn, type DataTableHandle } from "@/components/data-table";
 import { ImportExcelDialog } from "@/components/import-excel-dialog";
 import { BulkDeleteDialog } from "@/components/bulk-delete-dialog";
@@ -44,10 +43,12 @@ interface Person {
   national_id?: string | null;
   father_name?: string | null;
   personnel_type?: string | null;
+  position?: string | null;
+  phone?: string | null;
   mobile?: string | null;
-  hire_date?: string | null;
   email?: string | null;
   supervisor_name?: string | null;
+  collaboration_start?: string | null;
   status?: string;
 }
 
@@ -134,9 +135,10 @@ export function PersonnelPage() {
       badgeLabels: Object.fromEntries(PERSONNEL_TYPES.map(t => [t.value, t.label])),
       badgeColors: Object.fromEntries(PERSONNEL_TYPES.map(t => [t.value, t.color])),
     },
+    { key: "position", header: "سمت", sortable: true, filterable: true, align: "right" },
     { key: "mobile", header: "موبایل", align: "right" },
-    { key: "hire_date", header: "تاریخ استخدام", type: "date", align: "right" },
     { key: "supervisor_name", header: "سرپرست", filterable: true, align: "right" },
+    { key: "collaboration_start", header: "شروع همکاری", align: "right" },
     { key: "status", header: "وضعیت", type: "status", align: "right" },
   ];
 
@@ -167,9 +169,12 @@ export function PersonnelPage() {
       national_id: row.national_id || null,
       father_name: row.father_name || null,
       personnel_type: (row.personnel_type as string) || undefined,
+      position: row.position || null,
+      phone: row.phone || null,
       mobile: row.mobile || null,
       email: row.email || null,
       supervisor_name: row.supervisor_name || null,
+      collaboration_start: row.collaboration_start || null,
     };
     if (mode === "update" && existingId) {
       await apiClient.put(`${API_ENDPOINTS.personnel}/${existingId}`, payload);
@@ -197,10 +202,13 @@ export function PersonnelPage() {
     "نام": "first_name",
     "نام خانوادگی": "last_name",
     "نام پدر": "father_name",
-    "سمت": "personnel_type",
+    "پست": "position",
+    "سمت": "position",
     "نوع": "personnel_type",
+    "تاریخ شروع همکاری": "collaboration_start",
     "شماره همراه": "mobile",
     "موبایل": "mobile",
+    "تلفن": "phone",
     "سرپرست": "supervisor_name",
   };
   const importTemplateColumns = [
@@ -208,9 +216,10 @@ export function PersonnelPage() {
     { key: "last_name", header: "نام خانوادگی" },
     { key: "national_id", header: "کد ملی" },
     { key: "father_name", header: "نام پدر" },
-    { key: "personnel_type", header: "سمت" },
+    { key: "position", header: "پست" },
     { key: "mobile", header: "شماره همراه" },
     { key: "supervisor_name", header: "سرپرست" },
+    { key: "collaboration_start", header: "تاریخ شروع همکاری" },
   ];
 
 
@@ -223,7 +232,7 @@ export function PersonnelPage() {
         data={data}
         columns={columns}
         loading={loading}
-        searchKeys={["personnel_code", "first_name", "last_name", "personnel_type", "national_id", "supervisor_name"]}
+        searchKeys={["personnel_code", "first_name", "last_name", "position", "national_id", "supervisor_name"]}
         title="پرسنل"
         layoutKey="personnel"
         tableRef={tableRef}
@@ -336,8 +345,8 @@ function PersonnelDialog({ open, editRow, duplicateFrom, onClose, onSaved }: {
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState({
     first_name: "", last_name: "", national_id: "", father_name: "",
-    personnel_type: "", mobile: "",
-    supervisor_name: "", hire_date: "", contract_id: "",
+    personnel_type: "", position: "", mobile: "", phone: "",
+    supervisor_name: "", collaboration_start: "", contract_id: "",
   });
 
   // v3.1.0: حالت کپی — از ردیف مبدأ پیش‌پر می‌شود ولی کد ملی خالی است (رکورد جدید)
@@ -352,15 +361,26 @@ function PersonnelDialog({ open, editRow, duplicateFrom, onClose, onSaved }: {
         national_id: duplicateFrom ? "" : (sourceRow?.national_id || ""),
         father_name: sourceRow?.father_name || "",
         personnel_type: sourceRow?.personnel_type || "",
+        position: sourceRow?.position || "",
         mobile: sourceRow?.mobile || "",
-        hire_date: sourceRow?.hire_date || "",
+        phone: sourceRow?.phone || "",
         supervisor_name: sourceRow?.supervisor_name || "",
+        collaboration_start: sourceRow?.collaboration_start || "",
         contract_id: sourceRow?.contract_id != null ? String(sourceRow.contract_id) : "",
       });
+      // اگر نوع خالی بود ولی position فارسی معتبر داشت، خودکار map شود
+      if (!sourceRow?.personnel_type && sourceRow?.position) {
+        const mapped = PERSONNEL_TYPES.find(t => t.label === sourceRow.position);
+        if (mapped) setForm(f => ({ ...f, personnel_type: mapped.value }));
+      }
     }
   }, [open, sourceRow, duplicateFrom]);
 
-  const setType = (v: string) => setForm(f => ({ ...f, personnel_type: v }));
+  // با تغییر نوع، سمت فارسی هماهنگ پر می‌شود
+  const setType = (v: string) => {
+    const meta = typeMeta(v);
+    setForm(f => ({ ...f, personnel_type: v, position: meta?.label || f.position }));
+  };
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -374,9 +394,11 @@ function PersonnelDialog({ open, editRow, duplicateFrom, onClose, onSaved }: {
         national_id: form.national_id.trim() || null,
         father_name: form.father_name.trim() || null,
         personnel_type: form.personnel_type,
+        position: form.position.trim() || null,
         mobile: form.mobile.trim() || null,
+        phone: form.phone.trim() || null,
         supervisor_name: form.supervisor_name.trim() || null,
-        hire_date: form.hire_date || null,
+        collaboration_start: form.collaboration_start.trim() || null,
         contract_id: form.contract_id ? Number(form.contract_id) : null,
       };
       if (editRow) {
@@ -428,8 +450,8 @@ function PersonnelDialog({ open, editRow, duplicateFrom, onClose, onSaved }: {
               <Input value={form.father_name} onChange={e => setForm({ ...form, father_name: e.target.value })} className="text-right" />
             </div>
             <div className="space-y-2">
-              <Label className="text-right block">تاریخ استخدام</Label>
-              <JalaliDatePicker value={form.hire_date} onChange={v => setForm({ ...form, hire_date: v })} />
+              <Label className="text-right block">تاریخ شروع همکاری</Label>
+              <Input value={form.collaboration_start} onChange={e => setForm({ ...form, collaboration_start: e.target.value })} placeholder="1404/02/01" dir="ltr" className="text-left" />
             </div>
           </div>
 
@@ -439,13 +461,17 @@ function PersonnelDialog({ open, editRow, duplicateFrom, onClose, onSaved }: {
               <ContractSelect value={form.contract_id} onChange={v => setForm({ ...form, contract_id: v })} />
             </div>
             <div className="space-y-2">
-              <Label className="text-right block">سمت (اجباری)</Label>
+              <Label className="text-right block">نوع پرسنل (اجباری)</Label>
               <SearchableSelect
                 value={form.personnel_type}
                 onChange={setType}
                 options={PERSONNEL_TYPES.map(t => ({ value: t.value, label: t.label }))}
-                placeholder="انتخاب سمت..."
+                placeholder="انتخاب نوع..."
               />
+            </div>
+            <div className="space-y-2">
+              <Label className="text-right block">سمت</Label>
+              <Input value={form.position} onChange={e => setForm({ ...form, position: e.target.value })} className="text-right" />
             </div>
           </div>
 
@@ -453,6 +479,10 @@ function PersonnelDialog({ open, editRow, duplicateFrom, onClose, onSaved }: {
             <div className="space-y-2">
               <Label className="text-right block">موبایل</Label>
               <Input value={form.mobile} onChange={e => setForm({ ...form, mobile: e.target.value })} dir="ltr" className="text-left" />
+            </div>
+            <div className="space-y-2">
+              <Label className="text-right block">تلفن</Label>
+              <Input value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} dir="ltr" className="text-left" />
             </div>
             <div className="space-y-2">
               <Label className="text-right block">سرپرست</Label>

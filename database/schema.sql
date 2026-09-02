@@ -163,9 +163,12 @@ CREATE TABLE IF NOT EXISTS `personnel` (
     `last_name`        VARCHAR(100) NOT NULL,
     `national_id`      VARCHAR(20)  NULL,                          -- کد ملی
     `personnel_type`   ENUM('employee','contractor','operator','guard') NOT NULL DEFAULT 'employee',
+    `position`         VARCHAR(200) NULL,
+    `phone`            VARCHAR(50)  NULL,
     `mobile`           VARCHAR(50)  NULL,
     `email`            VARCHAR(200) NULL,
     `hire_date`        DATE NULL,
+    `contract_end_date` DATE NULL,
     `status`        VARCHAR(30) NOT NULL DEFAULT 'active',
     `created_at`       TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     `updated_at`       TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
