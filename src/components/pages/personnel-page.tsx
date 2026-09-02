@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useCallback, useRef, type ReactNode } from "react";
 import { apiClient } from "@/lib/api-client";
 import { API_ENDPOINTS } from "@/lib/api-config";
 import { Card, CardContent } from "@/components/ui/card";
@@ -190,6 +190,19 @@ export function PersonnelPage() {
   ];
 
 
+  const byType = data.reduce<Record<string, number>>((acc, person) => {
+    const position = (person.position || "").trim();
+    const key = position === "سرپرست اکیپ"
+      ? "crew_supervisor"
+      : position === "کارشناس خط"
+        ? "line_expert"
+        : position === "سیمبان"
+          ? "lineman"
+          : "other";
+    acc[key] = (acc[key] || 0) + 1;
+    return acc;
+  }, {});
+
   return (
     <div className="space-y-2">
       {/* نوار آمار */}
@@ -255,10 +268,16 @@ export function PersonnelPage() {
   );
 }
 
-/** نوار آمار پرسنل — کل + تفکیک نقش‌های کلیدی */
+/** نوار آمار پرسنل — کل + تفکیک سمت‌های کلیدی */
+const PERSONNEL_TYPE_META: Record<string, { label: string; icon: ReactNode; iconClass: string; cardClass: string }> = {
+  crew_supervisor: { label: "سرپرست اکیپ", icon: <UserCog className="w-5 h-5 text-white" />, iconClass: "from-amber-500 to-amber-600", cardClass: "from-amber-50 via-white to-amber-100/60" },
+  line_expert: { label: "کارشناس خط", icon: <Cog className="w-5 h-5 text-white" />, iconClass: "from-blue-500 to-blue-600", cardClass: "from-blue-50 via-white to-blue-100/60" },
+  lineman: { label: "سیمبان", icon: <Wrench className="w-5 h-5 text-white" />, iconClass: "from-emerald-500 to-emerald-600", cardClass: "from-emerald-50 via-white to-emerald-100/60" },
+};
+
 function PersonnelStatsBar({ total, byType }: { total: number; byType: Record<string, number> }) {
-  const keyTypes = ["crew_supervisor", "line_expert", "lineman"];
-  const otherCount = total - keyTypes.reduce((s, k) => s + (byType[k] || 0), 0);
+  const keyTypes = Object.keys(PERSONNEL_TYPE_META);
+  const otherCount = Math.max(0, total - keyTypes.reduce((s, k) => s + (byType[k] || 0), 0));
 
   const cards = [
     {
@@ -267,7 +286,7 @@ function PersonnelStatsBar({ total, byType }: { total: number; byType: Record<st
       cardClass: "from-indigo-50 via-white to-indigo-100/60",
     },
     ...keyTypes.map(t => {
-      const meta = typeMeta(t)!;
+      const meta = PERSONNEL_TYPE_META[t];
       return {
         key: t, label: meta.label, value: (byType[t] || 0).toLocaleString("fa-IR"),
         icon: meta.icon, iconClass: meta.iconClass, cardClass: meta.cardClass,
