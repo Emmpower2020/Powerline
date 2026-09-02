@@ -16,6 +16,7 @@ import { ImportExcelDialog } from "@/components/import-excel-dialog";
 import { BulkDeleteDialog } from "@/components/bulk-delete-dialog";
 import { useBulkDelete } from "@/hooks/use-bulk-delete";
 import { useToast } from "@/hooks/use-toast";
+import { useStatsVisible } from "@/hooks/use-stats-visible";
 import { GenericBulkActions } from "@/components/generic-bulk-actions";
 import { ContractSelect } from "@/components/contract-select";
 import { logError } from "@/lib/error-log";
@@ -55,6 +56,7 @@ const voltageBadge: Record<string, { label: string; color: string }> = {
 
 export function CircuitsPage() {
   const { toast } = useToast();
+  const showStats = useStatsVisible();
   const [data, setData] = useState<Circuit[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
@@ -190,7 +192,7 @@ export function CircuitsPage() {
   return (
     <div className="space-y-2">
       {/* نوار آمار — هماهنگ با خطوط/دکل‌ها */}
-      <CircuitsStatsBar total={data.length} byVoltage={byVoltage} />
+      {showStats && <CircuitsStatsBar total={data.length} byVoltage={byVoltage} />}
 
       <DataTable
         data={data}

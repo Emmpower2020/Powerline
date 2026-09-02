@@ -183,10 +183,12 @@ export function BulkTowersActions({ getSelection, onApplied }: BulkTowersActions
         break;
       default: return;
     }
+    // برچسب عملیات: «تغییر گروهی قرارداد» → «تغییر قرارداد» تا جملهٔ
+    // «در حال اجرای تغییر قرارداد» درست و خوانا ساخته شود.
     const label = actionMeta[fieldAction].title
-      .replace("تغییر گروهی ", "")
-      .replace("اتصال گروهی دکل‌ها به ", "اتصال به ");
-    requestPatch(rows, patch, label + " تغییر کرد");
+      .replace("تغییر گروهی ", "تغییر ")
+      .replace("اتصال گروهی دکل‌ها به خط", "اتصال دکل‌ها به خط");
+    requestPatch(rows, patch, label);
   };
 
   // یک پنجره برای هر دو مرحله: انتخاب مقدار و تأیید/اجرای عملیات گروهی

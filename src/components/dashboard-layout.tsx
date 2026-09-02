@@ -171,6 +171,8 @@ export function DashboardLayout({ children, currentPage, onNavigate, title, subt
     if (typeof window !== "undefined") {
       if (value) localStorage.setItem("powerline_selected_contract", value);
       else localStorage.removeItem("powerline_selected_contract");
+      // v4.3.53: صفحاتی مثل نقشه به این رویداد گوش می‌دهند و داده خود را از نو می‌گیرند
+      window.dispatchEvent(new Event("powerline:contract-changed"));
     }
   };
   const visibleNavItems = navItems.filter(item => !item.permission || hasPermission(item.permission));

@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/select";
 import { Loader2 } from "lucide-react";
 import { JalaliDatePicker } from "@/components/jalali-date-picker";
+import { fromJalali, fromPersianNumber } from "@/lib/jalali";
 import { ContractSelect } from "@/components/contract-select";
 
 // قرارداد
@@ -34,12 +35,31 @@ export function CreateContractDialog({ open, onClose, onCreated }: { open: boole
     }
   }, [open]);
 
+  // تاریخ شمسی کاربر (مثل 1405/05/30) به ISO دیتابیس تبدیل می‌شود
+  const jalaliToIso = (v: string): string | null => {
+    const norm = fromPersianNumber(v.trim()).replace(/-/g, "/");
+    if (!/^\d{4}\/(0?[1-9]|1[0-2])\/(0?[1-9]|[12]\d|3[01])$/.test(norm)) return null;
+    const iso = fromJalali(norm);
+    return /^\d{4}-\d{2}-\d{2}$/.test(iso) ? iso : null;
+  };
+
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.title.trim()) { setError("عنوان قرارداد الزامی است"); return; }
     if (!form.contractor_id) { setError("انتخاب پیمانکار الزامی است"); return; }
+    // فرمت تاریخ شمسی بررسی می‌شود — خالی مجاز است
+    let startIso: string | null = null;
+    let endIso: string | null = null;
+    if (form.start_date.trim()) {
+      startIso = jalaliToIso(form.start_date);
+      if (!startIso) { setError("فرمت تاریخ شروع درست نیست — تاریخ می‌بایست با فرمت 1405/05/30 نوشته شود"); return; }
+    }
+    if (form.end_date.trim()) {
+      endIso = jalaliToIso(form.end_date);
+      if (!endIso) { setError("فرمت تاریخ پایان درست نیست — تاریخ می‌بایست با فرمت 1405/05/30 نوشته شود"); return; }
+    }
     setSubmitting(true); setError(null);
-    try { await apiClient.post(API_ENDPOINTS.contracts, { title: form.title, contractor_id: form.contractor_id ? Number(form.contractor_id) : null, contract_type: form.contract_type, start_date: form.start_date || null, end_date: form.end_date || null, amount: form.amount ? Number(form.amount) : 0, notes: form.notes || null }); setForm({ title: "", contractor_id: "", contract_type: "maintenance", start_date: "", end_date: "", amount: "", notes: "" }); onCreated(); } catch (err) { setError(err instanceof Error ? err.message : "خطا"); } finally { setSubmitting(false); }
+    try { await apiClient.post(API_ENDPOINTS.contracts, { title: form.title, contractor_id: form.contractor_id ? Number(form.contractor_id) : null, contract_type: form.contract_type, start_date: startIso, end_date: endIso, amount: form.amount ? Number(form.amount) : 0, notes: form.notes || null }); setForm({ title: "", contractor_id: "", contract_type: "maintenance", start_date: "", end_date: "", amount: "", notes: "" }); onCreated(); } catch (err) { setError(err instanceof Error ? err.message : "خطا"); } finally { setSubmitting(false); }
   };
 
   return (
@@ -50,10 +70,17 @@ export function CreateContractDialog({ open, onClose, onCreated }: { open: boole
         <Field label="نوع قرارداد"><Select value={form.contract_type} onValueChange={v => setForm({ ...form, contract_type: v })}><SelectTrigger className="w-full"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="maintenance">نگهداری</SelectItem><SelectItem value="construction">ساخت</SelectItem><SelectItem value="inspection">بازدید</SelectItem></SelectContent></Select></Field>
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        <Field label="تاریخ شروع"><JalaliDatePicker value={form.start_date} onChange={v => setForm({ ...form, start_date: v })} /></Field>
-        <Field label="تاریخ پایان"><JalaliDatePicker value={form.end_date} onChange={v => setForm({ ...form, end_date: v })} /></Field>
+        <Field label="تاریخ شروع قرارداد">
+          <Input value={form.start_date} onChange={e => setForm({ ...form, start_date: e.target.value })} placeholder="1405/05/30" dir="ltr" className="text-left bg-white" />
+        </Field>
+        <Field label="تاریخ پایان قرارداد">
+          <Input value={form.end_date} onChange={e => setForm({ ...form, end_date: e.target.value })} placeholder="1405/05/30" dir="ltr" className="text-left bg-white" />
+        </Field>
         <Field label="مبلغ (ریال)"><Input type="text" value={form.amount} onChange={e => setForm({ ...form, amount: e.target.value.replace(/[^0-9]/g, '') })} dir="ltr" className="text-left" /></Field>
       </div>
+      <p className="text-[12px] text-slate-500 bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800 rounded-lg px-3 py-2 text-right">
+        توضیح: تاریخ می‌بایست با فرمت <span className="font-mono font-bold text-indigo-600 dark:text-indigo-400" dir="ltr">1405/05/30</span> نوشته شود
+      </p>
       <Field label="توضیحات"><Textarea value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} rows={2} className="text-right" /></Field>
     </Shell>
   );
@@ -91,13 +118,13 @@ export function CreateSafetyDialog({ open, onClose, onCreated }: { open: boolean
 export function CreatePersonnelDialog({ open, onClose, onCreated }: { open: boolean; onClose: () => void; onCreated: () => void }) {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [form, setForm] = useState({ first_name: "", last_name: "", personnel_type: "employee", position: "", phone: "", mobile: "", email: "", hire_date: "", contract_id: "" });
+  const [form, setForm] = useState({ first_name: "", last_name: "", personnel_type: "employee", position: "", phone: "", contractor_phone: "", mobile: "", email: "", hire_date: "", contract_id: "" });
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.first_name) { setError("نام الزامی است"); return; }
     setSubmitting(true); setError(null);
-    try { await apiClient.post(API_ENDPOINTS.personnel, { first_name: form.first_name, last_name: form.last_name, personnel_type: form.personnel_type, position: form.position || null, phone: form.phone || null, mobile: form.mobile || null, email: form.email || null, hire_date: form.hire_date || null, contract_id: form.contract_id ? Number(form.contract_id) : null }); setForm({ first_name: "", last_name: "", personnel_type: "employee", position: "", phone: "", mobile: "", email: "", hire_date: "", contract_id: "" }); onCreated(); } catch (err) { setError(err instanceof Error ? err.message : "خطا"); } finally { setSubmitting(false); }
+    try { await apiClient.post(API_ENDPOINTS.personnel, { first_name: form.first_name, last_name: form.last_name, personnel_type: form.personnel_type, position: form.position || null, phone: form.contractor_phone || form.phone || null, mobile: form.mobile || null, email: form.email || null, hire_date: form.hire_date || null, contract_id: form.contract_id ? Number(form.contract_id) : null }); setForm({ first_name: "", last_name: "", personnel_type: "employee", position: "", phone: "", contractor_phone: "", mobile: "", email: "", hire_date: "", contract_id: "" }); onCreated(); } catch (err) { setError(err instanceof Error ? err.message : "خطا"); } finally { setSubmitting(false); }
   };
 
   return (

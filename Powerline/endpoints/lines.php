@@ -287,6 +287,65 @@ function registerLineRoutes(Router $router): void
         Response::success(null, 'خط با موفقیت ویرایش شد');
     });
 
+    // ویرایش گروهی خطوط — v4.3.53: حداکثر ۱۰۰ خط در هر درخواست با یک UPDATE تراکنشی
+    // بدنه: {"ids":[...], "patch":{"voltage_kv":63, "contract_id":2, ...}}
+    $router->post('lines/bulk-update', function () {
+        $user = Auth::authenticate();
+        Auth::requirePermission('lines.update');
+
+        $body = Helpers::getJsonBody();
+        $ids = $body['ids'] ?? [];
+        $patch = $body['patch'] ?? [];
+
+        if (!is_array($ids) || count($ids) === 0) Response::error(400, 'لیست شناسه‌ها ارسال نشده');
+        if (count($ids) > 100) Response::error(400, 'حداکثر ۱۰۰ خط در هر درخواست');
+        if (!is_array($patch) || count($patch) === 0) Response::error(400, 'مقدار ویرایش ارسال نشده');
+
+        $ids = array_values(array_unique(array_filter(array_map('intval', $ids), fn($v) => $v > 0)));
+        if (count($ids) === 0) Response::error(400, 'شناسه معتبر ارسال نشده');
+
+        $allowedFields = [
+            'dispatch_code', 'name', 'group_name',
+            'voltage_kv', 'circuit_count', 'bundle_count',
+            'conductor_type', 'length_km', 'circuit_length_km',
+            'total_towers', 'tension_towers', 'suspension_towers',
+            'plain_terrain', 'semi_mountainous', 'mountainous',
+            'commission_year', 'line_supervisor', 'line_expert',
+            'owner_org_id', 'contractor_id', 'contract_id', 'status',
+            'tower_structure',
+        ];
+
+        $updates = [];
+        $params = [];
+        foreach ($allowedFields as $field) {
+            if (array_key_exists($field, $patch)) {
+                $updates[] = "`$field` = ?";
+                $params[] = $patch[$field];
+            }
+        }
+        if (!$updates) Response::error(400, 'هیچ فیلد مجازی برای ویرایش ارسال نشده');
+
+        $db = Database::getInstance();
+        $pdo = $db->getConnection();
+        $idPlaceholders = implode(',', array_fill(0, count($ids), '?'));
+
+        try {
+            $pdo->beginTransaction();
+            $params = array_merge($params, $ids);
+            $stmt = $pdo->prepare("UPDATE `lines` SET " . implode(', ', $updates) . ", updated_at = NOW() WHERE id IN ($idPlaceholders)");
+            $stmt->execute($params);
+            $updated = $stmt->rowCount();
+            $pdo->commit();
+        } catch (Throwable $e) {
+            if ($pdo->inTransaction()) $pdo->rollBack();
+            Logger::error('Lines bulk-update failed', ['error' => $e->getMessage(), 'count' => count($ids)]);
+            Response::error(500, 'ویرایش گروهی خطوط ناموفق بود: ' . $e->getMessage());
+        }
+
+        Logger::info('Lines bulk-updated', ['count' => $updated, 'user_id' => $user['id']]);
+        Response::success(['updated' => $updated], "{$updated} خط ویرایش شد");
+    });
+
     // حذف خط (HARD DELETE - حذف کامل از دیتابیس)
     $router->delete('lines/{id}', function ($id) {
         $user = Auth::authenticate();

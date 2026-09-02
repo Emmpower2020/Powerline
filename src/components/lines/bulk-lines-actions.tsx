@@ -110,25 +110,35 @@ export function BulkLinesActions({ getSelection, onApplied }: BulkLinesActionsPr
   const applyPatch = async () => {
     if (!pendingOperation) return;
     const { rows: targetRows, patch, label: successText } = pendingOperation;
+    // v4.3.53: مانند دکل‌ها، بسته‌های ۱۰۰تایی با یک درخواست (lines/bulk-update)
+    // به‌جای ویرایش یکی‌یکی — چند برابر سریع‌تر و با تعداد درخواست کمتر.
+    const BATCH_SIZE = 100;
+    const batches = Array.from({ length: Math.ceil(targetRows.length / BATCH_SIZE) }, (_, i) =>
+      targetRows.slice(i * BATCH_SIZE, (i + 1) * BATCH_SIZE)
+    );
     setApplying(true);
     let success = 0;
     const errors: string[] = [];
     try {
-      for (let i = 0; i < targetRows.length; i++) {
-        const row = targetRows[i];
+      for (let i = 0; i < batches.length; i++) {
+        const batch = batches[i];
         try {
-          await apiClient.put(`${API_ENDPOINTS.lines}/${row.id}`, patch);
-          success++;
+          const res = await apiClient.post<any>(API_ENDPOINTS.linesBulkUpdate, {
+            ids: batch.map((row: any) => row.id),
+            patch,
+          }, { timeoutMs: 60_000 });
+          success += Number(res?.data?.updated ?? batch.length);
         } catch (err: any) {
-          errors.push(`${row.line_code || row.id}: ${err?.message || "خطا"}`);
+          errors.push(`بسته ${i + 1}: ${err?.message || "خطای نامشخص"}`);
         }
-        setProgress({ completed: i + 1, total: targetRows.length, success, failed: errors.length });
+        const completed = Math.min((i + 1) * BATCH_SIZE, targetRows.length);
+        setProgress({ completed, total: targetRows.length, success, failed: errors.length });
       }
       onApplied();
       setOperationOpen(false);
       setFieldAction(null);
       if (errors.length === 0) toast({ title: "انجام شد", description: `${successText} — ${success.toLocaleString("fa-IR")} ردیف` });
-      else toast({ title: "اعمال ناقص", description: `${success.toLocaleString("fa-IR")} ردیف موفق، ${errors.length.toLocaleString("fa-IR")} ناموفق — اولین خطا: ${errors[0]}`, variant: "destructive" });
+      else toast({ title: "اعمال ناقص", description: `${success.toLocaleString("fa-IR")} ردیف موفق، ${errors.length.toLocaleString("fa-IR")} بسته ناموفق — اولین خطا: ${errors[0]}`, variant: "destructive" });
     } finally {
       setApplying(false);
       setPendingOperation(null);
@@ -165,7 +175,8 @@ export function BulkLinesActions({ getSelection, onApplied }: BulkLinesActionsPr
       }
       default: return;
     }
-    requestPatch(rows, patch, actionMeta[fieldAction].title.replace("تغییر گروهی ", "") + " تغییر کرد");
+    // «تغییر گروهی ولتاژ» → «تغییر ولتاژ» تا «در حال اجرای تغییر ولتاژ» درست ساخته شود
+    requestPatch(rows, patch, actionMeta[fieldAction].title.replace("تغییر گروهی ", "تغییر "));
   };
 
   // یک پنجره برای هر دو مرحله: انتخاب مقدار و تأیید/اجرای عملیات گروهی

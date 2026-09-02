@@ -12,6 +12,7 @@ import { BulkTowersActions } from "@/components/towers/bulk-towers-actions";
 import { getTowerIssues } from "@/lib/towers-quality";
 import { usePersonnelOptions } from "@/hooks/use-personnel-options";
 import { useToast } from "@/hooks/use-toast";
+import { useStatsVisible } from "@/hooks/use-stats-visible";
 import { logError } from "@/lib/error-log";
 import { cn } from "@/lib/utils";
 import {
@@ -45,6 +46,7 @@ export function TowersPage() {
   const deletingRowsRef = useRef<any[]>([]);
   const tableRef = useRef<DataTableHandle | null>(null);
   const { toast } = useToast();
+  const showStats = useStatsVisible();
   // v3.0.0: پرسنل برای بررسی همخوانی سرپرست در سلامت داده
   const { supervisorOptions } = usePersonnelOptions();
   const supervisorNames = useMemo(() => new Set(supervisorOptions.map(o => o.value)), [supervisorOptions]);
@@ -430,12 +432,14 @@ export function TowersPage() {
   return (
     <div className="space-y-2">
       {/* نوار آمار — بر اساس داده‌های فیلترشده */}
-      <TowersStatsBar
-        data={filteredData}
-        issuesCount={issuesCount}
-        issuesFilterActive={issuesOnly}
-        onIssuesClick={() => setIssuesOnly(v => !v)}
-      />
+      {showStats && (
+        <TowersStatsBar
+          data={filteredData}
+          issuesCount={issuesCount}
+          issuesFilterActive={issuesOnly}
+          onIssuesClick={() => setIssuesOnly(v => !v)}
+        />
+      )}
 
       <DataTable
         data={filteredData}

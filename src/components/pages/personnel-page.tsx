@@ -17,6 +17,7 @@ import { ImportExcelDialog } from "@/components/import-excel-dialog";
 import { BulkDeleteDialog } from "@/components/bulk-delete-dialog";
 import { useBulkDelete } from "@/hooks/use-bulk-delete";
 import { useToast } from "@/hooks/use-toast";
+import { useStatsVisible } from "@/hooks/use-stats-visible";
 import { GenericBulkActions } from "@/components/generic-bulk-actions";
 import { logError } from "@/lib/error-log";
 import { Loader2, Plus, HardHat, UserCog, Cog, Users, Car, Wrench } from "lucide-react";
@@ -36,6 +37,7 @@ import { Loader2, Plus, HardHat, UserCog, Cog, Users, Car, Wrench } from "lucide
 interface Person {
   id: number;
   personnel_code?: string;
+  contract_id?: number | null;
   first_name: string;
   last_name: string;
   national_id?: string | null;
@@ -67,6 +69,7 @@ const typeMeta = (t?: string | null) => PERSONNEL_TYPES.find(x => x.value === t)
 
 export function PersonnelPage() {
   const { toast } = useToast();
+  const showStats = useStatsVisible();
   const [data, setData] = useState<Person[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
@@ -223,7 +226,7 @@ export function PersonnelPage() {
   return (
     <div className="space-y-2">
       {/* نوار آمار */}
-      <PersonnelStatsBar total={data.length} byType={byType} />
+      {showStats && <PersonnelStatsBar total={data.length} byType={byType} />}
 
       <DataTable
         data={data}

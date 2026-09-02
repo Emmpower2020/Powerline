@@ -48,22 +48,24 @@ export function GenericBulkActions({
     if (!pendingRun || !rows.length) return;
     setBusy(true);
     let ok = 0, fail = 0;
+    // v4.3.53: درخواست‌ها به‌جای یکی‌یکی، در دسته‌های ۱۰تایی موازی ارسال می‌شوند
+    // تا عملیات روی ردیف‌های زیاد چند برابر سریع‌تر تمام شود.
+    const CHUNK = 10;
     try {
-      for (let i = 0; i < rows.length; i++) {
-        try {
-          await apiClient.put(`${endpoint}/${rows[i].id}`, pendingRun.patch);
-          ok++;
-        } catch {
-          fail++;
-        }
-        setProgress({ completed: i + 1, total: rows.length, success: ok, failed: fail });
+      for (let i = 0; i < rows.length; i += CHUNK) {
+        const chunk = rows.slice(i, i + CHUNK);
+        const results = await Promise.allSettled(
+          chunk.map((row) => apiClient.put(`${endpoint}/${row.id}`, pendingRun.patch)),
+        );
+        for (const r of results) { if (r.status === "fulfilled") ok++; else fail++; }
+        setProgress({ completed: Math.min(i + CHUNK, rows.length), total: rows.length, success: ok, failed: fail });
       }
       onApplied();
       setOperationOpen(false);
       setContractOpen(false);
       toast({
         title: fail ? "اعمال ناقص" : "انجام شد",
-        description: `${ok.toLocaleString("fa-IR")} ${entityName} با موفقیت ${pendingRun.label} شد${fail ? `، ${fail.toLocaleString("fa-IR")} مورد ناموفق بود` : ""}`,
+        description: `${pendingRun.label} روی ${ok.toLocaleString("fa-IR")} ${entityName} اعمال شد${fail ? `، ${fail.toLocaleString("fa-IR")} مورد ناموفق بود` : ""}`,
         variant: fail ? "destructive" : undefined,
       });
     } finally {
@@ -90,7 +92,7 @@ export function GenericBulkActions({
     const isUnknown = contractId === "__unknown__";
     requestRun(
       { contract_id: isUnknown ? null : Number(contractId) },
-      isUnknown ? "به «نامشخص» منتقل" : "منتقل به قرارداد انتخاب‌شده",
+      isUnknown ? "پاک کردن قرارداد" : "انتقال به قرارداد",
     );
   };
 
@@ -110,8 +112,8 @@ export function GenericBulkActions({
         {canChangeContract && (canToggleStatus || true) && <DropdownMenuSeparator />}
         {additionalActions}{additionalActions && (canToggleStatus || canChangeContract) && <DropdownMenuSeparator />}
         {canToggleStatus && <>
-          <DropdownMenuItem className="gap-2 cursor-pointer" onClick={() => requestRun({status: "active"}, "فعال") }><Power className="w-4 h-4 text-emerald-600"/>فعال کردن</DropdownMenuItem>
-          <DropdownMenuItem className="gap-2 cursor-pointer" onClick={() => requestRun({status: "inactive"}, "غیرفعال") }><PowerOff className="w-4 h-4 text-slate-500"/>غیرفعال کردن</DropdownMenuItem>
+          <DropdownMenuItem className="gap-2 cursor-pointer" onClick={() => requestRun({status: "active"}, "فعال کردن") }><Power className="w-4 h-4 text-emerald-600"/>فعال کردن</DropdownMenuItem>
+          <DropdownMenuItem className="gap-2 cursor-pointer" onClick={() => requestRun({status: "inactive"}, "غیرفعال کردن") }><PowerOff className="w-4 h-4 text-slate-500"/>غیرفعال کردن</DropdownMenuItem>
         </>}
         <DropdownMenuItem className="gap-2 cursor-pointer" onClick={() => { onApplied(); toast({title:"بروزرسانی شد", description:"جدول با داده‌های جدید بارگذاری شد"}); }}><RefreshCcw className="w-4 h-4 text-blue-600"/>بروزرسانی</DropdownMenuItem>
       </DropdownMenuContent>

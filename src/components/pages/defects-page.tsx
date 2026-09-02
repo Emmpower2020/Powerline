@@ -21,6 +21,7 @@ import { GenericBulkActions } from "@/components/generic-bulk-actions";
 import { BulkOperationDialog, type BulkOperationProgress } from "@/components/bulk-operation-dialog";
 import { CreateDefectDialog } from "@/components/defects/create-defect-dialog";
 import { useToast } from "@/hooks/use-toast";
+import { useStatsVisible } from "@/hooks/use-stats-visible";
 import { logError } from "@/lib/error-log";
 import type { Defect } from "@/lib/types";
 import {
@@ -64,6 +65,7 @@ const priorityLabels: Record<string, { label: string; color: string }> = {
 
 export function DefectsPage() {
   const { toast } = useToast();
+  const showStats = useStatsVisible();
   const [data, setData] = useState<Defect[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
@@ -392,7 +394,7 @@ export function DefectsPage() {
   return (
     <div className="space-y-2">
       {/* نوار آمار */}
-      <DefectsStatsBar data={data} />
+      {showStats && <DefectsStatsBar data={data} />}
 
       <DataTable
         data={data}

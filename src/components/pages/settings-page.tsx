@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { apiClient } from "@/lib/api-client";
 import { API_ENDPOINTS } from "@/lib/api-config";
@@ -8,8 +8,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Loader2, Save, KeyRound, User as UserIcon } from "lucide-react";
+import { Loader2, Save, KeyRound, User as UserIcon, LayoutGrid } from "lucide-react";
+import { useStatsVisible, setStatsVisible } from "@/hooks/use-stats-visible";
 
 export function SettingsPage() {
   const { user } = useAuth();
@@ -18,6 +20,9 @@ export function SettingsPage() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const showStats = useStatsVisible();
+  const [statsToggle, setStatsToggle] = useState(true);
+  useEffect(() => { setStatsToggle(showStats); }, [showStats]);
 
   const handleChangePassword = async (e: React.FormEvent) => {
     e.preventDefault(); setMessage(null);
@@ -44,6 +49,22 @@ export function SettingsPage() {
               <p className="text-sm text-slate-500">@{user?.username}</p>
               {user?.email && <p className="text-sm text-slate-400">{user.email}</p>}
             </div>
+          </div>
+        </CardContent>
+      </Card>
+      <Card>
+        <CardHeader><CardTitle className="flex items-center gap-2"><LayoutGrid className="w-5 h-5" />نمایش رابط کاربری</CardTitle></CardHeader>
+        <CardContent>
+          <div className="flex items-center justify-between max-w-md gap-4">
+            <div className="text-right">
+              <p className="text-sm font-medium text-slate-800 dark:text-slate-100">کارت‌های آماری بالای صفحات</p>
+              <p className="text-xs text-slate-500 mt-1">نمایش کارت‌های آمار (کل، ولتاژ، وضعیت و...) در بالای جدول‌ها را روشن یا خاموش می‌کند</p>
+            </div>
+            <Switch
+              checked={statsToggle}
+              onCheckedChange={(v) => { setStatsToggle(v); setStatsVisible(v); }}
+              className="data-[state=checked]:bg-indigo-600"
+            />
           </div>
         </CardContent>
       </Card>

@@ -155,6 +155,14 @@ export function MapPage() {
     return () => clearTimeout(d);
   }, [load]);
 
+  // v4.3.53: با تغییر «قرارداد جاری» در هدر، داده نقشه از نو بارگذاری می‌شود
+  // تا خطوط و دکل‌های همان قرارداد روی نقشه دیده شوند.
+  useEffect(() => {
+    const onContractChange = () => setRefreshKey((k) => k + 1);
+    window.addEventListener("powerline:contract-changed", onContractChange);
+    return () => window.removeEventListener("powerline:contract-changed", onContractChange);
+  }, []);
+
   // ایندکس‌ها و مسیرها
   const linesById = useMemo(() => new Map(lines.map((l) => [l.id, l])), [lines]);
   const towersById = useMemo(() => new Map(towers.map((t) => [t.id, t])), [towers]);
@@ -678,19 +686,19 @@ export function MapPage() {
                                   />
                                   <span className="min-w-0 flex-1">
                                     <span
-                                      className="block text-[13.5px] leading-snug whitespace-normal break-words text-slate-600 dark:text-slate-300"
+                                      className="block text-[13.5px] font-medium leading-snug whitespace-normal break-words text-slate-800 dark:text-slate-100"
                                       title={l.name}
                                     >
                                       {l.name}
                                     </span>
                                     <span className="flex items-center gap-1.5 mt-0.5">
                                       <span
-                                        className="text-[11.5px] font-mono rounded px-1 py-px bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400"
+                                        className="text-[11.5px] font-mono rounded px-1 py-px bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300"
                                         dir="ltr"
                                       >
                                         {l.line_code}
                                       </span>
-                                      <span className="text-[11.5px] text-slate-400 nums-fa">
+                                      <span className="text-[11.5px] text-slate-500 dark:text-slate-400 nums-fa">
                                         {l.towerCount > 0 ? `${fa(l.towerCount)} دکل` : "بدون دکل"}
                                       </span>
                                     </span>

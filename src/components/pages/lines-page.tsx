@@ -13,6 +13,7 @@ import { getLineIssues } from "@/lib/lines-quality";
 import { usePersonnelOptions } from "@/hooks/use-personnel-options";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
+import { useStatsVisible } from "@/hooks/use-stats-visible";
 import { logError } from "@/lib/error-log";
 import { cn } from "@/lib/utils";
 import {
@@ -41,6 +42,7 @@ export function LinesPage() {
   const deletingRowsRef = useRef<any[]>([]);
   const tableRef = useRef<DataTableHandle | null>(null);
   const { toast } = useToast();
+  const showStats = useStatsVisible();
   // v3.0.0: پرسنل برای بررسی همخوانی سرپرست/کارشناس در سلامت داده
   const { supervisorOptions, expertOptions } = usePersonnelOptions();
   const supervisorNames = useMemo(() => new Set(supervisorOptions.map(o => o.value)), [supervisorOptions]);
@@ -374,12 +376,14 @@ export function LinesPage() {
   return (
     <div className="space-y-2">
       {/* نوار آمار (مورد ۱) — بر اساس داده‌های فیلترشده */}
-      <LinesStatsBar
-        data={filteredData}
-        issuesCount={issuesCount}
-        issuesFilterActive={issuesOnly}
-        onIssuesClick={() => setIssuesOnly(v => !v)}
-      />
+      {showStats && (
+        <LinesStatsBar
+          data={filteredData}
+          issuesCount={issuesCount}
+          issuesFilterActive={issuesOnly}
+          onIssuesClick={() => setIssuesOnly(v => !v)}
+        />
+      )}
 
       <DataTable
         data={filteredData}

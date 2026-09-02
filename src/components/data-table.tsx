@@ -406,7 +406,14 @@ function DataTableInner<T extends { id: number }>({
       setSelectionAllActive(false);
       return;
     }
+    // v4.3.53: انتخاب اُپتیمیزه — ابتدا همان لحظه ردیف‌های موجود انتخاب می‌شوند
+    // (تیک فوراً و بدون نمایش حالت منفی/نیمه‌انتخاب برمی‌گردد)، سپس اگر داده بیشتری
+    // لازم بود (انتخاب همه صفحات) از سرور گرفته و انتخاب تکمیل می‌شود.
+    const prevRows = selectedRows;
+    const prevCache = selectedRowCache;
     setSelectingAll(true);
+    setSelectedRows(new Set(filteredIds));
+    setSelectedRowCache(new Map(filtered.map(r => [r.id, r] as const)));
     try {
       const rows = onLoadAllRows ? await onLoadAllRows() : filtered;
       const eligible = rows || [];
@@ -415,6 +422,9 @@ function DataTableInner<T extends { id: number }>({
       setSelectionAllActive(true);
       toast({ title: "انتخاب همه انجام شد", description: `${eligible.length.toLocaleString("fa-IR")} ردیف انتخاب شد` });
     } catch (err: any) {
+      // برگشت به وضعیت قبل در صورت خطا
+      setSelectedRows(prevRows);
+      setSelectedRowCache(prevCache);
       toast({ title: "انتخاب همه ناموفق بود", description: err?.message || "دریافت همه رکوردها انجام نشد", variant: "destructive" });
     } finally {
       setSelectingAll(false);
@@ -797,7 +807,7 @@ function DataTableInner<T extends { id: number }>({
                     <input
                       type="checkbox"
                       checked={allFilteredSelected}
-                      ref={(el) => { if (el) el.indeterminate = !allFilteredSelected && someFilteredSelected; }}
+                      ref={(el) => { if (el) el.indeterminate = !selectingAll && !allFilteredSelected && someFilteredSelected; }}
                       onChange={() => { void toggleSelectAll(); }}
                       disabled={selectingAll}
                       className="w-4 h-4 cursor-pointer"
