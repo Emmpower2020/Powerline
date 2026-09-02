@@ -243,8 +243,8 @@ export function DashboardLayout({ children, currentPage, onNavigate, title, subt
             {/* v3.5.2: وضعیت داده‌های مرجع — آنلاین/کش محلی/آفلاین */}
             <DataStatusBadge />
             <div className="hidden lg:flex items-center gap-2 min-w-[260px] max-w-[360px]">
-              <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 whitespace-nowrap">قرارداد جاری</span>
-              <div className="min-w-0 flex-1 rounded-lg transition-colors bg-indigo-50/70 hover:bg-indigo-100/80 dark:bg-indigo-950/35 dark:hover:bg-indigo-900/50 px-1 py-0.5">
+              <span className="text-sm font-extrabold text-indigo-700 dark:text-indigo-300 whitespace-nowrap">قرارداد جاری</span>
+              <div className="min-w-0 flex-1 rounded-lg transition-colors bg-indigo-100/80 hover:bg-indigo-200/90 dark:bg-indigo-950/55 dark:hover:bg-indigo-900/80 px-1.5 py-1">
                 <ContractSelect value={selectedContract} onChange={onContractChange} disabled={contractsLoading} className="min-w-0 flex-1" preserveUnknownValue />
               </div>
             </div>
@@ -267,10 +267,10 @@ export function DashboardLayout({ children, currentPage, onNavigate, title, subt
                 </button>
               </DropdownMenuTrigger>
               {/* v2.8.0: DropdownMenu راست‌چین — align="start" برای RTL */}
-              <DropdownMenuContent align="start" className="w-60">
+              <DropdownMenuContent align="end" className="w-60 text-right" dir="rtl">
                 {/* هدر کاربر با گرادیان */}
                 <div className="px-3 py-3 bg-gradient-to-l from-indigo-50 to-purple-50 dark:from-indigo-950/40 dark:to-purple-950/40 border-b border-slate-100 dark:border-slate-800 rounded-t-md">
-                  <div className="flex items-center gap-2.5">
+                  <div className="flex items-center gap-2.5" dir="rtl">
                     <div className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-500 via-purple-500 to-indigo-600 flex items-center justify-center shadow-md shadow-indigo-500/30 shrink-0">
                       <UserCog className="w-5 h-5 text-white" />
                     </div>

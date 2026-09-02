@@ -127,7 +127,7 @@ export function SearchableSelect({
                         setOpen(false);
                         setQuery("");
                       }}
-                      className="cursor-pointer"
+                      className="cursor-pointer hover:bg-slate-50 hover:text-slate-900 data-[selected=true]:bg-indigo-50 data-[selected=true]:text-indigo-800 dark:hover:bg-slate-800 dark:data-[selected=true]:bg-indigo-950/50 dark:data-[selected=true]:text-indigo-200"
                     >
                       <Check className={cn("w-4 h-4 shrink-0 ml-2", value === opt.value ? "opacity-100" : "opacity-0")} />
                       <div className="flex items-baseline gap-2 min-w-0 flex-1">
@@ -241,7 +241,7 @@ export function SearchableMultiSelect({
                       value={`${opt.label} ${opt.value} ${opt.description || ""}`}
                       disabled={atLimit}
                       onSelect={() => { toggle(opt.value); setQuery(""); }}
-                      className="cursor-pointer"
+                      className="cursor-pointer hover:bg-slate-50 hover:text-slate-900 data-[selected=true]:bg-indigo-50 data-[selected=true]:text-indigo-800 dark:hover:bg-slate-800 dark:data-[selected=true]:bg-indigo-950/50 dark:data-[selected=true]:text-indigo-200"
                     >
                       <div className={cn(
                         "w-4 h-4 shrink-0 ml-2 border rounded flex items-center justify-center",

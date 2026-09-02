@@ -207,11 +207,15 @@ function DataTableInner<T extends { id: number }>({
   const previousDataSignatureRef = useRef<string | null>(null);
   const dataSelectionSignature = useMemo(() => data.map(r => String(r.id)).join(","), [data]);
   useEffect(() => {
-    if (previousDataSignatureRef.current !== dataSelectionSignature) {
+    if (previousDataSignatureRef.current !== dataSelectionSignature || data.length === 0) {
       previousDataSignatureRef.current = dataSelectionSignature;
       clearSelection();
+    } else {
+      // حتی اگر شناسه‌ها عوض نشده باشند، دریافت تازه داده به معنی Refresh است؛
+      // انتخاب قبلی نباید به دادهٔ تازه منتقل شود.
+      clearSelection();
     }
-  }, [dataSelectionSignature, clearSelection]);
+  }, [data, dataSelectionSignature, clearSelection]);
 
   // سلامت داده به‌صورت پیش‌فرض در همه جدول‌ها نمایش داده می‌شود.
   const effectiveColumns = useMemo<DataTableColumn<T>[]>(() => {
@@ -661,7 +665,7 @@ function DataTableInner<T extends { id: number }>({
   };
 
   const actionButton = (button: ReactNode, title: string, disabled = false) =>
-    disabled ? <span title={title} className="inline-flex cursor-not-allowed">{button}</span> : button;
+    disabled ? <span title={title} className="inline-flex cursor-default">{button}</span> : button;
 
   return (
     <div className="space-y-3" dir="rtl">

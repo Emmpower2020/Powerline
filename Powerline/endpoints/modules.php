@@ -79,7 +79,7 @@ function registerModuleRoutes(Router $router): void
         }
         if (in_array($table, ['contracts', 'contractors'], true) && strtolower((string)($row['status'] ?? '')) === 'active') {
             $specific = $table === 'contracts'
-                ? 'قرارداد فعال است و برای جلوگیری از حذف ناخواسته تا زمانی که وضعیت آن را به «غیرفعال/منقضی/تکمیل» تغییر ندهید، حذف نمی‌شود.'
+                ? 'قرارداد فعال است و برای جلوگیری از حذف ناخواسته تا زمانی که وضعیت آن را از «فعال» خارج نکنید، حذف نمی‌شود.'
                 : 'پیمانکار فعال است و برای جلوگیری از حذف ناخواسته تا زمانی که وضعیت آن را به «غیرفعال» تغییر ندهید، حذف نمی‌شود.';
             Response::error(409, "حذف $label انجام نشد.\n\n$specific");
         }
@@ -384,7 +384,7 @@ function registerModuleRoutes(Router $router): void
         $chk->execute([$contractorId]);
         if (!$chk->fetchColumn()) Response::error(400, 'پیمانکار انتخاب‌شده وجود ندارد');
         $code = trim((string)($body['contract_code'] ?? ''));
-        if ($code === '') $code = 'C-' . date('Y') . '-' . str_pad((string)random_int(0, 9999), 4, '0', STR_PAD_LEFT);
+        if ($code === '') Response::error(400, 'کد قرارداد الزامی است و باید توسط کاربر وارد شود.');
         $start = !empty($body['start_date']) ? $body['start_date'] : date('Y-m-d');
         $end = !empty($body['end_date']) ? $body['end_date'] : date('Y-m-d', strtotime('+1 year'));
         if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)$start) || !preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)$end)) Response::error(400, 'فرمت تاریخ قرارداد نامعتبر است');
@@ -405,17 +405,36 @@ function registerModuleRoutes(Router $router): void
         Auth::authenticate();
         Auth::requirePermissionSoft('contracts.update');
         $body = Helpers::getJsonBody(); $pdo = Database::getInstance()->getConnection();
-        $fields = ['title', 'contractor_id', 'contract_type', 'start_date', 'end_date', 'amount', 'status', 'notes'];
+        $fields = ['contract_code', 'title', 'contractor_id', 'contract_type', 'start_date', 'end_date', 'amount', 'status', 'notes'];
         $updates = []; $params = [];
-        foreach ($fields as $f) { if (array_key_exists($f, $body)) { $updates[] = "`$f` = ?"; $params[] = $body[$f]; } }
+        foreach ($fields as $f) {
+            if (!array_key_exists($f, $body)) continue;
+            $v = $body[$f];
+            if ($f === 'contract_code' && trim((string)$v) === '') Response::error(400, 'کد قرارداد الزامی است و باید توسط کاربر وارد شود.');
+            if ($f === 'contract_code') $v = trim((string)$v);
+            $updates[] = "`$f` = ?"; $params[] = $v;
+        }
         if (empty($updates)) Response::error(400, 'هیچ فیلدی ارسال نشده');
         $params[] = (int)$id;
-        $pdo->prepare("UPDATE contracts SET " . implode(', ', $updates) . " WHERE id = ?")->execute($params);
+        try {
+            $pdo->prepare("UPDATE contracts SET " . implode(', ', $updates) . " WHERE id = ?")->execute($params);
+        } catch (PDOException $e) {
+            if ((string)$e->getCode() === '23000') Response::error(409, 'کد قرارداد تکراری است یا ارتباط یکی از اطلاعات مرتبط معتبر نیست.');
+            Response::error(500, 'ویرایش قرارداد ناموفق بود: ' . $e->getMessage());
+        }
         Response::success(null, 'قرارداد ویرایش شد');
     });
 
     $router->delete('contracts/{id}', function ($id) use ($guardedDelete) {
         Auth::authenticate(); Auth::requirePermission('contracts.delete');
+        $pdo = Database::getInstance()->getConnection();
+        $chk = $pdo->prepare("SELECT status FROM contracts WHERE id = ? LIMIT 1");
+        $chk->execute([(int)$id]);
+        $status = $chk->fetchColumn();
+        if ($status === false) Response::error(404, 'قرارداد پیدا نشد یا قبلاً حذف شده است');
+        if (strtolower((string)$status) === 'active') {
+            Response::error(409, 'حذف قرارداد انجام نشد. این قرارداد در حال حاضر «فعال» است و برای جلوگیری از حذف ناخواسته، حذف قرارداد فعال مجاز نیست. ابتدا وضعیت قرارداد را از «فعال» خارج کنید و سپس، پس از برداشتن تمام وابستگی‌ها، دوباره برای حذف اقدام کنید.');
+        }
         $guardedDelete('contracts', 'قرارداد', (int)$id, ['invoices' => 'صورت‌وضعیت‌ها']);
     });
 
@@ -1211,6 +1230,14 @@ function registerModuleRoutes(Router $router): void
     $router->delete('contractors/{id}', function ($id) use ($guardedDelete) {
         Auth::authenticate();
         Auth::requirePermissionSoft('contractors.delete');
+        $pdo = Database::getInstance()->getConnection();
+        $chk = $pdo->prepare("SELECT status FROM contractors WHERE id = ? LIMIT 1");
+        $chk->execute([(int)$id]);
+        $status = $chk->fetchColumn();
+        if ($status === false) Response::error(404, 'پیمانکار پیدا نشد یا قبلاً حذف شده است');
+        if (strtolower((string)$status) === 'active') {
+            Response::error(409, 'حذف پیمانکار انجام نشد. این پیمانکار در حال حاضر «فعال» است و برای جلوگیری از حذف ناخواسته، حذف پیمانکار فعال مجاز نیست. ابتدا وضعیت پیمانکار را به «غیرفعال» تغییر دهید و سپس، پس از برداشتن تمام وابستگی‌ها، دوباره برای حذف اقدام کنید.');
+        }
         $guardedDelete('contractors', 'پیمانکار', (int)$id, [
             'contracts' => 'قراردادها',
             'invoices' => 'صورت‌وضعیت‌ها',

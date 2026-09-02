@@ -251,7 +251,7 @@ export function CreateTowerDialog({ open, onClose, onCreated, editRow, duplicate
                       onChange={(e) => onLineChange(e.target.value)}
                       title={isEdit ? "خط دکل در ویرایش قابل تغییر نیست — نام خط از بخش «خطوط انتقال» مدیریت می‌شود" : undefined}
                       className={isEdit
-                        ? "w-full h-9 rounded-md border border-input bg-slate-50 px-3 text-sm text-right cursor-not-allowed dark:bg-slate-800 dark:text-slate-400"
+                        ? "w-full h-9 rounded-md border border-input bg-slate-50 px-3 text-sm text-right cursor-default dark:bg-slate-800 dark:text-slate-400"
                         : "w-full h-9 rounded-md border border-input bg-white px-3 text-sm text-right cursor-pointer focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 dark:bg-slate-800 dark:text-slate-100"}
                     >
                       <option value="">بدون اتصال به خط</option>

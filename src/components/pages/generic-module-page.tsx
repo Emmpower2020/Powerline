@@ -12,7 +12,6 @@ import { Loader2 } from "lucide-react";
 import { ContractSelect } from "@/components/contract-select";
 import { SearchableSelect } from "@/components/searchable-select";
 import { DataTable, type DataTableColumn } from "@/components/data-table";
-import { CreateContractDialog, CreateSafetyDialog, CreatePersonnelDialog, CreateContractorDialog, CreateEquipmentDialog } from "@/components/create-dialogs";
 import type { PaginatedResponse } from "@/lib/types";
 import { GenericBulkActions } from "@/components/generic-bulk-actions";
 import { ImportExcelDialog } from "@/components/import-excel-dialog";
@@ -25,8 +24,7 @@ interface GenericItem { id: number; [key: string]: unknown }
 type GenericConfig = {
   title: string;
   columns: DataTableColumn<GenericItem>[];
-  create?: "contract" | "safety" | "personnel" | "contractor" | "equipment";
-  editKeys?: string[];
+    editKeys?: string[];
   importKeys?: string[];
   activityStatus?: boolean;
 };
@@ -101,7 +99,7 @@ const STATUS_OPTIONS: Record<string, Array<{ value: string; label: string }>> = 
 const CONTRACTOR_ID_SELECT_MODULES = new Set(["contracts", "invoices"]);
 
 const configs: Record<string, GenericConfig> = {
-  contracts: { title: "قراردادها", create: "contract", editKeys: ["title","contractor_id","contract_type","start_date","end_date","amount","status","notes"], importKeys: ["contract_code","title","contractor_id","contract_type","start_date","end_date","amount","status","notes"], columns: [
+  contracts: { title: "قراردادها", editKeys: ["contract_code","title","contractor_id","contract_type","start_date","end_date","amount","status","notes"], importKeys: ["contract_code","title","contractor_id","contract_type","start_date","end_date","amount","status","notes"], columns: [
     { key: "contract_code", header: "کد قرارداد", sortable: true, filterable: true, align: "left" },
     { key: "title", header: "عنوان قرارداد", sortable: true, filterable: true },
     { key: "contractor_name", header: "پیمانکار", sortable: true, filterable: true },
@@ -117,7 +115,7 @@ const configs: Record<string, GenericConfig> = {
     { key: "final_amount", header: "مبلغ نهایی", sortable: true, type: "number" },
     { key: "status", header: "وضعیت", type: "badge", badgeLabels: { draft: "پیش‌نویس", submitted: "ارسال", approved: "تأیید", paid: "پرداخت", rejected: "رد" }, badgeColors: { draft: "bg-slate-100 text-slate-700", submitted: "bg-blue-100 text-blue-700", approved: "bg-indigo-100 text-indigo-700", paid: "bg-green-100 text-green-700", rejected: "bg-red-100 text-red-700" } },
   ]},
-  "safety-incidents": { title: "حوادث ایمنی", create: "safety", editKeys: ["contract_id","title","incident_type","severity","description","location_desc","occurred_at","status"], importKeys: ["contract_id","title","incident_type","severity","description","location_desc","occurred_at"], columns: [
+  "safety-incidents": { title: "حوادث ایمنی", editKeys: ["contract_id","title","incident_type","severity","description","location_desc","occurred_at","status"], importKeys: ["contract_id","title","incident_type","severity","description","location_desc","occurred_at"], columns: [
     { key: "incident_code", header: "کد", sortable: true, filterable: true, align: "left" },
     { key: "contract_title", header: "قرارداد", sortable: true, filterable: true, wrap: true },
     { key: "title", header: "عنوان", sortable: true, filterable: true },
@@ -126,7 +124,7 @@ const configs: Record<string, GenericConfig> = {
     { key: "occurred_at", header: "تاریخ", type: "date" },
     { key: "status", header: "وضعیت", type: "badge", badgeLabels: { reported: "گزارش شده", under_investigation: "در حال بررسی", resolved: "حل شده", closed: "بسته شده" }, badgeColors: { reported: "bg-blue-100 text-blue-700", resolved: "bg-green-100 text-green-700", closed: "bg-slate-100 text-slate-500" } },
   ]},
-  "line-incidents": { title: "حوادث خطوط", create: "safety", editKeys: ["contract_id","title","incident_type","severity","description","location_desc","occurred_at","line_id","tower_id","status"], importKeys: ["contract_id","title","incident_type","severity","description","location_desc","occurred_at","line_id","tower_id"], columns: [
+  "line-incidents": { title: "حوادث خطوط", editKeys: ["contract_id","title","incident_type","severity","description","location_desc","occurred_at","line_id","tower_id","status"], importKeys: ["contract_id","title","incident_type","severity","description","location_desc","occurred_at","line_id","tower_id"], columns: [
     { key: "incident_code", header: "کد", sortable: true, filterable: true, align: "left" },
     { key: "contract_title", header: "قرارداد", sortable: true, filterable: true, wrap: true },
     { key: "line_code", header: "خط", sortable: true, filterable: true },
@@ -137,7 +135,7 @@ const configs: Record<string, GenericConfig> = {
     { key: "occurred_at", header: "تاریخ", type: "date", sortable: true },
     { key: "status", header: "وضعیت", type: "badge", badgeLabels: { reported: "گزارش شده", under_investigation: "در حال بررسی", resolved: "حل شده", closed: "بسته شده" }, badgeColors: { reported: "bg-blue-100 text-blue-700", resolved: "bg-green-100 text-green-700", closed: "bg-slate-100 text-slate-500" } },
   ]},
-  personnel: { title: "پرسنل", create: "personnel", activityStatus: true, editKeys: ["contract_id","first_name","last_name","personnel_type","position","phone","mobile","email","status"], importKeys: ["contract_id","first_name","last_name","personnel_type","position","phone","mobile","email","status"], columns: [
+  personnel: { title: "پرسنل", activityStatus: true, editKeys: ["contract_id","first_name","last_name","personnel_type","position","phone","mobile","email","status"], importKeys: ["contract_id","first_name","last_name","personnel_type","position","phone","mobile","email","status"], columns: [
     { key: "personnel_code", header: "کد", sortable: true, filterable: true, align: "left" },
     { key: "contract_title", header: "قرارداد", sortable: true, filterable: true, wrap: true },
     { key: "first_name", header: "نام", sortable: true, filterable: true },
@@ -146,7 +144,7 @@ const configs: Record<string, GenericConfig> = {
     { key: "position", header: "سمت", sortable: true, filterable: true },
     { key: "mobile", header: "موبایل", align: "left" },
   ]},
-  contractors: { title: "پیمانکاران", create: "contractor", activityStatus: true, editKeys: ["contractor_code","contractor_name","ceo_name","contractor_phone","mobile","address","status"], importKeys: ["contractor_code","contractor_name","ceo_name","contractor_phone","mobile","address","status"], columns: [
+  contractors: { title: "پیمانکاران", activityStatus: true, editKeys: ["contractor_code","contractor_name","ceo_name","contractor_phone","mobile","address","status"], importKeys: ["contractor_code","contractor_name","ceo_name","contractor_phone","mobile","address","status"], columns: [
     { key: "id", header: "ID", sortable: true, filterable: true, align: "left" },
     { key: "contractor_code", header: "کد پیمانکار", sortable: true, filterable: true, align: "left" },
     { key: "contractor_name", header: "نام پیمانکار", sortable: true, filterable: true, wrap: true },
@@ -158,7 +156,7 @@ const configs: Record<string, GenericConfig> = {
     { key: "created_at", header: "ایجاد", type: "date" },
     { key: "updated_at", header: "آخرین ویرایش", type: "date" },
   ]},
-  equipment: { title: "تجهیزات", create: "equipment", activityStatus: true, editKeys: ["contract_id","serial_number","manufacturer","model","install_date","warranty_expiry","status"], importKeys: ["contract_id","serial_number","manufacturer","model","install_date","warranty_expiry"], columns: [
+  equipment: { title: "تجهیزات", activityStatus: true, editKeys: ["contract_id","serial_number","manufacturer","model","install_date","warranty_expiry","status"], importKeys: ["contract_id","serial_number","manufacturer","model","install_date","warranty_expiry"], columns: [
     { key: "serial_number", header: "سریال", sortable: true, filterable: true, align: "left" },
     { key: "contract_title", header: "قرارداد", sortable: true, filterable: true, wrap: true },
     { key: "manufacturer", header: "سازنده", sortable: true, filterable: true },
@@ -213,6 +211,11 @@ function EditorDialog({
     e.preventDefault(); setSaving(true); setError(null);
     try {
       // اعتبارسنجی فرمت تاریخ شمسی: 1405/05/30
+      if (moduleKey === "contracts" && !String(form.contract_code ?? "").trim()) {
+        setError("کد قرارداد الزامی است و باید توسط کاربر وارد شود.");
+        setSaving(false);
+        return;
+      }
       for (const k of keys) {
         if (DATE_FIELDS.has(k) && (form[k] ?? "").trim() !== "") {
           if (!jalaliTextToIso(form[k] ?? "")) {
@@ -243,7 +246,7 @@ function EditorDialog({
     : (STATUS_OPTIONS[moduleKey] || null);
 
   const visibleKeys = moduleKey === "contracts"
-    ? ["title", "contractor_id", "contract_type", "amount", "start_date", "end_date", "status", "notes"].filter(k => keys.includes(k))
+    ? ["contract_code", "title", "contractor_id", "contract_type", "start_date", "end_date", "amount", "status", "notes"].filter(k => keys.includes(k))
     : keys;
 
   return <Dialog open={open} onOpenChange={v => !v && onClose()}>
@@ -389,26 +392,17 @@ export function GenericModulePage({ moduleKey, endpoint }: { moduleKey: string; 
 
   const makeDuplicate = (row: GenericItem) => {
     const copy: GenericItem = { ...row, id: -1 };
+    if (moduleKey === "contracts") copy.contract_code = "";
     setEditor({ open: true, mode: "create", row: copy });
   };
 
-  const renderCreate = () => {
-    const props = { open: showCreate, onClose: () => setShowCreate(false), onCreated: () => { setShowCreate(false); setRefreshKey(k => k + 1); } };
-    switch (config.create) {
-      case "contract": return <CreateContractDialog {...props} />;
-      case "safety": return <CreateSafetyDialog {...props} />;
-      case "personnel": return <CreatePersonnelDialog {...props} />;
-      case "contractor": return <CreateContractorDialog {...props} />;
-      case "equipment": return <CreateEquipmentDialog {...props} />;
-      default: return null;
-    }
-  };
+  const openCreateEditor = () => setEditor({ open: true, mode: "create", row: null });
 
   return <div className="space-y-4">
     <DataTable data={data} columns={config.columns} loading={loading}
       searchKeys={config.columns.map(c => c.key)} title={config.title}
       layoutKey={moduleKey}
-      onAdd={config.create ? () => setShowCreate(true) : (moduleKey === "invoices" ? () => setEditor({open:true,mode:"create",row:null}) : undefined)}
+      onAdd={selectedKeys.length ? openCreateEditor : undefined}
       onRefresh={() => setRefreshKey(k => k + 1)}
       onEdit={selectedKeys.length ? (row) => setEditor({open:true,mode:"edit",row}) : undefined}
       onDuplicate={selectedKeys.length ? makeDuplicate : undefined}
@@ -421,8 +415,7 @@ export function GenericModulePage({ moduleKey, endpoint }: { moduleKey: string; 
       }}
       toolbarExtra={(rows) => <GenericBulkActions rows={rows} endpoint={endpoint} entityName={config.title.replace("ها","")} onApplied={() => setRefreshKey(k => k + 1)} canToggleStatus={!!config.activityStatus} canChangeContract={!!config.editKeys?.includes("contract_id")} />}
     />
-    {renderCreate()}
-    <EditorDialog open={editor.open} row={editor.row} keys={selectedKeys} title={config.title} moduleKey={moduleKey} mode={editor.mode} endpoint={endpoint} activityStatus={!!config.activityStatus} onClose={() => setEditor({open:false,mode:editor.mode,row:null})} onSaved={() => { setEditor({open:false,mode:editor.mode,row:null}); setRefreshKey(k => k + 1); }} />
+    <EditorDialog open={editor.open} row={editor.row} keys={selectedKeys} title={config.title} moduleKey={moduleKey} mode={editor.mode} endpoint={endpoint} activityStatus={!!config.activityStatus} onClose={() => setEditor(prev => ({...prev, open:false, row:null}))} onSaved={() => { setEditor(prev => ({...prev, open:false, row:null})); setRefreshKey(k => k + 1); }} />
 
     {/* ورود انبوه استاندارد از اکسل — همان تجربه مدارها/خطوط */}
     <ImportExcelDialog
