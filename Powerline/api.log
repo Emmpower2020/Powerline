@@ -1,0 +1,28 @@
+[2026-09-02 21:26:41] [ERROR] [IP:127.0.0.1] [GET /api.php/backend-version] Undefined variable $personnelPositionCol in C:\Users\Every One\.zcode\workspace\default\base68\Powerline\endpoints\modules.php:581
+[2026-09-02 21:26:41] [ERROR] [IP:127.0.0.1] [GET /api.php/backend-version] Undefined variable $personnelCols in C:\Users\Every One\.zcode\workspace\default\base68\Powerline\endpoints\modules.php:581
+[2026-09-02 21:26:41] [INFO] [IP:127.0.0.1] [GET /api.php/backend-version] API request Context: {"method":"GET","uri":"/api.php/backend-version"}
+[2026-09-02 21:26:41] [ERROR] [IP:127.0.0.1] [GET /api.php/personnel?page=1&page_size=5] Undefined variable $personnelPositionCol in C:\Users\Every One\.zcode\workspace\default\base68\Powerline\endpoints\modules.php:581
+[2026-09-02 21:26:41] [ERROR] [IP:127.0.0.1] [GET /api.php/personnel?page=1&page_size=5] Undefined variable $personnelCols in C:\Users\Every One\.zcode\workspace\default\base68\Powerline\endpoints\modules.php:581
+[2026-09-02 21:26:41] [INFO] [IP:127.0.0.1] [GET /api.php/personnel?page=1&page_size=5] API request Context: {"method":"GET","uri":"/api.php/personnel?page=1&page_size=5"}
+[2026-09-02 21:26:41] [ERROR] [IP:127.0.0.1] [GET /api.php/personnel?page=1&page_size=5] Uncaught exception: Value of type null is not callable
+#0 C:\Users\Every One\.zcode\workspace\default\base68\Powerline\lib\Router.php(120): {closure}()
+#1 C:\Users\Every One\.zcode\workspace\default\base68\Powerline\api.php(102): Router->dispatch()
+#2 {main}
+[2026-09-02 21:27:55] [ERROR] [IP:127.0.0.1] [GET /api.php/personnel?page=1&page_size=5] Undefined variable $personnelPositionCol in C:\Users\Every One\.zcode\workspace\default\base68\Powerline\endpoints\modules.php:581
+[2026-09-02 21:31:48] [INFO] [IP:127.0.0.1] [GET /api.php/personnel?page=1&page_size=5] API request Context: {"method":"GET","uri":"/api.php/personnel?page=1&page_size=5"}
+[2026-09-02 21:32:03] [INFO] [IP:127.0.0.1] [GET /api.php/bootstrap] API request Context: {"method":"GET","uri":"/api.php/bootstrap"}
+[2026-09-02 21:32:03] [INFO] [IP:127.0.0.1] [POST /api.php/personnel] API request Context: {"method":"POST","uri":"/api.php/personnel"}
+[2026-09-02 21:32:03] [INFO] [IP:127.0.0.1] [POST /api.php/personnel/bulk-import] API request Context: {"method":"POST","uri":"/api.php/personnel/bulk-import"}
+[2026-09-02 21:32:20] [INFO] [IP:127.0.0.1] [PUT /api.php/personnel/328] API request Context: {"method":"PUT","uri":"/api.php/personnel/328"}
+[2026-09-02 21:32:20] [INFO] [IP:127.0.0.1] [POST /api.php/personnel/bulk-delete] API request Context: {"method":"POST","uri":"/api.php/personnel/bulk-delete"}
+[2026-09-02 21:32:20] [INFO] [IP:127.0.0.1] [POST /api.php/personnel/bulk-delete] Personnel bulk-deleted Context: {"count":2,"skipped":0,"user_id":1}
+[2026-09-02 21:33:02] [INFO] [IP:127.0.0.1] [GET /api.php/personnel?page=1&page_size=3] API request Context: {"method":"GET","uri":"/api.php/personnel?page=1&page_size=3"}
+[2026-09-02 21:33:02] [INFO] [IP:127.0.0.1] [GET /api.php/backend-version] API request Context: {"method":"GET","uri":"/api.php/backend-version"}
+[2026-09-02 21:33:25] [INFO] [IP:127.0.0.1] [GET /api.php/personnel?page=1&page_size=2] API request Context: {"method":"GET","uri":"/api.php/personnel?page=1&page_size=2"}
+[2026-09-02 21:33:25] [INFO] [IP:127.0.0.1] [GET /api.php/bootstrap] API request Context: {"method":"GET","uri":"/api.php/bootstrap"}
+[2026-09-02 21:33:26] [INFO] [IP:127.0.0.1] [GET /api.php/tower-structures] API request Context: {"method":"GET","uri":"/api.php/tower-structures"}
+[2026-09-02 21:33:26] [INFO] [IP:127.0.0.1] [GET /api.php/tower-type-codes] API request Context: {"method":"GET","uri":"/api.php/tower-type-codes"}
+[2026-09-02 21:33:26] [INFO] [IP:127.0.0.1] [GET /api.php/contracts] API request Context: {"method":"GET","uri":"/api.php/contracts"}
+[2026-09-02 21:46:15] [INFO] [IP:127.0.0.1] [POST /api.php/personnel/bulk-import] API request Context: {"method":"POST","uri":"/api.php/personnel/bulk-import"}
+[2026-09-02 21:46:28] [INFO] [IP:127.0.0.1] [POST /api.php/personnel/bulk-import] API request Context: {"method":"POST","uri":"/api.php/personnel/bulk-import"}
+[2026-09-02 21:46:47] [INFO] [IP:127.0.0.1] [GET /api.php/personnel?page=1&page_size=50] API request Context: {"method":"GET","uri":"/api.php/personnel?page=1&page_size=50"}

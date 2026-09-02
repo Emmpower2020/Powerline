@@ -6,6 +6,34 @@
 
 function registerModuleRoutes(Router $router): void
 {
+    // v4.3.69: ستون «سمت» پرسنل در نسخه‌های مختلف دیتابیس یا position است یا
+    // personnel_type — کوئری‌ها با ستون واقعی ساخته می‌شوند تا import روی
+    // هر دو ساختار بدون خطای «Unknown column» کار کند.
+    // v4.3.70: جدول personnel در نسخه‌های مختلف دیتابیس ستون‌های متفاوتی دارد
+    // (position / personnel_type / phone / collaboration_start ممکن است نباشند).
+    // کوئری‌ها فقط با ستون‌های واقعی موجود ساخته می‌شوند تا هیچ‌وقت
+    // «Unknown column» و خطای ۵۰۰ رخ ندهد.
+    $personnelCols = function (PDO $pdo): array {
+        $cols = [];
+        foreach ($pdo->query('SHOW COLUMNS FROM personnel')->fetchAll() as $c) {
+            if (isset($c['Field'])) $cols[$c['Field']] = true;
+        }
+        return $cols;
+    };
+    $personnelPositionCol = function (PDO $pdo) use ($personnelCols) {
+        $cols = $personnelCols($pdo);
+        if (isset($cols['position'])) return 'position';
+        if (isset($cols['personnel_type'])) return 'personnel_type';
+        return null; // هیچ ستون سمدی وجود ندارد
+    };
+
+    // v4.3.70: نمایش نسخه بک‌اند برای اطمینان از آپلود درست فایل‌ها
+    // (بدون نیاز به لاگین — فقط شماره نسخه برمی‌گرداند)
+    $router->get('backend-version', function () {
+        Response::success(['version' => 'v4.3.70', 'component' => 'Powerline PHP Backend'], 'نسخه بک‌اند');
+    });
+
+
     // ─────────────────────────────────────────────────────────────
     // v4.3.55: سازگاری جداول مرجع دکل با هر دو ساختار دیتابیس
     // نسخه‌های مختلف دیتابیس یا ستون `status` (varchar) دارند یا `is_active` (tinyint).
@@ -596,27 +624,6 @@ function registerModuleRoutes(Router $router): void
         $stmt->execute($params);
         Response::paginated($stmt->fetchAll(), $page, $pageSize, $total);
     });
-
-    // v4.3.69: ستون «سمت» پرسنل در نسخه‌های مختلف دیتابیس یا position است یا
-    // personnel_type — کوئری‌ها با ستون واقعی ساخته می‌شوند تا import روی
-    // هر دو ساختار بدون خطای «Unknown column» کار کند.
-    // v4.3.70: جدول personnel در نسخه‌های مختلف دیتابیس ستون‌های متفاوتی دارد
-    // (position / personnel_type / phone / collaboration_start ممکن است نباشند).
-    // کوئری‌ها فقط با ستون‌های واقعی موجود ساخته می‌شوند تا هیچ‌وقت
-    // «Unknown column» و خطای ۵۰۰ رخ ندهد.
-    $personnelCols = function (PDO $pdo): array {
-        $cols = [];
-        foreach ($pdo->query('SHOW COLUMNS FROM personnel')->fetchAll() as $c) {
-            if (isset($c['Field'])) $cols[$c['Field']] = true;
-        }
-        return $cols;
-    };
-    $personnelPositionCol = function (PDO $pdo) use ($personnelCols) {
-        $cols = $personnelCols($pdo);
-        if (isset($cols['position'])) return 'position';
-        if (isset($cols['personnel_type'])) return 'personnel_type';
-        return null; // هیچ ستون سمدی وجود ندارد
-    };
 
     $router->post('personnel', function () use ($personnelPositionCol, $personnelCols) {
         Auth::authenticate();

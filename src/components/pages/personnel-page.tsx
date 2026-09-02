@@ -183,7 +183,7 @@ export function PersonnelPage() {
     { key: "last_name", header: "نام خانوادگی" },
     { key: "national_id", header: "کد ملی" },
     { key: "father_name", header: "نام پدر" },
-    { key: "position", header: "پست" },
+    { key: "position", header: "سمت" },
     { key: "mobile", header: "شماره همراه" },
     { key: "supervisor_name", header: "سرپرست" },
     { key: "collaboration_start", header: "تاریخ شروع همکاری" },
