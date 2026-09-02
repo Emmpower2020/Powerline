@@ -21,7 +21,7 @@ import { usePersonnelOptions } from "@/hooks/use-personnel-options";
 import { useToast } from "@/hooks/use-toast";
 import { useTowerReferences } from "@/hooks/use-tower-references";
 import { ContractSelect } from "@/components/contract-select";
-import { BulkOperationDialog, type BulkOperationProgress } from "@/components/bulk-operation-dialog";
+import { BulkOperationPanel, type BulkOperationProgress } from "@/components/bulk-operation-dialog";
 
 interface BulkLinesActionsProps {
   /** ردیف‌های انتخاب‌شده — در لحظهٔ کلیک از جدول خوانده می‌شود */
@@ -100,9 +100,8 @@ export function BulkLinesActions({ getSelection, onApplied }: BulkLinesActionsPr
 
   const requestPatch = (targetRows: any[], patch: Record<string, unknown>, successText: string) => {
     if (targetRows.length === 0) return;
-    // ابتدا دیالوگ انتخاب مقدار را می‌بندیم تا با دیالوگ تأیید عملیات گروهی
-    // هم‌زمان باز نباشد؛ این کار از تداخل Radix Dialog/Popover و خطای کلاینت جلوگیری می‌کند.
-    setFieldAction(null);
+    // دیالوگ بسته نمی‌شود؛ محتوای همان پنجره به مرحلهٔ «تأیید عملیات» عوض می‌شود
+    // تا نور پس‌زمینه بین دو مرحله فلش نزند و حس پرش پنجره نداشته باشیم.
     setPendingOperation({ rows: targetRows, patch, label: successText });
     setProgress({ completed: 0, total: targetRows.length, success: 0, failed: 0 });
     setOperationOpen(true);
@@ -127,6 +126,7 @@ export function BulkLinesActions({ getSelection, onApplied }: BulkLinesActionsPr
       }
       onApplied();
       setOperationOpen(false);
+      setFieldAction(null);
       if (errors.length === 0) toast({ title: "انجام شد", description: `${successText} — ${success.toLocaleString("fa-IR")} ردیف` });
       else toast({ title: "اعمال ناقص", description: `${success.toLocaleString("fa-IR")} ردیف موفق، ${errors.length.toLocaleString("fa-IR")} ناموفق — اولین خطا: ${errors[0]}`, variant: "destructive" });
     } finally {
@@ -168,7 +168,8 @@ export function BulkLinesActions({ getSelection, onApplied }: BulkLinesActionsPr
     requestPatch(rows, patch, actionMeta[fieldAction].title.replace("تغییر گروهی ", "") + " تغییر کرد");
   };
 
-  const dialogOpen = fieldAction !== null;
+  // یک پنجره برای هر دو مرحله: انتخاب مقدار و تأیید/اجرای عملیات گروهی
+  const dialogOpen = fieldAction !== null || operationOpen;
 
   return (
     <>
@@ -207,14 +208,27 @@ export function BulkLinesActions({ getSelection, onApplied }: BulkLinesActionsPr
         </DropdownMenuContent>
       </DropdownMenu>
 
-      {/* دیالوگ مقدار برای تغییرات گروهی */}
-      <Dialog open={dialogOpen} onOpenChange={(o) => { if (!o && !applying) setFieldAction(null); }}>
+      {/* دیالوگ یکپارچه: مرحلهٔ انتخاب مقدار → مرحلهٔ تأیید/اجرا (بدون بسته‌شدن پنجره) */}
+      <Dialog open={dialogOpen} onOpenChange={(o) => { if (!o && !applying) { setFieldAction(null); setOperationOpen(false); setPendingOperation(null); } }}>
         <DialogContent className="max-w-md" dir="rtl">
           <DialogHeader>
             <DialogTitle className="text-right">
-              {fieldAction ? actionMeta[fieldAction].title : ""}
+              {operationOpen
+                ? (applying ? `در حال اجرای ${pendingOperation?.label ?? "عملیات گروهی"}` : "تأیید عملیات گروهی")
+                : (fieldAction ? actionMeta[fieldAction].title : "")}
             </DialogTitle>
           </DialogHeader>
+          {operationOpen ? (
+            <BulkOperationPanel
+              entityName="خط"
+              operationLabel={pendingOperation?.label ?? "عملیات گروهی"}
+              progress={progress}
+              running={applying}
+              onCancel={() => { if (!applying) { setOperationOpen(false); setPendingOperation(null); } }}
+              onConfirm={applyPatch}
+            />
+          ) : (
+          <>
           <div className="space-y-3">
             <p className="text-sm text-slate-500 text-right">
               این مقدار روی <span className="font-bold text-indigo-600 nums-fa">{rows.length.toLocaleString("fa-IR")}</span> خط انتخاب‌شده اعمال می‌شود.
@@ -318,18 +332,10 @@ export function BulkLinesActions({ getSelection, onApplied }: BulkLinesActionsPr
               {applying ? <><Loader2 className="w-4 h-4 ml-2 animate-spin" />در حال اعمال...</> : "اعمال روی همه"}
             </Button>
           </DialogFooter>
+          </>
+          )}
         </DialogContent>
       </Dialog>
-
-      <BulkOperationDialog
-        open={operationOpen}
-        entityName="خط"
-        operationLabel={pendingOperation?.label ?? "عملیات گروهی"}
-        progress={progress}
-        running={applying}
-        onCancel={() => { if (!applying) { setOperationOpen(false); setPendingOperation(null); } }}
-        onConfirm={applyPatch}
-      />
     </>
   );
 }

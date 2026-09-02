@@ -7,7 +7,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "
 import { useToast } from "@/hooks/use-toast";
 import { apiClient } from "@/lib/api-client";
 import { ContractSelect } from "@/components/contract-select";
-import { BulkOperationDialog, type BulkOperationProgress } from "@/components/bulk-operation-dialog";
+import { BulkOperationPanel, type BulkOperationProgress } from "@/components/bulk-operation-dialog";
 
 export function GenericBulkActions({
   rows,
@@ -60,6 +60,7 @@ export function GenericBulkActions({
       }
       onApplied();
       setOperationOpen(false);
+      setContractOpen(false);
       toast({
         title: fail ? "اعمال ناقص" : "انجام شد",
         description: `${ok.toLocaleString("fa-IR")} ${entityName} با موفقیت ${pendingRun.label} شد${fail ? `، ${fail.toLocaleString("fa-IR")} مورد ناموفق بود` : ""}`,
@@ -85,8 +86,7 @@ export function GenericBulkActions({
       toast({ title: "قرارداد را انتخاب کنید" });
       return;
     }
-    setContractOpen(false);
-    // «نامشخص» → قرارداد ردیف‌ها پاک می‌شود (NULL)
+    // «نامشخص» → قرارداد ردیف‌ها پاک می‌شود (NULL)؛ پنجره باز می‌ماند و به مرحلهٔ تأیید می‌رود
     const isUnknown = contractId === "__unknown__";
     requestRun(
       { contract_id: isUnknown ? null : Number(contractId) },
@@ -117,28 +117,38 @@ export function GenericBulkActions({
       </DropdownMenuContent>
     </DropdownMenu>
 
-    <Dialog open={contractOpen} onOpenChange={(open) => !busy && setContractOpen(open)}>
+    {/* دیالوگ یکپارچه: انتخاب قرارداد → تأیید/اجرا در همان پنجره (بدون فلش نور پس‌زمینه) */}
+    <Dialog open={contractOpen || operationOpen} onOpenChange={(open) => { if (!open && !busy) { setContractOpen(false); setOperationOpen(false); setPendingRun(null); } }}>
       <DialogContent className="max-w-md" dir="rtl">
-        <DialogHeader><DialogTitle className="text-right">تغییر گروهی قرارداد</DialogTitle></DialogHeader>
-        <div className="space-y-3">
-          <p className="text-sm text-slate-500 text-right">قرارداد انتخاب‌شده روی <span className="font-bold text-indigo-600 nums-fa">{rows.length.toLocaleString("fa-IR")}</span> ردیف اعمال می‌شود. برای پاک کردن قرارداد «نامشخص» را انتخاب کنید.</p>
-          <ContractSelect value={contractId} onChange={setContractId} preserveUnknownValue />
-        </div>
-        <DialogFooter>
-          <Button type="button" variant="outline" onClick={() => setContractOpen(false)} disabled={busy}>انصراف</Button>
-          <Button type="button" className="bg-indigo-600 hover:bg-indigo-700" onClick={applyContract} disabled={busy || !contractId}>اعمال روی همه</Button>
-        </DialogFooter>
+        <DialogHeader>
+          <DialogTitle className="text-right">
+            {operationOpen
+              ? (busy ? `در حال اجرای ${pendingRun?.label ?? "عملیات گروهی"}` : "تأیید عملیات گروهی")
+              : "تغییر گروهی قرارداد"}
+          </DialogTitle>
+        </DialogHeader>
+        {operationOpen ? (
+          <BulkOperationPanel
+            entityName={entityName}
+            operationLabel={pendingRun?.label ?? "عملیات گروهی"}
+            progress={progress}
+            running={busy}
+            onCancel={() => { if (!busy) { setOperationOpen(false); setPendingRun(null); } }}
+            onConfirm={run}
+          />
+        ) : (
+          <>
+            <div className="space-y-3">
+              <p className="text-sm text-slate-500 text-right">قرارداد انتخاب‌شده روی <span className="font-bold text-indigo-600 nums-fa">{rows.length.toLocaleString("fa-IR")}</span> ردیف اعمال می‌شود. برای پاک کردن قرارداد «نامشخص» را انتخاب کنید.</p>
+              <ContractSelect value={contractId} onChange={setContractId} preserveUnknownValue />
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setContractOpen(false)} disabled={busy}>انصراف</Button>
+              <Button type="button" className="bg-indigo-600 hover:bg-indigo-700" onClick={applyContract} disabled={busy || !contractId}>اعمال روی همه</Button>
+            </DialogFooter>
+          </>
+        )}
       </DialogContent>
     </Dialog>
-
-    <BulkOperationDialog
-      open={operationOpen}
-      entityName={entityName}
-      operationLabel={pendingRun?.label ?? "عملیات گروهی"}
-      progress={progress}
-      running={busy}
-      onCancel={() => { if (!busy) { setOperationOpen(false); setPendingRun(null); } }}
-      onConfirm={run}
-    />
   </>;
 }
