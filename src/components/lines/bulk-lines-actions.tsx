@@ -247,12 +247,12 @@ export function BulkLinesActions({ getSelection, onApplied }: BulkLinesActionsPr
 
             {fieldAction === "contract" ? (
               <div className="space-y-2">
-                <Label className="text-right block">قرارداد</Label>
+                <Label className="text-right block text-xs text-slate-600 dark:text-slate-300">قرارداد</Label>
                 <ContractSelect value={value} onChange={setValue} preserveUnknownValue />
               </div>
             ) : fieldAction === "contractor" ? (
               <div className="space-y-2">
-                <Label className="text-right block">{actionMeta.contractor.label}</Label>
+                <Label className="text-right block text-xs text-slate-600 dark:text-slate-300">{actionMeta.contractor.label}</Label>
                 {contractorsLoaded ? (
                   <Select value={value} onValueChange={setValue}>
                     <SelectTrigger className="w-full bg-white"><SelectValue placeholder="انتخاب پیمانکار..." /></SelectTrigger>
@@ -270,7 +270,7 @@ export function BulkLinesActions({ getSelection, onApplied }: BulkLinesActionsPr
               </div>
             ) : fieldAction === "voltage" ? (
               <div className="space-y-2">
-                <Label className="text-right block">{actionMeta.voltage.label}</Label>
+                <Label className="text-right block text-xs text-slate-600 dark:text-slate-300">{actionMeta.voltage.label}</Label>
                 <Select value={value} onValueChange={setValue}>
                   <SelectTrigger className="w-full bg-white"><SelectValue placeholder="انتخاب ولتاژ..." /></SelectTrigger>
                   <SelectContent>
@@ -285,7 +285,7 @@ export function BulkLinesActions({ getSelection, onApplied }: BulkLinesActionsPr
             ) : fieldAction === "supervisor" ? (
               // v3.0.0: سرپرست خط از پرسنل با کمبوباکس قابل جستجو
               <div className="space-y-2">
-                <Label className="text-right block">{actionMeta.supervisor.label}</Label>
+                <Label className="text-right block text-xs text-slate-600 dark:text-slate-300">{actionMeta.supervisor.label}</Label>
                 <SearchableSelect
                   value={value}
                   onChange={setValue}
@@ -297,7 +297,7 @@ export function BulkLinesActions({ getSelection, onApplied }: BulkLinesActionsPr
             ) : fieldAction === "expert" ? (
               // v3.0.0: کارشناس خط از پرسنل با کمبوباکس قابل جستجو
               <div className="space-y-2">
-                <Label className="text-right block">{actionMeta.expert.label}</Label>
+                <Label className="text-right block text-xs text-slate-600 dark:text-slate-300">{actionMeta.expert.label}</Label>
                 <SearchableSelect
                   value={value}
                   onChange={setValue}
@@ -309,7 +309,7 @@ export function BulkLinesActions({ getSelection, onApplied }: BulkLinesActionsPr
             ) : fieldAction === "conductor_type" ? (
               // v3.4.1: نوع سیم از فهرست استاندارد هادی‌ها
               <div className="space-y-2">
-                <Label className="text-right block">{actionMeta.conductor_type.label}</Label>
+                <Label className="text-right block text-xs text-slate-600 dark:text-slate-300">{actionMeta.conductor_type.label}</Label>
                 <SearchableSelect
                   value={value}
                   onChange={setValue}
@@ -321,7 +321,7 @@ export function BulkLinesActions({ getSelection, onApplied }: BulkLinesActionsPr
             ) : fieldAction === "tower_structure" ? (
               // v3.4.1: نوع سازه دکل از مقادیر معتبر دیتابیس
               <div className="space-y-2">
-                <Label className="text-right block">{actionMeta.tower_structure.label}</Label>
+                <Label className="text-right block text-xs text-slate-600 dark:text-slate-300">{actionMeta.tower_structure.label}</Label>
                 <SearchableSelect
                   value={value}
                   onChange={setValue}

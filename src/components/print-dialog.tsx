@@ -262,19 +262,19 @@ export function PrintDialog({
           <div className="space-y-4 p-4 bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-slate-200 dark:border-slate-700">
             {/* عنوان */}
             <div className="space-y-2">
-              <Label className="text-right block">عنوان گزارش</Label>
+              <Label className="text-right block text-xs text-slate-600 dark:text-slate-300">عنوان گزارش</Label>
               <Input value={title} onChange={e => setTitle(e.target.value)} disabled={printing} className="text-right" placeholder="عنوان گزارش..." />
             </div>
 
             {/* زیرعنوان */}
             <div className="space-y-2">
-              <Label className="text-right block">زیرعنوان (اختیاری)</Label>
+              <Label className="text-right block text-xs text-slate-600 dark:text-slate-300">زیرعنوان (اختیاری)</Label>
               <Input value={subtitle} onChange={e => setSubtitle(e.target.value)} disabled={printing} className="text-right" placeholder="مثلاً: بازه زمانی ۱۴۰۰ تا ۱۴۰۳، منطقه کرمانشاه..." />
             </div>
 
             {/* جهت صفحه */}
             <div className="space-y-2">
-              <Label className="text-right block">جهت صفحه</Label>
+              <Label className="text-right block text-xs text-slate-600 dark:text-slate-300">جهت صفحه</Label>
               <div className="grid grid-cols-2 gap-2">
                 <button type="button" onClick={() => setOrientation("landscape")} disabled={printing}
                   className={cn("px-3 py-2 rounded border text-sm cursor-pointer transition-colors flex items-center gap-2",
@@ -293,7 +293,7 @@ export function PrintDialog({
 
             {/* محدوده صفحه — ردیف جداگانه */}
             <div className="space-y-2">
-              <Label className="text-right block">محدوده صفحه</Label>
+              <Label className="text-right block text-xs text-slate-600 dark:text-slate-300">محدوده صفحه</Label>
               <div className="grid grid-cols-3 gap-2">
                 <button type="button" onClick={() => setScope("current")} disabled={printing || currentCount === 0}
                   className={cn("px-3 py-2 rounded border text-sm cursor-pointer transition-colors text-center",
@@ -321,7 +321,7 @@ export function PrintDialog({
           {/* انتخاب ستون‌ها با checkbox */}
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <Label className="text-right block">ستون‌های چاپ</Label>
+              <Label className="text-right block text-xs text-slate-600 dark:text-slate-300">ستون‌های چاپ</Label>
               <div className="flex gap-2 text-xs">
                 <button type="button" onClick={selectVisibleColumns} disabled={printing}
                   className="text-indigo-600 hover:text-indigo-700 cursor-pointer">ستون‌های نمایش</button>

@@ -73,9 +73,9 @@ export function SettingsPage() {
         <CardContent>
           <form onSubmit={handleChangePassword} className="space-y-4 max-w-md">
             {message && <div className={`p-3 rounded-lg text-sm text-right ${message.type === "success" ? "bg-green-50 text-green-600" : "bg-red-50 text-red-600"}`}>{message.text}</div>}
-            <div className="space-y-2"><Label className="text-right block">رمز فعلی</Label><Input type="password" value={oldPassword} onChange={e => setOldPassword(e.target.value)} className="text-right" /></div>
-            <div className="space-y-2"><Label className="text-right block">رمز جدید</Label><Input type="password" value={newPassword} onChange={e => setNewPassword(e.target.value)} className="text-right" /></div>
-            <div className="space-y-2"><Label className="text-right block">تکرار رمز جدید</Label><Input type="password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} className="text-right" /></div>
+            <div className="space-y-2"><Label className="text-right block text-xs text-slate-600 dark:text-slate-300">رمز فعلی</Label><Input type="password" value={oldPassword} onChange={e => setOldPassword(e.target.value)} className="text-right" /></div>
+            <div className="space-y-2"><Label className="text-right block text-xs text-slate-600 dark:text-slate-300">رمز جدید</Label><Input type="password" value={newPassword} onChange={e => setNewPassword(e.target.value)} className="text-right" /></div>
+            <div className="space-y-2"><Label className="text-right block text-xs text-slate-600 dark:text-slate-300">تکرار رمز جدید</Label><Input type="password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} className="text-right" /></div>
             <Button type="submit" disabled={saving} className="bg-indigo-600 hover:bg-indigo-700">{saving ? <><Loader2 className="w-4 h-4 ml-2 animate-spin" />در حال ذخیره...</> : <><Save className="w-4 h-4 ml-2" />ذخیره</>}</Button>
           </form>
         </CardContent>

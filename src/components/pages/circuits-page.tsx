@@ -366,7 +366,7 @@ function CircuitDialog({ open, editRow, duplicateFrom, existingCodes, onClose, o
       <DialogContent className="max-w-lg">
         <DialogHeader>
           <DialogTitle className="text-right">
-            {editRow ? `ویرایش مدار: ${editRow.dispatch_code}` : isDuplicate ? `مدار جدید (کپی از: ${duplicateFrom?.dispatch_code})` : "مدار جدید"}
+            {editRow ? `ویرایش مدار: ${editRow.dispatch_code}` : isDuplicate ? `کپی مدار جدید (از: ${duplicateFrom?.dispatch_code})` : "ثبت مدار جدید"}
           </DialogTitle>
         </DialogHeader>
         <form onSubmit={submit} className="space-y-4">
@@ -374,7 +374,7 @@ function CircuitDialog({ open, editRow, duplicateFrom, existingCodes, onClose, o
           <FormSection title="مشخصات مدار">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="space-y-2">
-              <Label className="text-right block">کد دیسپاچینگ (اجباری)</Label>
+              <Label className="text-right block text-xs text-slate-600 dark:text-slate-300">کد دیسپاچینگ (اجباری)</Label>
               <Input
                 value={form.dispatch_code}
                 onChange={e => setForm({ ...form, dispatch_code: e.target.value.toUpperCase() })}
@@ -384,7 +384,7 @@ function CircuitDialog({ open, editRow, duplicateFrom, existingCodes, onClose, o
               />
             </div>
             <div className="space-y-2">
-              <Label className="text-right block">ولتاژ (اجباری)</Label>
+              <Label className="text-right block text-xs text-slate-600 dark:text-slate-300">ولتاژ (اجباری)</Label>
               <SearchableSelect
                 value={form.voltage}
                 onChange={v => setForm({ ...form, voltage: v })}
@@ -397,11 +397,11 @@ function CircuitDialog({ open, editRow, duplicateFrom, existingCodes, onClose, o
             </div>
           </div>
           <div className="space-y-2">
-            <Label className="text-right block">قرارداد</Label>
+            <Label className="text-right block text-xs text-slate-600 dark:text-slate-300">قرارداد</Label>
             <ContractSelect value={form.contract_id} onChange={v => setForm({ ...form, contract_id: v })} />
           </div>
           <div className="space-y-2">
-            <Label className="text-right block">نام مدار</Label>
+            <Label className="text-right block text-xs text-slate-600 dark:text-slate-300">نام مدار</Label>
             <Input
               value={form.name}
               onChange={e => setForm({ ...form, name: e.target.value })}

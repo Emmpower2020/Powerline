@@ -971,6 +971,7 @@ function DataTableInner<T extends { id: number }>({
                         key={col.key}
                         className={cn(
                           "p-2",
+                          "text-slate-700 dark:text-slate-300",
                           col.wrap ? "whitespace-normal break-words align-top" : "whitespace-nowrap",
                           "text-right"
                         )}

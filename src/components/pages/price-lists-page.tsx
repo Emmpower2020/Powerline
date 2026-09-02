@@ -345,25 +345,25 @@ function CreatePriceListDialog({ open, onClose, onCreated }: { open: boolean; on
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
-          <DialogTitle className="text-right">فهرست بها جدید</DialogTitle>
+          <DialogTitle className="text-right">ثبت فهرست بها جدید</DialogTitle>
         </DialogHeader>
         <form onSubmit={submit} className="space-y-4">
           {error && <div className="bg-red-50 dark:bg-red-950 text-red-600 text-sm p-3 rounded-lg text-right">{error}</div>}
           <div className="space-y-2">
-            <Label className="text-right block">نام فهرست (اجباری)</Label>
+            <Label className="text-right block text-xs text-slate-600 dark:text-slate-300">نام فهرست (اجباری)</Label>
             <Input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder="مثلاً: فهرست بها ۱۴۰۵" className="text-right" autoFocus />
           </div>
           <div className="space-y-2">
-            <Label className="text-right block">قرارداد</Label>
+            <Label className="text-right block text-xs text-slate-600 dark:text-slate-300">قرارداد</Label>
             <ContractSelect value={form.contract_id} onChange={v => setForm({ ...form, contract_id: v })} />
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="space-y-2">
-              <Label className="text-right block">نسخه</Label>
+              <Label className="text-right block text-xs text-slate-600 dark:text-slate-300">نسخه</Label>
               <Input value={form.version} onChange={e => setForm({ ...form, version: e.target.value })} placeholder="1405.1" className="text-right" />
             </div>
             <div className="space-y-2">
-              <Label className="text-right block">تاریخ اجرا</Label>
+              <Label className="text-right block text-xs text-slate-600 dark:text-slate-300">تاریخ اجرا</Label>
               <JalaliDatePicker value={form.effective_date} onChange={v => setForm({ ...form, effective_date: v })} />
             </div>
           </div>
@@ -413,32 +413,32 @@ function CreatePriceListItemDialog({ open, priceListId, onClose, onCreated }: {
       <DialogContent className="max-w-lg">
         <DialogHeader>
           <DialogTitle className="text-right">
-            <span className="flex items-center gap-2"><FileSpreadsheet className="w-5 h-5 text-indigo-600" />قلم جدید فهرست بها</span>
+            <span className="flex items-center gap-2"><FileSpreadsheet className="w-5 h-5 text-indigo-600" />ثبت قلم جدید فهرست بها</span>
           </DialogTitle>
         </DialogHeader>
         <form onSubmit={submit} className="space-y-4">
           {error && <div className="bg-red-50 dark:bg-red-950 text-red-600 text-sm p-3 rounded-lg text-right">{error}</div>}
           <div className="space-y-2">
-            <Label className="text-right block">شرح قلم (اجباری)</Label>
+            <Label className="text-right block text-xs text-slate-600 dark:text-slate-300">شرح قلم (اجباری)</Label>
             <Input value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} placeholder="مثلاً: تعویض مقره پلیمری" className="text-right" autoFocus />
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="space-y-2">
-              <Label className="text-right block">کد (خالی = خودکار)</Label>
+              <Label className="text-right block text-xs text-slate-600 dark:text-slate-300">کد (خالی = خودکار)</Label>
               <Input value={form.code} onChange={e => setForm({ ...form, code: e.target.value })} placeholder="P-006" dir="ltr" className="text-left" />
             </div>
             <div className="space-y-2">
-              <Label className="text-right block">واحد</Label>
+              <Label className="text-right block text-xs text-slate-600 dark:text-slate-300">واحد</Label>
               <Input value={form.unit} onChange={e => setForm({ ...form, unit: e.target.value })} className="text-right" />
             </div>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="space-y-2">
-              <Label className="text-right block">بهای واحد (ریال)</Label>
+              <Label className="text-right block text-xs text-slate-600 dark:text-slate-300">بهای واحد (ریال)</Label>
               <Input type="text" value={form.unit_price} onChange={e => setForm({ ...form, unit_price: e.target.value.replace(/[^0-9.]/g, "") })} dir="ltr" className="text-left" />
             </div>
             <div className="space-y-2">
-              <Label className="text-right block">دسته</Label>
+              <Label className="text-right block text-xs text-slate-600 dark:text-slate-300">دسته</Label>
               <Select value={form.category} onValueChange={v => setForm({ ...form, category: v })}>
                 <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
                 <SelectContent>

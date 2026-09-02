@@ -150,16 +150,16 @@ function CreateChecklistDialog({ open, onClose, onCreated }: { open: boolean; on
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
-          <DialogTitle className="text-right">چک‌لیست جدید</DialogTitle>
+          <DialogTitle className="text-right">ثبت چک‌لیست جدید</DialogTitle>
         </DialogHeader>
         <form onSubmit={submit} className="space-y-4">
           {error && <div className="bg-red-50 dark:bg-red-950 text-red-600 text-sm p-3 rounded-lg text-right">{error}</div>}
           <div className="space-y-2">
-            <Label className="text-right block">نام چک‌لیست (اجباری)</Label>
+            <Label className="text-right block text-xs text-slate-600 dark:text-slate-300">نام چک‌لیست (اجباری)</Label>
             <Input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder="مثلاً: چک‌لیست بازدید دوره‌ای دکل" className="text-right" autoFocus />
           </div>
           <div className="space-y-2">
-            <Label className="text-right block">دامنه استفاده</Label>
+            <Label className="text-right block text-xs text-slate-600 dark:text-slate-300">دامنه استفاده</Label>
             <Select value={form.applies_to} onValueChange={v => setForm({ ...form, applies_to: v })}>
               <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
               <SelectContent>
@@ -171,7 +171,7 @@ function CreateChecklistDialog({ open, onClose, onCreated }: { open: boolean; on
             </Select>
           </div>
           <div className="space-y-2">
-            <Label className="text-right block">توضیحات</Label>
+            <Label className="text-right block text-xs text-slate-600 dark:text-slate-300">توضیحات</Label>
             <Textarea value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} rows={3} className="text-right" placeholder="مثلاً: بررسی سازه، مقره و یراق‌آلات" />
           </div>
           <DialogFooter>

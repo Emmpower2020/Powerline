@@ -188,7 +188,7 @@ export function CreateDefectDialog({ open, onClose, onCreated, editRow, duplicat
             {isEdit
               ? `ویرایش عیب: ${editRow?.defect_code || ""}`
               : isDuplicate
-                ? `ثبت عیب جدید (کپی از: ${duplicateFrom?.defect_code || ""})`
+                ? `کپی عیب جدید (از: ${duplicateFrom?.defect_code || ""})`
                 : "ثبت عیب جدید"}
           </DialogTitle>
         </DialogHeader>
@@ -198,7 +198,7 @@ export function CreateDefectDialog({ open, onClose, onCreated, editRow, duplicat
 
           {/* v3.3.0: انتخاب زنجیره‌ای — اول دسته کلی (۲۴ دسته)، بعد عیب همان دسته */}
           <div className="space-y-2 p-3 bg-indigo-50/50 dark:bg-indigo-950/20 rounded-lg border border-indigo-100 dark:border-indigo-900">
-            <Label className="text-right flex items-center gap-1.5">
+            <Label className="text-right flex items-center gap-1.5 text-xs text-slate-600 dark:text-slate-300">
               <Sparkles className="w-4 h-4 text-indigo-500" />
               انتخاب از عیوب استاندارد (اختیاری)
             </Label>
@@ -229,12 +229,12 @@ export function CreateDefectDialog({ open, onClose, onCreated, editRow, duplicat
           </div>
 
           <div className="space-y-2">
-            <Label className="text-right block">قرارداد</Label>
+            <Label className="text-right block text-xs text-slate-600 dark:text-slate-300">قرارداد</Label>
             <ContractSelect value={form.contract_id} onChange={v => setForm({ ...form, contract_id: v })} />
           </div>
 
           <div className="space-y-2">
-            <Label className="text-right block">عنوان عیب (اجباری)</Label>
+            <Label className="text-right block text-xs text-slate-600 dark:text-slate-300">عنوان عیب (اجباری)</Label>
             <Input
               value={form.title}
               onChange={e => setForm({ ...form, title: e.target.value })}
@@ -245,7 +245,7 @@ export function CreateDefectDialog({ open, onClose, onCreated, editRow, duplicat
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div className="space-y-2">
-              <Label className="text-right block">شدت</Label>
+              <Label className="text-right block text-xs text-slate-600 dark:text-slate-300">شدت</Label>
               <SearchableSelect
                 value={form.severity}
                 onChange={v => setForm({ ...form, severity: v || "minor" })}
@@ -257,7 +257,7 @@ export function CreateDefectDialog({ open, onClose, onCreated, editRow, duplicat
               />
             </div>
             <div className="space-y-2">
-              <Label className="text-right block">اولویت</Label>
+              <Label className="text-right block text-xs text-slate-600 dark:text-slate-300">اولویت</Label>
               <SearchableSelect
                 value={form.priority}
                 onChange={v => setForm({ ...form, priority: v || "medium" })}
@@ -270,7 +270,7 @@ export function CreateDefectDialog({ open, onClose, onCreated, editRow, duplicat
               />
             </div>
             <div className="space-y-2">
-              <Label className="text-right block">ریسک ایمنی</Label>
+              <Label className="text-right block text-xs text-slate-600 dark:text-slate-300">ریسک ایمنی</Label>
               <SearchableSelect
                 value={form.safety_risk}
                 onChange={v => setForm({ ...form, safety_risk: v || "none" })}
@@ -286,7 +286,7 @@ export function CreateDefectDialog({ open, onClose, onCreated, editRow, duplicat
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="space-y-2">
-              <Label className="text-right block">خط انتقال (اختیاری)</Label>
+              <Label className="text-right block text-xs text-slate-600 dark:text-slate-300">خط انتقال (اختیاری)</Label>
               <SearchableSelect
                 value={form.line_id}
                 onChange={v => setForm({ ...form, line_id: v })}
@@ -297,7 +297,7 @@ export function CreateDefectDialog({ open, onClose, onCreated, editRow, duplicat
               />
             </div>
             <div className="space-y-2">
-              <Label className="text-right block">نوع / دسته عیب (اختیاری)</Label>
+              <Label className="text-right block text-xs text-slate-600 dark:text-slate-300">نوع / دسته عیب (اختیاری)</Label>
               <Input
                 value={form.defect_type}
                 onChange={e => setForm({ ...form, defect_type: e.target.value })}
@@ -308,7 +308,7 @@ export function CreateDefectDialog({ open, onClose, onCreated, editRow, duplicat
           </div>
 
           <div className="space-y-2">
-            <Label className="text-right block">محل / موقعیت (اختیاری)</Label>
+            <Label className="text-right block text-xs text-slate-600 dark:text-slate-300">محل / موقعیت (اختیاری)</Label>
             <Input
               value={form.location_desc}
               onChange={e => setForm({ ...form, location_desc: e.target.value })}
@@ -318,7 +318,7 @@ export function CreateDefectDialog({ open, onClose, onCreated, editRow, duplicat
           </div>
 
           <div className="space-y-2">
-            <Label className="text-right block">توضیحات</Label>
+            <Label className="text-right block text-xs text-slate-600 dark:text-slate-300">توضیحات</Label>
             <Textarea
               value={form.description}
               onChange={e => setForm({ ...form, description: e.target.value })}

@@ -428,7 +428,7 @@ function ConductorDialog({ open, editRow, duplicateFrom, onClose, onSaved }: {
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-right">
-            {editRow ? `ویرایش سیم: ${conductorDisplayName(editRow.name)}` : isDup ? `سیم جدید (کپی از: ${conductorDisplayName(duplicateFrom?.name)})` : "ثبت سیم جدید"}
+            {editRow ? `ویرایش سیم: ${conductorDisplayName(editRow.name)}` : isDup ? `کپی سیم جدید (از: ${conductorDisplayName(duplicateFrom?.name)})` : "ثبت سیم جدید"}
           </DialogTitle>
         </DialogHeader>
         <form onSubmit={submit} className="space-y-4">
@@ -437,41 +437,41 @@ function ConductorDialog({ open, editRow, duplicateFrom, onClose, onSaved }: {
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div className="space-y-2">
-              <Label className="text-right block">نام سیم (اجباری)</Label>
+              <Label className="text-right block text-xs text-slate-600 dark:text-slate-300">نام سیم (اجباری)</Label>
               <Input value={form.name} onChange={e => set("name", e.target.value)} placeholder="مثلاً Lynx" dir="ltr" className="text-left" />
             </div>
             <div className="space-y-2">
-              <Label className="text-right block">استاندارد</Label>
+              <Label className="text-right block text-xs text-slate-600 dark:text-slate-300">استاندارد</Label>
               <SearchableSelect value={form.standard} onChange={v => set("standard", v)} options={STD_OPTIONS} placeholder="انتخاب..." allowClear />
             </div>
             <div className="space-y-2">
-              <Label className="text-right block">نوع هادی</Label>
+              <Label className="text-right block text-xs text-slate-600 dark:text-slate-300">نوع هادی</Label>
               <Input value={form.type} onChange={e => set("type", e.target.value)} dir="ltr" className="text-left" />
             </div>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div className="space-y-2">
-              <Label className="text-right block">سطح مقطع کل (mm²)</Label>
+              <Label className="text-right block text-xs text-slate-600 dark:text-slate-300">سطح مقطع کل (mm²)</Label>
               <Input type="number" step="0.01" value={form.sectional_area_all} onChange={e => set("sectional_area_all", e.target.value)} dir="ltr" className="text-left" />
             </div>
             <div className="space-y-2">
-              <Label className="text-right block">قطر کل (mm)</Label>
+              <Label className="text-right block text-xs text-slate-600 dark:text-slate-300">قطر کل (mm)</Label>
               <Input type="number" step="0.01" value={form.overall_diameter_all} onChange={e => set("overall_diameter_all", e.target.value)} dir="ltr" className="text-left" />
             </div>
             <div className="space-y-2">
-              <Label className="text-right block">تنش نهایی (kg)</Label>
+              <Label className="text-right block text-xs text-slate-600 dark:text-slate-300">تنش نهایی (kg)</Label>
               <Input type="number" step="0.1" value={form.ultimate_strength} onChange={e => set("ultimate_strength", e.target.value)} dir="ltr" className="text-left" />
             </div>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div className="space-y-2">
-              <Label className="text-right block">وزن کل (kg/km)</Label>
+              <Label className="text-right block text-xs text-slate-600 dark:text-slate-300">وزن کل (kg/km)</Label>
               <Input type="number" step="0.1" value={form.weight_all} onChange={e => set("weight_all", e.target.value)} dir="ltr" className="text-left" />
             </div>
             <div className="space-y-2">
-              <Label className="text-right block">مقاومت (Ω/km)</Label>
+              <Label className="text-right block text-xs text-slate-600 dark:text-slate-300">مقاومت (Ω/km)</Label>
               <Input type="number" step="0.0001" value={form.resistance} onChange={e => set("resistance", e.target.value)} dir="ltr" className="text-left" />
             </div>
           </div>
@@ -479,22 +479,22 @@ function ConductorDialog({ open, editRow, duplicateFrom, onClose, onSaved }: {
           {/* v3.5.4: رشته‌بندی به خط جدید تمام‌عرض منتقل شد — قبلاً دو فیلد کوچک در یک‌سوم عرض بود */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="space-y-2">
-              <Label className="text-right block">رشته‌بندی رو — لایه بیرونی (آلومینیوم)</Label>
+              <Label className="text-right block text-xs text-slate-600 dark:text-slate-300">رشته‌بندی رو — لایه بیرونی (آلومینیوم)</Label>
               <Input value={form.stranding_outer} onChange={e => set("stranding_outer", e.target.value)} placeholder="مثلاً 30/2.79 (تعداد رشته/قطر هر رشته به mm)" title="تعداد رشته/قطر هر رشته (mm)" dir="ltr" className="text-left" />
             </div>
             <div className="space-y-2">
-              <Label className="text-right block">رشته‌بندی داخل — هسته (فولاد)</Label>
+              <Label className="text-right block text-xs text-slate-600 dark:text-slate-300">رشته‌بندی داخل — هسته (فولاد)</Label>
               <Input value={form.stranding_inner} onChange={e => set("stranding_inner", e.target.value)} placeholder="مثلاً 7/2.79 (تعداد رشته/قطر هر رشته به mm)" title="تعداد رشته/قطر هر رشته (mm)" dir="ltr" className="text-left" />
             </div>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="space-y-2">
-              <Label className="text-right block">ماده رو</Label>
+              <Label className="text-right block text-xs text-slate-600 dark:text-slate-300">ماده رو</Label>
               <SearchableSelect value={form.material_outer} onChange={v => set("material_outer", v || "Alum.")} options={MAT_OPTIONS} />
             </div>
             <div className="space-y-2">
-              <Label className="text-right block">ماده داخل</Label>
+              <Label className="text-right block text-xs text-slate-600 dark:text-slate-300">ماده داخل</Label>
               <SearchableSelect value={form.material_inner} onChange={v => set("material_inner", v || "Steel")} options={MAT_OPTIONS} />
             </div>
           </div>

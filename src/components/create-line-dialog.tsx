@@ -202,8 +202,8 @@ export function CreateLineDialog({ open, onClose, onCreated, editRow, duplicateF
             {isEdit
               ? `ویرایش خط: ${editRow?.name || ""}`
               : isDuplicate
-                ? `افزودن خط جدید (کپی از: ${duplicateFrom?.name || ""})`
-                : "افزودن خط انتقال جدید"}
+                ? `کپی خط جدید (از: ${duplicateFrom?.name || ""})`
+                : "ثبت خط جدید"}
           </DialogTitle>
         </DialogHeader>
         <form onSubmit={submit} className="space-y-5">
@@ -380,5 +380,5 @@ export function CreateLineDialog({ open, onClose, onCreated, editRow, duplicateF
 }
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return <div className="space-y-2"><Label className="text-right block">{label}</Label>{children}</div>;
+  return <div className="space-y-2"><Label className="text-right block text-xs text-slate-600 dark:text-slate-300">{label}</Label>{children}</div>;
 }
