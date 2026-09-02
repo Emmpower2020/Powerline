@@ -242,9 +242,9 @@ export function DashboardLayout({ children, currentPage, onNavigate, title, subt
           <div className="flex items-center gap-1.5">
             {/* v3.5.2: وضعیت داده‌های مرجع — آنلاین/کش محلی/آفلاین */}
             <DataStatusBadge />
-            <div className="hidden lg:flex items-center gap-2 min-w-[260px] max-w-[360px]">
+            <div className="hidden lg:flex items-center gap-2 min-w-[338px] max-w-[468px]">
               <span className="text-sm font-extrabold text-indigo-700 dark:text-indigo-300 whitespace-nowrap">قرارداد جاری</span>
-              <div className="min-w-0 flex-1 rounded-lg transition-colors bg-indigo-100/80 hover:bg-indigo-200/90 dark:bg-indigo-950/55 dark:hover:bg-indigo-900/80 px-1.5 py-1">
+              <div className="min-w-0 flex-1">
                 <ContractSelect value={selectedContract} onChange={onContractChange} disabled={contractsLoading} className="min-w-0 flex-1" preserveUnknownValue />
               </div>
             </div>

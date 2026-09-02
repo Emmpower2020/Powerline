@@ -4,6 +4,8 @@
  */
 
 import { API_BASE_URL, API_ENDPOINTS, TOKEN_KEY, REFRESH_TOKEN_KEY } from "./api-config";
+
+const DIRECT_API_BASE_URL = "https://jibimarket.com/Powerline/api.php";
 import { markCacheDirty } from "./local-cache";
 
 export class ApiError extends Error {
@@ -98,6 +100,18 @@ class ApiClient {
     localStorage.removeItem("powerline_user");
   }
 
+  private buildDirectUrl(endpoint: string, params?: Record<string, unknown>): string {
+    const sep = endpoint.startsWith("/") ? "" : "/";
+    const url = `${DIRECT_API_BASE_URL}${sep}${endpoint}`;
+    if (!params) return url;
+    const searchParams = new URLSearchParams();
+    Object.entries(params).forEach(([key, value]) => {
+      if (value !== undefined && value !== null && value !== "") searchParams.append(key, String(value));
+    });
+    const queryString = searchParams.toString();
+    return queryString ? `${url}?${queryString}` : url;
+  }
+
   private buildUrl(endpoint: string, params?: Record<string, unknown>): string {
     // endpoint بدون اسلش ابتدایی (مثل "lines/bulk-delete") هم درست به پروکسی وصل شود
     const sep = endpoint.startsWith("/") ? "" : "/";
@@ -165,6 +179,27 @@ class ApiClient {
       const data = await response.json().catch(() => ({}));
 
       if (!response.ok) {
+        // v4.3.61: اگر پراکسی Vercel نتوانست سرور مقصد را ببیند، برای GET یک‌بار
+        // مستقیم از مرورگر به API واقعی تلاش می‌کنیم. برای POST/PUT/DELETE عمداً
+        // fallback مستقیم نداریم تا در صورت پاسخ نامطمئن، عملیات دوبار اجرا نشود.
+        if (method === "GET" && response.status === 503 && typeof window !== "undefined" && API_BASE_URL.startsWith("/")) {
+          try {
+            const directUrl = this.buildDirectUrl(endpoint, scopedParams);
+            const directResponse = await fetch(directUrl, {
+              method,
+              headers: requestHeaders,
+              cache: "no-store",
+            });
+            const directData = await directResponse.json().catch(() => ({}));
+            if (directResponse.ok) {
+              if (directData && typeof directData === "object" && "pagination" in directData) return directData as T;
+              return (directData?.data ?? directData) as T;
+            }
+          } catch {
+            // ادامه مسیر عادی و نمایش خطای پراکسی
+          }
+        }
+
         // اگه توکن منقضی شده، تلاش برای رفرش (فقط یک‌بار — v3.5.1)
         if (response.status === 401 && !skipAuth && !_retried) {
           const refreshed = await this.tryRefresh();

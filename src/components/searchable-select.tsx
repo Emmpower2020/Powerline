@@ -30,7 +30,7 @@ export interface SearchableOption {
 
 export function SearchableSelect({
   value, onChange, options, placeholder = "انتخاب...", searchPlaceholder = "جستجو...",
-  emptyText = "موردی یافت نشد", disabled = false, allowClear = false, className, align = "start", preserveUnknownValue = false,
+  emptyText = "موردی یافت نشد", disabled = false, allowClear = false, className, align = "start", preserveUnknownValue = false, optionItemClassName,
 }: {
   value: string;
   onChange: (value: string) => void;
@@ -45,6 +45,8 @@ export function SearchableSelect({
   align?: "start" | "center" | "end";
   /** اگر true باشد مقدار ویژه نامشخص به‌صورت __unknown__ حفظ می‌شود. */
   preserveUnknownValue?: boolean;
+  /** کلاس اختصاصی گزینه‌ها برای کنترل ظاهر hover/keyboard highlight */
+  optionItemClassName?: string;
 }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -127,7 +129,11 @@ export function SearchableSelect({
                         setOpen(false);
                         setQuery("");
                       }}
-                      className="cursor-pointer hover:bg-slate-50 hover:text-slate-900 data-[selected=true]:bg-indigo-50 data-[selected=true]:text-indigo-800 dark:hover:bg-slate-800 dark:data-[selected=true]:bg-indigo-950/50 dark:data-[selected=true]:text-indigo-200"
+                      className={cn(
+                        "cursor-pointer hover:bg-slate-50 hover:text-slate-900 data-[selected=true]:bg-slate-50 data-[selected=true]:text-slate-900 dark:hover:bg-slate-800 dark:data-[selected=true]:bg-slate-800 dark:data-[selected=true]:text-slate-100",
+                        value === opt.value && "bg-indigo-50 text-indigo-800 dark:bg-indigo-950/50 dark:text-indigo-200",
+                        optionItemClassName
+                      )}
                     >
                       <Check className={cn("w-4 h-4 shrink-0 ml-2", value === opt.value ? "opacity-100" : "opacity-0")} />
                       <div className="flex items-baseline gap-2 min-w-0 flex-1">
@@ -241,7 +247,10 @@ export function SearchableMultiSelect({
                       value={`${opt.label} ${opt.value} ${opt.description || ""}`}
                       disabled={atLimit}
                       onSelect={() => { toggle(opt.value); setQuery(""); }}
-                      className="cursor-pointer hover:bg-slate-50 hover:text-slate-900 data-[selected=true]:bg-indigo-50 data-[selected=true]:text-indigo-800 dark:hover:bg-slate-800 dark:data-[selected=true]:bg-indigo-950/50 dark:data-[selected=true]:text-indigo-200"
+                      className={cn(
+                      "cursor-pointer hover:bg-slate-50 hover:text-slate-900 data-[selected=true]:bg-slate-50 data-[selected=true]:text-slate-900 dark:hover:bg-slate-800 dark:data-[selected=true]:bg-slate-800 dark:data-[selected=true]:text-slate-100",
+                      isSelected && "bg-indigo-50 text-indigo-800 dark:bg-indigo-950/50 dark:text-indigo-200"
+                    )}
                     >
                       <div className={cn(
                         "w-4 h-4 shrink-0 ml-2 border rounded flex items-center justify-center",

@@ -132,6 +132,26 @@ export async function OPTIONS() {
   });
 }
 
+function describeUpstreamNetworkFailure(code: string, message: string): string {
+  const c = code.toUpperCase();
+  if (c.includes("ENOTFOUND") || c.includes("EAI_AGAIN") || c.includes("ENODATA")) {
+    return "DNS دامنه سرور API حل نشد؛ دامنه یا DNS سرور مقصد را بررسی کنید.";
+  }
+  if (c.includes("ECONNREFUSED")) {
+    return "اتصال به سرور API رد شد؛ وب‌سرور یا پورت سرویس مقصد در دسترس نیست.";
+  }
+  if (c.includes("ECONNRESET") || c.includes("EPIPE")) {
+    return "اتصال به سرور API در میانه راه قطع شد؛ احتمالاً فایروال یا سرویس میزبان اتصال را بسته است.";
+  }
+  if (c.includes("ETIMEDOUT") || c.includes("TIMEOUT") || message.toLowerCase().includes("timeout")) {
+    return "اتصال به سرور API به پایان مهلت رسید؛ سرور مقصد کند، شلوغ یا مسدود است.";
+  }
+  if (c.includes("CERT") || message.toLowerCase().includes("certificate") || message.toLowerCase().includes("tls")) {
+    return "اعتبار گواهی HTTPS یا TLS سرور API قابل تأیید نبود.";
+  }
+  return message ? `خطای اتصال به سرور API: ${message}` : "اتصال به سرور API برقرار نشد.";
+}
+
 async function handleRequest(request: NextRequest) {
   const url = new URL(request.url);
   const path = url.pathname.replace(/^\/api\/proxy/, "");
@@ -226,10 +246,12 @@ async function handleRequest(request: NextRequest) {
 
   let response: Response | null = null;
   let networkErrorMessage = "";
+  let networkErrorCode = "";
   try {
     response = await fetchUpstream();
-  } catch (error) {
+  } catch (error: any) {
     networkErrorMessage = error instanceof Error ? error.message : "Unknown error";
+    networkErrorCode = String(error?.cause?.code || error?.code || "");
   }
 
   const responseText = response ? await response.text() : "";
@@ -277,14 +299,14 @@ async function handleRequest(request: NextRequest) {
   // ─── مسیر ۳: هاست قطع + نوشتن → خطای واقعی (هرگز موفقیت کاذب؛ جلوگیری از گم‌شدن داده) ───
   if (hostDown && !isGet) {
     const reason = response
-      ? `سرور پاسخ ${response.status} داد`
-      : `خطای شبکه: ${networkErrorMessage}`;
+      ? `سرور API پاسخ ${response.status} داد`
+      : describeUpstreamNetworkFailure(networkErrorCode, networkErrorMessage);
     return NextResponse.json(
       {
         success: false,
         error: {
           code: 503,
-          message: `ثبت/ویرایش انجام نشد چون سرور دیتابیس موقتاً در دسترس نیست (${reason}). داده ذخیره نشد — دوباره تلاش کنید. داده‌های قبلی شما سالم است`,
+          message: `عملیات ثبت/ویرایش انجام نشد؛ ارتباط برنامه با سرور API برقرار نشد (${reason}). هیچ داده‌ای در این تلاش ذخیره نشد و داده‌های قبلی دست‌نخورده مانده‌اند.`,
         },
       },
       { status: 503 }

@@ -30,6 +30,7 @@ export function ContractSelect({
       disabled={disabled}
       className={className}
       preserveUnknownValue={preserveUnknownValue}
+      optionItemClassName="hover:bg-indigo-50 hover:text-indigo-800 dark:hover:bg-indigo-950/50 dark:hover:text-indigo-200"
     />
   );
 }
