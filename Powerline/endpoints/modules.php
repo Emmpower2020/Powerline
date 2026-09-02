@@ -6,16 +6,49 @@
 
 function registerModuleRoutes(Router $router): void
 {
+    // ─────────────────────────────────────────────────────────────
+    // v4.3.55: سازگاری جداول مرجع دکل با هر دو ساختار دیتابیس
+    // نسخه‌های مختلف دیتابیس یا ستون `status` (varchar) دارند یا `is_active` (tinyint).
+    // کد قبلاً همیشه status را می‌خواند و روی دیتابیس‌های is_active با
+    // «Unknown column status» خطای 500 می‌داد (خطای بارگذاری ساختار/کد نوع دکل).
+    // ─────────────────────────────────────────────────────────────
+    $towerRefUsesStatus = function (PDO $pdo, string $table): bool {
+        static $cache = [];
+        if (!isset($cache[$table])) {
+            $hasStatus = false;
+            foreach ($pdo->query("SHOW COLUMNS FROM `$table`")->fetchAll() as $c) {
+                if (($c['Field'] ?? null) === 'status') { $hasStatus = true; break; }
+            }
+            $cache[$table] = $hasStatus;
+        }
+        return $cache[$table];
+    };
+    /** عبارت SELECT وضعیت به‌صورت متنی active/inactive برای فرانت‌اند */
+    $towerRefStatusExpr = function (PDO $pdo, string $table) use ($towerRefUsesStatus): string {
+        return $towerRefUsesStatus($pdo, $table)
+            ? 'status'
+            : "CASE WHEN is_active = 1 THEN 'active' ELSE 'inactive' END";
+    };
+    /** تبدیل مقدار active/inactive فرانت‌اند به [ستون واقعی، مقدار دیتابیسی] */
+    $towerRefStatusValue = function (PDO $pdo, string $table, $value) use ($towerRefUsesStatus): array {
+        $inactive = ((string)$value) === 'inactive';
+        return $towerRefUsesStatus($pdo, $table)
+            ? ['status', $inactive ? 'inactive' : 'active']
+            : ['is_active', $inactive ? 0 : 1];
+    };
+
     // مرجع‌های دکل: ساختارهای سازه و کدهای نوع دکل از جداول مرجع خوانده می‌شوند.
-    $router->get('tower-references', function () {
+    $router->get('tower-references', function () use ($towerRefUsesStatus) {
         Auth::authenticate();
         if (!Auth::canAccess('towers.view') && !Auth::canAccess('lines.view')) {
             Response::error(403, 'دسترسی به اطلاعات مرجع دکل‌ها مجاز نیست');
         }
         $pdo = Database::getInstance()->getConnection();
         try {
-            $structures = $pdo->query("SELECT id, name FROM tower_structures WHERE status = 'active' ORDER BY sort_order, id")->fetchAll();
-            $codes = $pdo->query("SELECT id, code, title FROM tower_type_codes WHERE status = 'active' ORDER BY sort_order, id")->fetchAll();
+            $whereS = $towerRefUsesStatus($pdo, 'tower_structures') ? "status = 'active'" : 'is_active = 1';
+            $whereC = $towerRefUsesStatus($pdo, 'tower_type_codes') ? "status = 'active'" : 'is_active = 1';
+            $structures = $pdo->query("SELECT id, name FROM tower_structures WHERE $whereS ORDER BY sort_order, id")->fetchAll();
+            $codes = $pdo->query("SELECT id, code, title FROM tower_type_codes WHERE $whereC ORDER BY sort_order, id")->fetchAll();
             Response::success([
                 'tower_structures' => $structures,
                 'tower_type_codes' => $codes,
@@ -27,21 +60,26 @@ function registerModuleRoutes(Router $router): void
     });
 
     // CRUD جداول مرجع ساختار و کد دکل
-    $router->get('tower-structures', function () {
+    $router->get('tower-structures', function () use ($towerRefStatusExpr) {
         Auth::authenticate(); Auth::requirePermissionSoft('towers.view');
         $pdo=Database::getInstance()->getConnection();
-        Response::success($pdo->query("SELECT id,name,sort_order,status,created_at,updated_at FROM tower_structures ORDER BY sort_order,id")->fetchAll());
+        $statusExpr = $towerRefStatusExpr($pdo, 'tower_structures');
+        Response::success($pdo->query("SELECT id,name,sort_order,$statusExpr AS status,created_at,updated_at FROM tower_structures ORDER BY sort_order,id")->fetchAll());
     });
-    $router->post('tower-structures', function () {
+    $router->post('tower-structures', function () use ($towerRefStatusValue) {
         Auth::authenticate(); Auth::requirePermissionSoft('towers.create');
         $b=Helpers::getJsonBody(); if(trim((string)($b['name']??''))==='') Response::error(400,'نام ساختار دکل الزامی است');
-        $pdo=Database::getInstance()->getConnection(); $st=$pdo->prepare("INSERT INTO tower_structures (name,sort_order,status) VALUES (?,?,?)");
-        try{$st->execute([trim($b['name']), (int)($b['sort_order']??0), (($b['status'] ?? 'active') === 'inactive' ? 'inactive' : 'active')]);}catch(PDOException $e){Response::error(409,'این ساختار قبلاً ثبت شده است');}
+        $pdo=Database::getInstance()->getConnection();
+        list($statusCol, $statusVal) = $towerRefStatusValue($pdo, 'tower_structures', $b['status'] ?? 'active');
+        $st=$pdo->prepare("INSERT INTO tower_structures (name,sort_order,$statusCol) VALUES (?,?,?)");
+        try{$st->execute([trim($b['name']), (int)($b['sort_order']??0), $statusVal]);}catch(PDOException $e){Response::error(409,'این ساختار قبلاً ثبت شده است');}
         Response::success(['id'=>(int)$pdo->lastInsertId()],'ساختار دکل ایجاد شد',201);
     });
-    $router->put('tower-structures/{id}', function($id){
+    $router->put('tower-structures/{id}', function($id) use ($towerRefStatusValue) {
         Auth::authenticate(); Auth::requirePermissionSoft('towers.update'); $b=Helpers::getJsonBody();
-        $fields=[];$params=[]; foreach(['name','sort_order','status'] as $f){if(array_key_exists($f,$b)){$fields[]="`$f`=?";$params[]=$b[$f];}}
+        $pdo=Database::getInstance()->getConnection();
+        $fields=[];$params=[]; foreach(['name','sort_order'] as $f){if(array_key_exists($f,$b)){$fields[]="`$f`=?";$params[]=$b[$f];}}
+        if(array_key_exists('status',$b)){list($statusCol,$statusVal)=$towerRefStatusValue($pdo,'tower_structures',$b['status']);$fields[]="`$statusCol`=?";$params[]=$statusVal;}
         if(!$fields) Response::error(400,'فیلدی برای ویرایش ارسال نشده'); $params[]=(int)$id;
         try{Database::getInstance()->execute("UPDATE tower_structures SET ".implode(',',$fields).",updated_at=NOW() WHERE id=?",$params);}catch(PDOException $e){Response::error(409,'ویرایش ساختار انجام نشد: '.$e->getMessage());}
         Response::success(null,'ساختار دکل ویرایش شد');
@@ -50,18 +88,24 @@ function registerModuleRoutes(Router $router): void
         Auth::authenticate(); Auth::requirePermissionSoft('towers.delete'); Database::getInstance()->execute("DELETE FROM tower_structures WHERE id=?",[(int)$id]); Response::success(null,'ساختار دکل حذف شد');
     });
 
-    $router->get('tower-type-codes', function () {
+    $router->get('tower-type-codes', function () use ($towerRefStatusExpr) {
         Auth::authenticate(); Auth::requirePermissionSoft('towers.view'); $pdo=Database::getInstance()->getConnection();
-        Response::success($pdo->query("SELECT id,code,title,sort_order,status,created_at,updated_at FROM tower_type_codes ORDER BY sort_order,id")->fetchAll());
+        $statusExpr = $towerRefStatusExpr($pdo, 'tower_type_codes');
+        Response::success($pdo->query("SELECT id,code,title,sort_order,$statusExpr AS status,created_at,updated_at FROM tower_type_codes ORDER BY sort_order,id")->fetchAll());
     });
-    $router->post('tower-type-codes', function () {
+    $router->post('tower-type-codes', function () use ($towerRefStatusValue) {
         Auth::authenticate(); Auth::requirePermissionSoft('towers.create'); $b=Helpers::getJsonBody(); if(trim((string)($b['code']??''))==='') Response::error(400,'کد نوع دکل الزامی است');
-        $pdo=Database::getInstance()->getConnection(); $st=$pdo->prepare("INSERT INTO tower_type_codes (code,title,sort_order,status) VALUES (?,?,?,?)");
-        try{$st->execute([trim($b['code']),trim((string)($b['title']??''))?:null,(int)($b['sort_order']??0),(($b['status'] ?? 'active') === 'inactive' ? 'inactive' : 'active')]);}catch(PDOException $e){Response::error(409,'این کد قبلاً ثبت شده است');}
+        $pdo=Database::getInstance()->getConnection();
+        list($statusCol, $statusVal) = $towerRefStatusValue($pdo, 'tower_type_codes', $b['status'] ?? 'active');
+        $st=$pdo->prepare("INSERT INTO tower_type_codes (code,title,sort_order,$statusCol) VALUES (?,?,?,?)");
+        try{$st->execute([trim($b['code']),trim((string)($b['title']??''))?:null,(int)($b['sort_order']??0), $statusVal]);}catch(PDOException $e){Response::error(409,'این کد قبلاً ثبت شده است');}
         Response::success(['id'=>(int)$pdo->lastInsertId()],'کد نوع دکل ایجاد شد',201);
     });
-    $router->put('tower-type-codes/{id}', function($id){
-        Auth::authenticate(); Auth::requirePermissionSoft('towers.update'); $b=Helpers::getJsonBody(); $fields=[];$params=[]; foreach(['code','title','sort_order','status'] as $f){if(array_key_exists($f,$b)){$fields[]="`$f`=?";$params[]=($f==='title'&&trim((string)$b[$f])==='')?null:$b[$f];}}
+    $router->put('tower-type-codes/{id}', function($id) use ($towerRefStatusValue) {
+        Auth::authenticate(); Auth::requirePermissionSoft('towers.update'); $b=Helpers::getJsonBody(); $pdo=Database::getInstance()->getConnection();
+        $fields=[];$params=[]; foreach(['code','sort_order'] as $f){if(array_key_exists($f,$b)){$fields[]="`$f`=?";$params[]=$b[$f];}}
+        if(array_key_exists('title',$b)){$fields[]="`title`=?";$params[]=trim((string)$b['title'])===''?null:$b['title'];}
+        if(array_key_exists('status',$b)){list($statusCol,$statusVal)=$towerRefStatusValue($pdo,'tower_type_codes',$b['status']);$fields[]="`$statusCol`=?";$params[]=$statusVal;}
         if(!$fields) Response::error(400,'فیلدی برای ویرایش ارسال نشده'); $params[]=(int)$id; Database::getInstance()->execute("UPDATE tower_type_codes SET ".implode(',',$fields).",updated_at=NOW() WHERE id=?",$params); Response::success(null,'کد نوع دکل ویرایش شد');
     });
     $router->delete('tower-type-codes/{id}', function($id){ Auth::authenticate(); Auth::requirePermissionSoft('towers.delete'); Database::getInstance()->execute("DELETE FROM tower_type_codes WHERE id=?",[(int)$id]); Response::success(null,'کد نوع دکل حذف شد'); });
@@ -75,7 +119,7 @@ function registerModuleRoutes(Router $router): void
     //  اصول: هر بخش permission جداگانه دارد (بدون دسترسی = کلید حذف می‌شود، نه 403)
     //  و هر بخش try/catch خودش را دارد (خطای یک جدول بقیه را زمین نمی‌زند)
     // ============================================================
-    $router->get('bootstrap', function () {
+    $router->get('bootstrap', function () use ($towerRefUsesStatus) {
         Auth::authenticate();
         $pdo = Database::getInstance()->getConnection();
 
@@ -116,10 +160,12 @@ function registerModuleRoutes(Router $router): void
         }
 
         // انواع سیم‌ها — کامل (۱۵ ردیف، سبک)
+        // v4.3.55: سازگاری با ساختار قدیمی دیتابیس (is_active به‌جای status)
         if (Auth::canAccess('conductors.view')) {
             try {
+                $condWhere = $towerRefUsesStatus($pdo, 'conductors') ? "status = 'active'" : 'is_active = 1';
                 $result['conductors'] = $pdo->query(
-                    "SELECT * FROM conductors WHERE status = 'active' ORDER BY sectional_area_all"
+                    "SELECT * FROM conductors WHERE $condWhere ORDER BY sectional_area_all"
                 )->fetchAll();
             } catch (Exception $e) {
                 $errors['conductors'] = 'در دسترس نیست';
@@ -130,8 +176,10 @@ function registerModuleRoutes(Router $router): void
         // مراجع دکل
         if (Auth::canAccess('towers.view')) {
             try {
-                $result['tower_structures'] = $pdo->query("SELECT id,name,sort_order FROM tower_structures WHERE status = 'active' ORDER BY sort_order,id")->fetchAll();
-                $result['tower_type_codes'] = $pdo->query("SELECT id,code,title,sort_order FROM tower_type_codes WHERE status = 'active' ORDER BY sort_order,id")->fetchAll();
+                $tsWhere = $towerRefUsesStatus($pdo, 'tower_structures') ? "status = 'active'" : 'is_active = 1';
+                $tcWhere = $towerRefUsesStatus($pdo, 'tower_type_codes') ? "status = 'active'" : 'is_active = 1';
+                $result['tower_structures'] = $pdo->query("SELECT id,name,sort_order FROM tower_structures WHERE $tsWhere ORDER BY sort_order,id")->fetchAll();
+                $result['tower_type_codes'] = $pdo->query("SELECT id,code,title,sort_order FROM tower_type_codes WHERE $tcWhere ORDER BY sort_order,id")->fetchAll();
             } catch (Exception $e) { $errors['tower_references'] = 'در دسترس نیست'; }
         }
 
@@ -610,7 +658,7 @@ function registerModuleRoutes(Router $router): void
         'weight_outer' => ($t = $r['weight_outer'] ?? null) !== null && $t !== '' ? (float)$t : null,
         'ultimate_strength' => ($t = $r['ultimate_strength'] ?? null) !== null && $t !== '' ? (float)$t : null,
         'resistance' => ($t = $r['resistance'] ?? null) !== null && $t !== '' ? (float)$t : null,
-        'status' => isset($r['status']) ? (string)$r['status'] : 'active',
+        'status' => isset($r['status']) ? (string)$r['status'] : (isset($r['is_active']) && (int)$r['is_active'] === 0 ? 'inactive' : 'active'),
     ];
     $conductorCols = "(`name`,`type`,`type_code`,`standard`,`core_type`,`material_outer`,`material_inner`,`stranding_outer`,`stranding_inner`,`sectional_area_outer`,`sectional_area_all`,`overall_diameter_all`,`overall_diameter_inner`,`diameter_code_all`,`diameter_code_inner`,`weight_all`,`weight_inner`,`weight_outer`,`ultimate_strength`,`resistance`,`status`)";
 
@@ -632,7 +680,7 @@ function registerModuleRoutes(Router $router): void
         Response::success($rows);
     });
 
-    $router->post('conductors', function () {
+    $router->post('conductors', function () use ($towerRefUsesStatus) {
         $user = Auth::authenticate();
         Auth::requirePermissionSoft('conductors.create');
         $body = Helpers::getJsonBody();
@@ -642,19 +690,30 @@ function registerModuleRoutes(Router $router): void
         $stmt = $pdo->prepare("SELECT id FROM conductors WHERE name = ? LIMIT 1");
         $stmt->execute([$f['name']]);
         if ($stmt->fetch()) Response::error(409, 'این نام سیم قبلاً ثبت شده است');
+        // v4.3.55: نگاشت status فرانت‌اند به ستون واقعی جدول (status یا is_active)
+        if (!$towerRefUsesStatus($pdo, 'conductors')) {
+            $f['is_active'] = (($f['status'] ?? 'active') === 'inactive') ? 0 : 1;
+            unset($f['status']);
+        }
+        $cols = '(' . implode(',', array_map(fn($k) => "`$k`", array_keys($f))) . ')';
         $vals = array_values($f);
         $ph = implode(',', array_fill(0, count($vals), '?'));
-        $pdo->prepare("INSERT INTO conductors $conductorCols VALUES ($ph, NOW())")->execute($vals);
+        $pdo->prepare("INSERT INTO conductors $cols VALUES ($ph, NOW())")->execute($vals);
         Response::success(['id' => (int)$pdo->lastInsertId()], 'سیم ایجاد شد', 201);
     });
 
-    $router->put('conductors/{id}', function ($id) {
+    $router->put('conductors/{id}', function ($id) use ($towerRefUsesStatus) {
         Auth::authenticate();
         Auth::requirePermissionSoft('conductors.update');
         $body = Helpers::getJsonBody();
         $f = $conductorFields($body);
         if ($f['name'] === '') Response::error(400, 'نام سیم الزامی است');
         $pdo = Database::getInstance()->getConnection();
+        // v4.3.55: نگاشت status فرانت‌اند به ستون واقعی جدول (status یا is_active)
+        if (!$towerRefUsesStatus($pdo, 'conductors')) {
+            $f['is_active'] = (($f['status'] ?? 'active') === 'inactive') ? 0 : 1;
+            unset($f['status']);
+        }
         $vals = array_values($f);
         $vals[] = (int) $id;
         $sets = implode(',', array_map(fn($k) => "`$k` = ?", array_keys($f)));

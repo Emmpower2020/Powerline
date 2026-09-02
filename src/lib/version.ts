@@ -3,7 +3,7 @@
  * تا کاربر بتواند در سایدبار (پایین-چپ) ببیند کدام نسخه در حال اجراست.
  * این مقدار باید با package.json و VERSION.md همگام باشد.
  */
-export const APP_VERSION = "v4.3.54";
+export const APP_VERSION = "v4.3.56";
 
 /** تاریخ انتشار نسخه فعلی (شمسی/میلادی به‌صورت متن کوتاه) */
 export const APP_VERSION_DATE = "2026-09-02";
