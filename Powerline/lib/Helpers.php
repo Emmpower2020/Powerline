@@ -353,7 +353,92 @@ class Helpers
     }
 
     // ─────────────────────────────────────────────────────────────
-    // v4.3.82 — گارد مرکزی دسترسی ابزارها (module × tool)
+    // v4.3.83 — RBAC: نقش‌محور شدن دسترسی‌ها
+    // همان ماتریس دسترسی، این‌بار روی «نقش» تعریف می‌شود (roles.module_permissions)
+    // و به کاربران نقش اختصاص می‌یابد (user_roles). مجوز شخصی users.module_permissions
+    // به‌عنوان پشتیبان برای کاربران بدون نقش باقی می‌ماند.
+
+    /**
+     * v4.3.83: نقش فعلی کاربر — آخرین تخصیص user_roles (مدل تک‌نقشی).
+     * خروجی: ['id' => int, 'display_name' => string] یا null.
+     */
+    public static function userPrimaryRole(int $userId): ?array
+    {
+        try {
+            $row = Database::getInstance()->fetchOne(
+                'SELECT r.id, r.display_name FROM user_roles ur JOIN roles r ON r.id = ur.role_id
+                 WHERE ur.user_id = ? ORDER BY ur.assigned_at DESC, ur.role_id DESC LIMIT 1',
+                [$userId]
+            );
+            return $row ? ['id' => (int) $row['id'], 'display_name' => (string) $row['display_name']] : null;
+        } catch (Throwable $e) {
+            return null; // جدول نقش‌ها هنوز ساخته نشده
+        }
+    }
+
+    /**
+     * v4.3.83: نقشهٔ دسترسی مؤثر کاربر — ماتریس «نقش» مقدم است؛
+     * اگر نقش ماتریس تعریف‌شده داشته باشد همان ملاک است، وگرنه مجوز شخصی
+     * (users.module_permissions از 4.3.81/82) به‌عنوان پشتیبان. null = فقط‌خوانده.
+     */
+    public static function effectiveModulePermissions(int $userId): ?array
+    {
+        $db = Database::getInstance();
+        // ۱) ماتریس نقش اختصاص‌یافته
+        if (self::columnExists('roles', 'module_permissions')) {
+            try {
+                $row = $db->fetchOne(
+                    'SELECT r.module_permissions FROM user_roles ur JOIN roles r ON r.id = ur.role_id
+                     WHERE ur.user_id = ? ORDER BY ur.assigned_at DESC, ur.role_id DESC LIMIT 1',
+                    [$userId]
+                );
+                $raw = $row['module_permissions'] ?? null;
+                if (is_string($raw) && $raw !== '') {
+                    $decoded = json_decode($raw, true);
+                    if (is_array($decoded) && $decoded) return $decoded; // خالی = تعریف‌نشده → پشتیبان
+                }
+            } catch (Throwable $e) { /* ناقص */ }
+        }
+        // ۲) مجوز شخصی کاربر (پشتیبان سازگار)
+        if (self::columnExists('users', 'module_permissions')) {
+            try {
+                $row = $db->fetchOne('SELECT module_permissions FROM users WHERE id = ?', [$userId]);
+                $raw = $row['module_permissions'] ?? null;
+                if (is_string($raw) && $raw !== '') {
+                    $decoded = json_decode($raw, true);
+                    if (is_array($decoded)) return $decoded;
+                }
+            } catch (Throwable $e) { /* ستون ناقص */ }
+        }
+        return null;
+    }
+
+    /**
+     * v4.3.83: پاک‌سازی ماتریس دسترسی دریافتی از کلاینت → JSON آمادهٔ ذخیره.
+     * مقدار هر ماژول: true | false | {view,create,edit,delete,import,export}
+     */
+    public static function cleanModulePermissions(array $mp): string
+    {
+        $clean = [];
+        $allowedTools = ['view', 'create', 'edit', 'delete', 'import', 'export'];
+        foreach ($mp as $k => $v) {
+            if (!is_string($k) || $k === '' || $k === 'id') continue;
+            if ($v === true) { $clean[$k] = true; continue; }
+            if (is_array($v)) {
+                if (($v['view'] ?? true) === false) { $clean[$k] = false; continue; }
+                $tools = ['view' => true];
+                foreach ($allowedTools as $t) {
+                    if ($t !== 'view' && !empty($v[$t])) $tools[$t] = true;
+                }
+                $clean[$k] = $tools;
+            } else {
+                $clean[$k] = false;
+            }
+        }
+        return json_encode($clean, JSON_UNESCAPED_UNICODE);
+    }
+
+    // v4.3.82 — گارد مرکزی دسترسی ابزارها (module × tool) — v4.3.83: نقش مقدم است
     // همان ماتریس دسترسی تب «کاربران ← دسترسی‌ها» اینجا روی سرور اعمال می‌شود:
     // POST→ایجاد، PUT→ویرایش، DELETE→حذف، bulk-import→ایمپورت و ...
     // مدیر سیستم (بدون امور) همیشه مجاز است؛ کاربر بدون نقشه فقط‌خواننده است.
@@ -479,23 +564,17 @@ class Helpers
         $district = $user['district_id'] ?? null;
         if ($district === null || $district === '' || (int) $district <= 0) return; // مدیر سیستم
 
-        // پیش از اجرای migration 4.3.81 → ستون وجود ندارد؛ محدودیتی اعمال نمی‌شود
-        if (!self::columnExists('users', 'module_permissions')) return;
+        // پیش از اجرای migration 4.3.81/83 → ستونی وجود ندارد؛ محدودیتی اعمال نمی‌شود
+        if (!self::columnExists('users', 'module_permissions') && !self::columnExists('roles', 'module_permissions')) return;
 
-        $row = Database::getInstance()->fetchOne(
-            'SELECT module_permissions FROM users WHERE id = ?',
-            [(int) $user['id']]
-        );
-        $raw = $row['module_permissions'] ?? null;
-        if (is_string($raw) && $raw !== '') {
-            $decoded = json_decode($raw, true);
-            if (is_array($decoded)) {
-                $entry = $decoded[$module] ?? null;
-                if (self::moduleToolAllowed($entry, $tool)) return;
-                self::denyTool($module, $tool);
-            }
+        // v4.3.83: دسترسی مؤثر — ماتریس نقش مقدم؛ مجوز شخصی پشتیبان؛ null = فقط‌خواننده
+        $decoded = self::effectiveModulePermissions((int) $user['id']);
+        if (is_array($decoded)) {
+            $entry = $decoded[$module] ?? null;
+            if (self::moduleToolAllowed($entry, $tool)) return;
+            self::denyTool($module, $tool);
         }
-        // نقشهٔ null / نامعتبر → فقط‌خواننده (هماهنگ با فرانت v4.3.82)
+        // نقشهٔ null / نامعتبر → فقط‌خوانده (هماهنگ با فرانت v4.3.82+)
         self::denyTool($module, $tool);
     }
 

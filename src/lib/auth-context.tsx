@@ -27,6 +27,9 @@ export interface User {
   district_name?: string | null;
   // v4.3.81: دسترسی ماژول‌ها — v4.3.82: مقدار هر ماژول می‌تواند بولین یا آبجکت ابزارها باشد
   module_permissions?: Record<string, ModulePermValue> | null;
+  // v4.3.83: نقش اختصاص‌یافته — دسترسی مؤثر از ماتریس همین نقش می‌آید
+  role_id?: number | null;
+  role_name?: string | null;
 }
 
 export interface UserRole {

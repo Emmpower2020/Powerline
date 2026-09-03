@@ -469,6 +469,7 @@ function registerDefectRoutes(Router $router): void
         $permColSel = Helpers::columnExists('users', 'module_permissions') ? ', u.module_permissions' : '';
         $sql = "SELECT u.id, u.username, u.full_name, u.email, u.status, u.organization_id$districtColSel$permColSel,
                        u.created_at, u.last_login_at,
+                       MAX(r.id) AS role_id,
                        GROUP_CONCAT(r.display_name SEPARATOR '، ') AS roles
                 FROM users u
                 LEFT JOIN user_roles ur ON ur.user_id = u.id
@@ -510,6 +511,9 @@ function registerDefectRoutes(Router $router): void
                 }
                 return null;
             })(),
+            // v4.3.83: نقش اختصاصیافته (RBAC) — تک‌نقشی
+            'role_id' => !empty($r['role_id']) ? (int) $r['role_id'] : null,
+            'role_name' => $r['roles'],
             'roles' => $r['roles'], 'created_at' => $r['created_at'], 'last_login_at' => $r['last_login_at'],
         ], $rows);
 
@@ -540,6 +544,10 @@ function registerDefectRoutes(Router $router): void
             }
             if (array_key_exists('module_permissions', $body) && $body['module_permissions'] !== null) {
                 Response::error(403, 'ماتریس دسترسی حساب مدیر خودتان قابل تغییر نیست');
+            }
+            // v4.3.83: نقش حساب خودتان قابل تغییر نیست (حذف super_admin = قفل شدن مدیریت)
+            if (array_key_exists('role_id', $body)) {
+                Response::error(403, 'نقش حساب کاربری خودتان قابل تغییر نیست');
             }
         }
 
@@ -577,30 +585,58 @@ function registerDefectRoutes(Router $router): void
             if ($mp === null) {
                 $updates[] = '`module_permissions` = NULL';
             } elseif (is_array($mp)) {
-                $clean = [];
-                $allowedTools = ['view', 'create', 'edit', 'delete', 'import', 'export'];
-                foreach ($mp as $k => $v) {
-                    if (!is_string($k) || $k === '' || $k === 'id') continue;
-                    if ($v === true) { $clean[$k] = true; continue; }
-                    if (is_array($v)) {
-                        if (($v['view'] ?? true) === false) { $clean[$k] = false; continue; }
-                        $tools = ['view' => true];
-                        foreach ($allowedTools as $t) {
-                            if ($t !== 'view' && !empty($v[$t])) $tools[$t] = true;
-                        }
-                        $clean[$k] = $tools;
-                    } else {
-                        $clean[$k] = false;
-                    }
-                }
+                // v4.3.83: پاک‌سازی متمرکز در Helpers
                 $updates[] = '`module_permissions` = ?';
-                $params[] = json_encode($clean, JSON_UNESCAPED_UNICODE);
+                $params[] = Helpers::cleanModulePermissions($mp);
             }
         }
-        if (!$updates) Response::error(400, 'هیچ فیلدی برای ویرایش ارسال نشده');
-        $updates[] = 'updated_at = NOW()';
-        $params[] = (int) $id;
-        $pdo->prepare('UPDATE users SET ' . implode(', ', $updates) . ' WHERE id = ?')->execute($params);
+        if (!$updates && !array_key_exists('role_id', $body)) Response::error(400, 'هیچ فیلدی برای ویرایش ارسال نشده');
+        if ($updates) {
+            $updates[] = 'updated_at = NOW()';
+            $params[] = (int) $id;
+            $pdo->prepare('UPDATE users SET ' . implode(', ', $updates) . ' WHERE id = ?')->execute($params);
+        }
+
+        // v4.3.83 (RBAC): تخصیص نقش — تک‌نقشی؛ null = حذف نقش (فقط‌مشاهده)
+        if (array_key_exists('role_id', $body)) {
+            $assignRoleId = null;
+            $rv = $body['role_id'];
+            if ($rv !== null && $rv !== '' && (int) $rv > 0) {
+                $roleStmt = $pdo->prepare('SELECT id, display_name, status FROM roles WHERE id = ?');
+                $roleStmt->execute([(int) $rv]);
+                $roleRow = $roleStmt->fetch();
+                if (!$roleRow) Response::error(404, 'نقش انتخاب‌شده پیدا نشد');
+                $assignRoleId = (int) $roleRow['id'];
+            }
+
+            // آیا این حساب بعد از همین ویرایش هم مدیر سیستم می‌ماند؟
+            $remainsAdmin = true;
+            if (array_key_exists('district_id', $body)) {
+                $v = $body['district_id'];
+                $remainsAdmin = ($v === null || $v === '' || (int) $v <= 0);
+            } else {
+                $remainsAdmin = ($current['district_id'] === null || (int) $current['district_id'] <= 0);
+            }
+            if ($remainsAdmin) {
+                // مدیر سیستم همیشه نقش super_admin را نگه می‌دارد (سطح دسترسی واقعی از «امور» می‌آید)
+                $superStmt = $pdo->prepare("SELECT id FROM roles WHERE name = 'super_admin' LIMIT 1");
+                $superStmt->execute();
+                $superId = $superStmt->fetchColumn();
+                if ($assignRoleId !== null && $superId && (int) $assignRoleId !== (int) $superId) {
+                    Response::error(403, 'این حساب مدیر سیستم است — نقش مدیر همیشه «مدیر ارشد سیستم» است؛ برای نقش دلخواه ابتدا امور بهره‌برداری اختصاص دهید');
+                }
+                $assignRoleId = $superId ? (int) $superId : null;
+            }
+
+            try {
+                $pdo->prepare('DELETE FROM user_roles WHERE user_id = ?')->execute([(int) $id]);
+                if ($assignRoleId !== null) {
+                    $pdo->prepare('INSERT INTO user_roles (user_id, role_id, assigned_at) VALUES (?, ?, NOW())')->execute([(int) $id, $assignRoleId]);
+                }
+            } catch (Throwable $e) {
+                Response::error(500, 'تخصیص نقش انجام نشد — جداول roles/user_roles در دسترس نیستند');
+            }
+        }
         Response::success(null, 'کاربر ویرایش شد');
     });
 
@@ -632,26 +668,27 @@ function registerDefectRoutes(Router $router): void
 
         $status = in_array((string) ($b['status'] ?? 'active'), ['inactive', '0'], true) ? 'inactive' : 'active';
 
-        // ماتریس دسترسی اولیه (اختیاری)
+        // ماتریس دسترسی اولیه (اختیاری — سازگار با ایمپورت) — v4.3.83: پاک‌سازی متمرکز
         $mpJson = null;
         if (isset($b['module_permissions']) && is_array($b['module_permissions']) && Helpers::columnExists('users', 'module_permissions')) {
-            $clean = [];
-            $allowedTools = ['view', 'create', 'edit', 'delete', 'import', 'export'];
-            foreach ($b['module_permissions'] as $k => $v) {
-                if (!is_string($k) || $k === '' || $k === 'id') continue;
-                if ($v === true) { $clean[$k] = true; continue; }
-                if (is_array($v)) {
-                    if (($v['view'] ?? true) === false) { $clean[$k] = false; continue; }
-                    $tools = ['view' => true];
-                    foreach ($allowedTools as $t) {
-                        if ($t !== 'view' && !empty($v[$t])) $tools[$t] = true;
-                    }
-                    $clean[$k] = $tools;
-                } else {
-                    $clean[$k] = false;
-                }
-            }
-            $mpJson = json_encode($clean, JSON_UNESCAPED_UNICODE);
+            $mpJson = Helpers::cleanModulePermissions($b['module_permissions']);
+        }
+
+        // v4.3.83 (RBAC): نقش اولیه — انتخابی؛ مدیر سیستم همیشه super_admin
+        $assignRoleId = null;
+        if ($districtId === null) {
+            try {
+                $superStmt = $pdo->prepare("SELECT id FROM roles WHERE name = 'super_admin' LIMIT 1");
+                $superStmt->execute();
+                $superId = $superStmt->fetchColumn();
+                $assignRoleId = $superId ? (int) $superId : null;
+            } catch (Throwable $e) { /* بدون نقش مدیر */ }
+        } elseif (array_key_exists('role_id', $b) && $b['role_id'] !== null && $b['role_id'] !== '' && (int) $b['role_id'] > 0) {
+            $roleStmt = $pdo->prepare('SELECT id FROM roles WHERE id = ?');
+            $roleStmt->execute([(int) $b['role_id']]);
+            $roleHit = $roleStmt->fetchColumn();
+            if (!$roleHit) Response::error(404, 'نقش انتخاب‌شده پیدا نشد');
+            $assignRoleId = (int) $roleHit;
         }
 
         $cols = ['username', 'full_name', 'password_hash', 'status'];
@@ -668,16 +705,13 @@ function registerDefectRoutes(Router $router): void
         $pdo->prepare($sql)->execute($vals);
         $newId = (int) $pdo->lastInsertId();
 
-        // تخصیص نقش — کاربر اموردار: district_user، بدون امور: super_admin
-        try {
-            $roleName = $districtId !== null ? 'district_user' : 'super_admin';
-            $role = $pdo->prepare('SELECT id FROM roles WHERE name = ? LIMIT 1');
-            $role->execute([$roleName]);
-            $roleId = $role->fetchColumn();
-            if ($roleId) {
-                $pdo->prepare('INSERT IGNORE INTO user_roles (user_id, role_id, assigned_at) VALUES (?, ?, NOW())')->execute([$newId, (int) $roleId]);
-            }
-        } catch (Throwable $e) { /* نقش تخصیص نشد — کاربر همچنان با محدودیت امور/ماتریس کار می‌کند */ }
+        // v4.3.83: تخصیص نقش — تک‌نقشی؛ کاربر بدون نقش = فقط‌مشاهده (fallback مجوز شخصی)
+        if ($assignRoleId !== null) {
+            try {
+                $pdo->prepare('DELETE FROM user_roles WHERE user_id = ?')->execute([$newId]);
+                $pdo->prepare('INSERT INTO user_roles (user_id, role_id, assigned_at) VALUES (?, ?, NOW())')->execute([$newId, $assignRoleId]);
+            } catch (Throwable $e) { /* نقش تخصیص نشد — کاربر با محدودیت امور/ماتریس کار می‌کند */ }
+        }
 
         Response::success(['id' => $newId], 'کاربر ایجاد شد' . ($password === '123456' ? ' — رمز پیش‌فرض 123456' : ''), 201);
     });
@@ -716,6 +750,181 @@ function registerDefectRoutes(Router $router): void
 
         $pdo->prepare('DELETE FROM users WHERE id = ?')->execute([(int) $id]);
         Response::success(null, 'کاربر حذف شد');
+    });
+
+    // =============== /roles endpoints — v4.3.83 (RBAC) ===============
+    // دسترسی‌ها روی نقش تعریف و در تب کاربران به هر نفر یک نقش اختصاص می‌یابد.
+    // پیش از اجرای SQL 4.3.83 فقط فهرست/توضیحات قابل استفاده است (ماتریس = NULL).
+
+    $router->get('roles', function () {
+        Auth::authenticate();
+        Auth::requireRole('super_admin');
+
+        $db = Database::getInstance();
+        $pdo = $db->getConnection();
+        $search = Helpers::getSearch();
+        $page = Helpers::getPage();
+        $pageSize = Helpers::getPageSize();
+        $offset = Helpers::getOffset();
+
+        $permSel = Helpers::columnExists('roles', 'module_permissions') ? 'r.module_permissions' : 'NULL AS module_permissions';
+        $statusSel = Helpers::columnExists('roles', 'status') ? 'r.status' : "'active' AS status";
+
+        $where = '1=1'; $params = [];
+        if (!empty($search)) {
+            $where = '(r.display_name LIKE ? OR r.name LIKE ? OR r.description LIKE ?)';
+            $sp = "%$search%"; $params = [$sp, $sp, $sp];
+        }
+
+        $countStmt = $pdo->prepare("SELECT COUNT(*) FROM roles r WHERE $where");
+        $countStmt->execute($params);
+        $total = (int) $countStmt->fetchColumn();
+
+        $sql = "SELECT r.id, r.name, r.display_name, r.description, r.is_system, $statusSel, $permSel, r.created_at,
+                       (SELECT COUNT(*) FROM user_roles ur WHERE ur.role_id = r.id) AS users_count
+                FROM roles r
+                WHERE $where
+                ORDER BY r.is_system DESC, r.id ASC
+                LIMIT $pageSize OFFSET $offset";
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute($params);
+        $rows = $stmt->fetchAll();
+
+        $data = array_map(fn($r) => [
+            'id' => (int) $r['id'],
+            'name' => $r['name'],
+            'display_name' => $r['display_name'],
+            'description' => $r['description'],
+            'is_system' => (int) $r['is_system'],
+            'status' => (string) $r['status'],
+            'module_permissions' => (function () use ($r) {
+                $raw = $r['module_permissions'] ?? null;
+                if (is_string($raw) && $raw !== '') {
+                    $decoded = json_decode($raw, true);
+                    if (is_array($decoded) && $decoded) return $decoded;
+                }
+                return null;
+            })(),
+            'users_count' => (int) $r['users_count'],
+            'created_at' => $r['created_at'],
+        ], $rows);
+
+        Response::paginated($data, $page, $pageSize, $total);
+    });
+
+    // v4.3.83: ثبت نقش جدید — ماتریس دسترسی بعداً از تب «دسترسی‌ها»
+    $router->post('roles', function () {
+        Auth::authenticate();
+        Auth::requireRole('super_admin');
+        $b = Helpers::getJsonBody();
+        $pdo = Database::getInstance()->getConnection();
+
+        $displayName = trim((string) ($b['display_name'] ?? ''));
+        if ($displayName === '') Response::error(400, 'نام نقش الزامی است');
+        if (mb_strlen($displayName) > 200) Response::error(400, 'نام نقش حداکثر ۲۰۰ کاراکتر است');
+
+        $dup = $pdo->prepare('SELECT id FROM roles WHERE display_name = ? LIMIT 1');
+        $dup->execute([$displayName]);
+        if ($dup->fetch()) Response::error(409, 'نقشی با همین نام قبلاً ثبت شده است');
+
+        $description = trim((string) ($b['description'] ?? ''));
+        $description = $description === '' ? null : $description;
+        $status = in_array((string) ($b['status'] ?? 'active'), ['inactive', '0'], true) ? 'inactive' : 'active';
+
+        // ماتریس دسترسی (اختیاری — برای «کپی نقش» از فرانت می‌آید)
+        $mpJson = null;
+        if (isset($b['module_permissions']) && is_array($b['module_permissions']) && Helpers::columnExists('roles', 'module_permissions')) {
+            $mpJson = Helpers::cleanModulePermissions($b['module_permissions']);
+        }
+
+        $cols = ['name', 'display_name', 'is_system'];
+        $vals = [$displayName, $displayName, 0];
+        if (Helpers::columnExists('roles', 'description')) { $cols[] = 'description'; $vals[] = $description; }
+        if (Helpers::columnExists('roles', 'status')) { $cols[] = 'status'; $vals[] = $status; }
+        if ($mpJson !== null && Helpers::columnExists('roles', 'module_permissions')) { $cols[] = 'module_permissions'; $vals[] = $mpJson; }
+
+        $sql = 'INSERT INTO roles (`' . implode('`, `', $cols) . '`, created_at) VALUES (' . implode(', ', array_fill(0, count($cols), '?')) . ', NOW())';
+        $pdo->prepare($sql)->execute($vals);
+        $newId = (int) $pdo->lastInsertId();
+
+        Response::success(['id' => $newId], 'نقش ایجاد شد', 201);
+    });
+
+    // v4.3.83: ویرایش نقش — مشخصات + ماتریس دسترسی (از دیالوگ دسترسی‌ها)
+    $router->put('roles/{id}', function ($id) {
+        Auth::authenticate();
+        Auth::requireRole('super_admin');
+        $body = Helpers::getJsonBody();
+        $pdo = Database::getInstance()->getConnection();
+
+        $stmt = $pdo->prepare('SELECT id, name, display_name, is_system FROM roles WHERE id = ?');
+        $stmt->execute([(int) $id]);
+        $role = $stmt->fetch();
+        if (!$role) Response::error(404, 'نقش پیدا نشد');
+
+        $updates = []; $params = [];
+        if (array_key_exists('display_name', $body)) {
+            $dn = trim((string) $body['display_name']);
+            if ($dn === '') Response::error(400, 'نام نقش خالی نمی‌تواند');
+            if ((int) $role['is_system'] === 1 && $dn !== (string) $role['display_name']) {
+                Response::error(403, 'نام نقش سیستمی قابل تغییر نیست');
+            }
+            $dup = $pdo->prepare('SELECT id FROM roles WHERE display_name = ? AND id != ? LIMIT 1');
+            $dup->execute([$dn, (int) $id]);
+            if ($dup->fetch()) Response::error(409, 'نقشی با همین نام قبلاً ثبت شده است');
+            $updates[] = '`display_name` = ?'; $params[] = $dn;
+            if ((int) $role['is_system'] === 0) { $updates[] = '`name` = ?'; $params[] = $dn; }
+        }
+        if (array_key_exists('description', $body) && Helpers::columnExists('roles', 'description')) {
+            $d = trim((string) $body['description']);
+            $updates[] = '`description` = ?';
+            $params[] = $d === '' ? null : $d;
+        }
+        if (array_key_exists('status', $body) && Helpers::columnExists('roles', 'status')) {
+            $sv = (string) $body['status'];
+            $updates[] = '`status` = ?';
+            $params[] = ($sv === 'inactive' || $sv === '0') ? 'inactive' : 'active';
+        }
+        // ماتریس دسترسی نقش — قلب تب «دسترسی‌ها»
+        if (array_key_exists('module_permissions', $body) && Helpers::columnExists('roles', 'module_permissions')) {
+            $mp = $body['module_permissions'];
+            if ($mp === null) {
+                $updates[] = '`module_permissions` = NULL';
+            } elseif (is_array($mp)) {
+                $updates[] = '`module_permissions` = ?';
+                $params[] = Helpers::cleanModulePermissions($mp);
+            } else {
+                Response::error(400, 'فرمت ماتریس دسترسی معتبر نیست');
+            }
+        }
+        if (!$updates) Response::error(400, 'هیچ فیلدی برای ویرایش ارسال نشده');
+        $updates[] = 'updated_at = NOW()';
+        $params[] = (int) $id;
+        $pdo->prepare('UPDATE roles SET ' . implode(', ', $updates) . ' WHERE id = ?')->execute($params);
+        Response::success(null, 'نقش ویرایش شد');
+    });
+
+    // v4.3.83: حذف نقش — نقش سیستمی/درحال‌استفاده حذف نمی‌شود
+    $router->delete('roles/{id}', function ($id) {
+        Auth::authenticate();
+        Auth::requireRole('super_admin');
+        $pdo = Database::getInstance()->getConnection();
+
+        $stmt = $pdo->prepare('SELECT id, display_name, is_system FROM roles WHERE id = ?');
+        $stmt->execute([(int) $id]);
+        $role = $stmt->fetch();
+        if (!$role) Response::error(404, 'نقش پیدا نشد');
+        if ((int) $role['is_system'] === 1) Response::error(403, 'نقش سیستمی حذف نمی‌شود');
+
+        $cnt = $pdo->prepare('SELECT COUNT(*) FROM user_roles WHERE role_id = ?');
+        $cnt->execute([(int) $id]);
+        $usersCount = (int) $cnt->fetchColumn();
+        if ($usersCount > 0) {
+            Response::error(409, "این نقش به {$usersCount} کاربر اختصاص دارد — ابتدا از تب «اطلاعات کاربران» نقش آن‌ها را تغییر دهید");
+        }
+
+        $pdo->prepare('DELETE FROM roles WHERE id = ?')->execute([(int) $id]);
+        Response::success(null, 'نقش حذف شد');
     });
 }
 

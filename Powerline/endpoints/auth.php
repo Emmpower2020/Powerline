@@ -81,20 +81,14 @@ function registerAuthRoutes(Router $router): void
             }
         }
 
-        // v4.3.81: نقشهٔ دسترسی ماژول‌های کاربر (اگر ستون وجود داشته باشد) —
-        // null یعنی همهٔ بخش‌ها مجاز؛ مقدار false یعنی آن بخش مسدود است
+        // v4.3.83 (RBAC): نقش کاربر + دسترسی مؤثر — ماتریس نقش مقدم بر مجوز شخصی
+        // کاربر بدون نقش → مجوز شخصی قبلی را حمل می‌کند (null = فقط‌خوانده)
+        $primaryRole = Helpers::userPrimaryRole((int) $user['id']);
+        $roleId = $primaryRole['id'] ?? null;
+        $roleName = $primaryRole['display_name'] ?? null;
         $modulePermissions = null;
-        if ($districtId !== null && Helpers::columnExists('users', 'module_permissions')) {
-            try {
-                $row = Database::getInstance()->fetchOne("SELECT module_permissions FROM users WHERE id = ?", [$user['id']]);
-                $raw = $row['module_permissions'] ?? null;
-                if (is_string($raw) && $raw !== '') {
-                    $decoded = json_decode($raw, true);
-                    if (is_array($decoded)) $modulePermissions = $decoded;
-                }
-            } catch (Throwable $e) {
-                $modulePermissions = null;
-            }
+        if ($districtId !== null) {
+            $modulePermissions = Helpers::effectiveModulePermissions((int) $user['id']);
         }
 
         Response::success([
@@ -109,6 +103,9 @@ function registerAuthRoutes(Router $router): void
                 'district_name'   => $districtName,
                 // v4.3.81: دسترسی ماژول‌ها — null یعنی همه (مدیرها همیشه null می‌مانند)
                 'module_permissions' => $modulePermissions,
+                // v4.3.83: نقش اختصاصیافته — دسترسی مؤثر از ماتریس همین نقش می‌آید
+                'role_id' => $roleId,
+                'role_name' => $roleName,
             ],
             'roles'       => $roles,
             'permissions' => $permissions,

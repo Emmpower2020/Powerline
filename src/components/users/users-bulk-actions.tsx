@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { putUser } from "@/lib/users-api";
+import { putRole, type RoleRow } from "@/lib/roles-api";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -12,8 +13,9 @@ import {
   DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { SearchableSelect } from "@/components/searchable-select";
-import { ListChecks, Power, PowerOff, KeyRound, ShieldCheck, Copy, CheckSquare, Eye, Ban, Loader2 } from "lucide-react";
-import { compactPermissions, presetRows, toEditableRows, summarizePermissions, type EditablePermRow } from "@/lib/module-access";
+import { ListChecks, Power, PowerOff, KeyRound, ShieldCheck, Copy, CheckSquare, Eye, Ban, UserCog, Loader2 } from "lucide-react";
+import { compactPermissions, presetRows, toEditableRows, summarizePermissions, type EditablePermRow, type ModulePermValue } from "@/lib/module-access";
+import { roleToPermSource } from "./permissions-dialog";
 import { useToast } from "@/hooks/use-toast";
 import type { UserRow } from "./permissions-dialog";
 
@@ -28,19 +30,22 @@ function ApplyingBar({ label, done, total }: { label: string; done: number; tota
 }
 
 /**
- * منوی «عملیات گروهی» تب کاربران — v4.3.82
- * فعال/غیرفعال گروهی + ریست رمز عبور به 123456 (همان الگوی بقیه جدول‌ها).
+ * منوی «عملیات گروهی» تب کاربران — v4.3.83
+ * فعال/غیرفعال گروهی + ریست رمز 123456 + تغییر نقش (RBAC).
  */
 export function UsersStatusActions({
-  selectedUsers, onApplied, selfUserId,
+  selectedUsers, onApplied, selfUserId, roles,
 }: {
   selectedUsers: UserRow[];
   onApplied: () => void;
   selfUserId?: number | null;
+  roles: RoleRow[];
 }) {
   const { toast } = useToast();
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
+  const [roleOpen, setRoleOpen] = useState(false);
+  const [roleId, setRoleId] = useState("");
 
   const requiresSelection = () => {
     if (!selectedUsers.length) {
@@ -106,6 +111,43 @@ export function UsersStatusActions({
     onApplied();
   };
 
+  /** v4.3.83: تغییر گروهی نقش — «نامشخص» یعنی حذف نقش کاربران */
+  const applyRole = async () => {
+    // خودمان را از تغییر نقش مستثنی می‌کنیم (بک‌اند هم بلاک می‌کند)
+    const targets = selectedUsers.filter(u => u.id !== selfUserId);
+    const isClear = !roleId || roleId === "__unknown__";
+    const role = roles.find(r => String(r.id) === roleId);
+    setRoleOpen(false);
+    if (!targets.length) {
+      toast({ title: "غيرمجاز", description: "نقش حساب کاربری خودتان قابل تغییر نیست", variant: "destructive" });
+      return;
+    }
+    setBusy(true);
+    const prog = { done: 0, total: targets.length };
+    setProgress({ ...prog });
+    let failed = 0;
+    for (const user of targets) {
+      try {
+        await putUser(user.id, { role_id: isClear ? null : Number(roleId) });
+      } catch { failed++; }
+      prog.done++;
+      setProgress({ ...prog });
+    }
+    setBusy(false);
+    setProgress(null);
+    setRoleId("");
+    toast({
+      title: failed ? "تغییر نقش ناقص ماند" : "نقش کاربران تغییر کرد",
+      description: failed
+        ? `${failed.toLocaleString("fa-IR")} کاربر به‌دلیل خطا تغییر نکرد`
+        : isClear
+          ? `نقش ${targets.length.toLocaleString("fa-IR")} کاربر حذف شد — دسترسی‌شان فقط‌مشاهده می‌شود`
+          : `نقش «${role?.display_name ?? ""}» به ${targets.length.toLocaleString("fa-IR")} کاربر اختصاص یافت`,
+      variant: failed ? "destructive" : undefined,
+    });
+    onApplied();
+  };
+
   return (
     <div className="flex items-center gap-2">
       {busy && progress && <ApplyingBar label="در حال اعمال" {...progress} />}
@@ -125,25 +167,78 @@ export function UsersStatusActions({
             <PowerOff className="w-4 h-4 text-slate-500" />غیرفعال کردن
           </DropdownMenuItem>
           <DropdownMenuSeparator />
+          <DropdownMenuItem className="gap-2 cursor-pointer" onClick={() => { if (requiresSelection()) return; setRoleOpen(true); }}>
+            <UserCog className="w-4 h-4 text-indigo-600" />تغییر نقش...
+          </DropdownMenuItem>
           <DropdownMenuItem className="gap-2 cursor-pointer" onClick={resetPasswords}>
             <KeyRound className="w-4 h-4 text-amber-600" />ریست رمز به 123456
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
+
+      {/* دیالوگ انتخاب نقش برای تغییر گروهی */}
+      <Dialog open={roleOpen} onOpenChange={(o) => { if (!busy) setRoleOpen(o); }}>
+        <DialogContent className="max-w-md" dir="rtl">
+          <DialogHeader>
+            <DialogTitle className="text-right flex items-center gap-2">
+              <UserCog className="w-5 h-5 text-indigo-600" />
+              تغییر گروهی نقش کاربران
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <p className="text-sm text-slate-500 text-right leading-6">
+              نقش انتخاب‌شده به
+              <span className="font-bold text-indigo-600 nums-fa"> {selectedUsers.length.toLocaleString("fa-IR")} </span>
+              کاربر اختصاص می‌یابد و دسترسی‌های همان نقش برایشان اعمال می‌شود.
+            </p>
+            <div className="space-y-2">
+              <SearchableSelect
+                value={roleId}
+                onChange={setRoleId}
+                placeholder="انتخاب نقش..."
+                options={roles
+                  .filter(r => isActiveRole(r))
+                  .map(r => {
+                    const sum = summarizePermissions(toEditableRows(roleToPermSource(r)));
+                    return {
+                      value: String(r.id),
+                      label: r.display_name,
+                      description: `${Number(r.users_count ?? 0).toLocaleString("fa-IR")} کاربر · ${sum.modules.toLocaleString("fa-IR")} بخش · ${sum.tools.toLocaleString("fa-IR")} ابزار`,
+                    };
+                  })}
+              />
+              <p className="text-[10px] text-slate-400 text-right leading-5">
+                «نامشخص» = حذف نقش — کاربر بدون نقش همهٔ بخش‌ها را فقط مشاهده می‌کند
+              </p>
+            </div>
+          </div>
+          <DialogFooter className="gap-2">
+            <Button type="button" variant="outline" onClick={() => setRoleOpen(false)}>انصراف</Button>
+            <Button type="button" className="bg-indigo-600 hover:bg-indigo-700" onClick={applyRole}>
+              <UserCog className="w-4 h-4" />اعمال نقش
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
 
+function isActiveRole(r: RoleRow): boolean {
+  const s = String(r.status ?? "active");
+  return !(s === "inactive" || s === "0" || s === "false");
+}
+
 /**
- * منوی «عملیات گروهی» تب دسترسی‌ها — v4.3.82
- * ویرایش گروهی ماتریس + کپی دسترسی از کاربر دیگر + پیش‌تنظیم‌های سریع.
+ * منوی «عملیات گروهی» تب دسترسی‌ها — v4.3.83 (RBAC)
+ * ویرایش گروهی ماتریس نقش‌ها + کپی دسترسی از نقش دیگر + پیش‌تنظیم‌های سریع.
  */
-export function PermissionsBulkActions({
-  selectedUsers, allUsers, onOpenMatrix, onApplied,
+export function RolePermissionsBulkActions({
+  selectedRoles, allRoles, onOpenMatrix, onApplied,
 }: {
-  selectedUsers: UserRow[];
-  allUsers: UserRow[];
-  onOpenMatrix: (targets: UserRow[], source: UserRow | null) => void;
+  selectedRoles: RoleRow[];
+  allRoles: RoleRow[];
+  onOpenMatrix: (targets: RoleRow[], source: RoleRow | null) => void;
   onApplied: () => void;
 }) {
   const { toast } = useToast();
@@ -152,20 +247,14 @@ export function PermissionsBulkActions({
   const [copyOpen, setCopyOpen] = useState(false);
   const [sourceId, setSourceId] = useState("");
 
-  /** فقط کاربران غیرمدیر — دسترسی مدیر تغییرناپذیر است */
-  const targets = useMemo(() => selectedUsers.filter(u => u.district_id != null), [selectedUsers]);
   const copyCandidates = useMemo(
-    () => allUsers.filter(u => u.district_id != null && !targets.some(t => t.id === u.id)),
-    [allUsers, targets]
+    () => allRoles.filter(r => !selectedRoles.some(t => t.id === r.id)),
+    [allRoles, selectedRoles]
   );
 
   const requiresSelection = () => {
-    if (!selectedUsers.length) {
-      toast({ title: "هیچ کاربری انتخاب نشده", description: "ابتدا کاربر(ان) مورد نظر را در جدول انتخاب کنید" });
-      return true;
-    }
-    if (!targets.length) {
-      toast({ title: "مدیر سیستم", description: "دسترسی مدیر سیستم (بدون امور) همیشه کامل و تغییرناپذیر است" });
+    if (!selectedRoles.length) {
+      toast({ title: "هیچ نقشی انتخاب نشده", description: "ابتدا نقش(های) مورد نظر را در جدول انتخاب کنید" });
       return true;
     }
     return false;
@@ -174,12 +263,12 @@ export function PermissionsBulkActions({
   const applyMap = async (rows: Record<string, EditablePermRow>, label: string) => {
     setBusy(true);
     const map = compactPermissions(rows);
-    const prog = { done: 0, total: targets.length };
+    const prog = { done: 0, total: selectedRoles.length };
     setProgress({ ...prog });
     let failed = 0;
-    for (const user of targets) {
+    for (const role of selectedRoles) {
       try {
-        await putUser(user.id, { module_permissions: map });
+        await putRole(role.id, { module_permissions: map });
       } catch { failed++; }
       prog.done++;
       setProgress({ ...prog });
@@ -189,8 +278,8 @@ export function PermissionsBulkActions({
     toast({
       title: failed ? `${label} ناقص ماند` : `${label} اعمال شد`,
       description: failed
-        ? `${failed.toLocaleString("fa-IR")} کاربر به‌دلیل خطا ذخیره نشد`
-        : `برای ${targets.length.toLocaleString("fa-IR")} کاربر ذخیره شد`,
+        ? `${failed.toLocaleString("fa-IR")} نقش به‌دلیل خطا ذخیره نشد`
+        : `برای ${selectedRoles.length.toLocaleString("fa-IR")} نقش ذخیره شد — کاربران همان نقش بلافاصله شامل می‌شوند`,
       variant: failed ? "destructive" : undefined,
     });
     onApplied();
@@ -203,14 +292,14 @@ export function PermissionsBulkActions({
   };
 
   const confirmCopy = async () => {
-    const source = allUsers.find(u => String(u.id) === sourceId);
+    const source = allRoles.find(r => String(r.id) === sourceId);
     if (!source) {
-      toast({ title: "کاربر مبدأ را انتخاب کنید" });
+      toast({ title: "نقش مبدأ را انتخاب کنید" });
       return;
     }
     setCopyOpen(false);
     setSourceId("");
-    await applyMap(toEditableRows(source), `کپی دسترسی از ${source.full_name}`);
+    await applyMap(toEditableRows(roleToPermSource(source)), `کپی دسترسی از ${source.display_name}`);
   };
 
   return (
@@ -224,14 +313,14 @@ export function PermissionsBulkActions({
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start" className="w-64">
           <DropdownMenuLabel className="text-xs text-right">
-            عملیات گروهی دسترسی — {selectedUsers.length ? `${targets.length.toLocaleString("fa-IR")} کاربر` : "کاربران"}
+            عملیات گروهی دسترسی — {selectedRoles.length ? `${selectedRoles.length.toLocaleString("fa-IR")} نقش` : "نقش‌ها"}
           </DropdownMenuLabel>
           <DropdownMenuSeparator />
-          <DropdownMenuItem className="gap-2 cursor-pointer" onClick={() => { if (requiresSelection()) return; onOpenMatrix(targets, targets[0] ?? null); }}>
+          <DropdownMenuItem className="gap-2 cursor-pointer" onClick={() => { if (requiresSelection()) return; onOpenMatrix(selectedRoles, selectedRoles[0] ?? null); }}>
             <ShieldCheck className="w-4 h-4 text-indigo-600" />ویرایش گروهی دسترسی‌ها...
           </DropdownMenuItem>
           <DropdownMenuItem className="gap-2 cursor-pointer" onClick={() => { if (requiresSelection()) return; setCopyOpen(true); }}>
-            <Copy className="w-4 h-4 text-emerald-600" />کپی دسترسی از کاربر...
+            <Copy className="w-4 h-4 text-emerald-600" />کپی دسترسی از نقش...
           </DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem className="gap-2 cursor-pointer" onClick={() => applyPreset("full")}>
@@ -246,32 +335,32 @@ export function PermissionsBulkActions({
         </DropdownMenuContent>
       </DropdownMenu>
 
-      {/* دیالوگ انتخاب کاربر مبدأ برای کپی دسترسی */}
-      <Dialog open={copyOpen} onOpenChange={setCopyOpen}>
+      {/* دیالوگ انتخاب نقش مبدأ برای کپی دسترسی */}
+      <Dialog open={copyOpen} onOpenChange={(o) => { if (!busy) setCopyOpen(o); }}>
         <DialogContent className="max-w-md" dir="rtl">
           <DialogHeader>
             <DialogTitle className="text-right flex items-center gap-2">
               <Copy className="w-5 h-5 text-emerald-600" />
-              کپی دسترسی از کاربر دیگر
+              کپی دسترسی از نقش دیگر
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-3">
             <p className="text-sm text-slate-500 text-right leading-6">
-              دسترسی‌های دقیق کاربر مبدأ (بخش‌ها + ابزارها) روی
-              <span className="font-bold text-indigo-600 nums-fa"> {targets.length.toLocaleString("fa-IR")} </span>
-              کاربر انتخاب‌شده کپی می‌شود.
+              دسترسی‌های دقیق نقش مبدأ (بخش‌ها + ابزارها) روی
+              <span className="font-bold text-indigo-600 nums-fa"> {selectedRoles.length.toLocaleString("fa-IR")} </span>
+              نقش انتخاب‌شده کپی می‌شود.
             </p>
             <div className="space-y-2">
               <SearchableSelect
                 value={sourceId}
                 onChange={setSourceId}
-                placeholder="انتخاب کاربر مبدأ..."
-                options={copyCandidates.map(u => {
-                  const sum = summarizePermissions(toEditableRows(u));
+                placeholder="انتخاب نقش مبدأ..."
+                options={copyCandidates.map(r => {
+                  const sum = summarizePermissions(toEditableRows(roleToPermSource(r)));
                   return {
-                    value: String(u.id),
-                    label: `${u.full_name} (@${u.username})`,
-                    description: `${sum.modules.toLocaleString("fa-IR")} بخش · ${sum.tools.toLocaleString("fa-IR")} ابزار`,
+                    value: String(r.id),
+                    label: r.display_name,
+                    description: `${Number(r.users_count ?? 0).toLocaleString("fa-IR")} کاربر · ${sum.modules.toLocaleString("fa-IR")} بخش · ${sum.tools.toLocaleString("fa-IR")} ابزار`,
                   };
                 })}
               />
@@ -289,12 +378,12 @@ export function PermissionsBulkActions({
   );
 }
 
-/** خلاصهٔ دسترسی برای ستون جدول — «x از ۲۳ بخش · y ابزار» */
-export function AccessSummaryCell({ user }: { user: UserRow }) {
-  if (user.district_id == null) {
-    return <Badge variant="outline" className="text-[11px] border-slate-200 text-slate-500">دسترسی کامل (مدیر)</Badge>;
+/** خلاصهٔ دسترسی یک ماتریس (نقش یا کاربر) — «x از ۲۳ بخش · y ابزار» */
+export function PermSummaryCell({ map }: { map: Record<string, ModulePermValue> | null | undefined }) {
+  if (map == null) {
+    return <Badge variant="outline" className="text-[11px] border-amber-200 text-amber-700 dark:text-amber-300">تعریف‌نشده — فقط مشاهده</Badge>;
   }
-  const sum = summarizePermissions(toEditableRows(user));
+  const sum = summarizePermissions(toEditableRows({ district_id: 1, module_permissions: map }));
   const total = 23;
   return (
     <div className="flex flex-col gap-1 items-start">

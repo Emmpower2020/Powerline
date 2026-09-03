@@ -104,12 +104,12 @@ function invalidateAllCache(): void {
   GET_CACHE.clear();
 }
 
-// ─── v4.3.82 (فقط توسعه): شبیه‌ساز مدیریت کاربران ───
-// بک‌اند قدیمی هاست (4.3.81) مقدار آبجکتی ماتریس دسترسی را false ذخیره می‌کرد و
-// POST/DELETE کاربر نداشت. تا زمان آپلود بک‌اند 4.3.82، نوشتن‌های /users در حالت
+// ─── v4.3.83 (فقط توسعه): شبیه‌ساز مدیریت کاربران/نقش‌ها ───
+// بک‌اند قدیمی هاست (≤4.3.82) endpoint نقش‌ها ندارد و role_id در PUT /users را
+// نادیده می‌گرفت. تا زمان آپلود بک‌اند 4.3.83، نوشتن‌های /users و /roles در حالت
 // توسعه به‌صورت محلی شبیه‌سازی می‌شوند (روی overlay حافظه‌ای) و هرگز به هاست نمی‌رسند.
 // با آپلود بک‌اند جدید، شبیه‌ساز خودش غیرفعال می‌شود و همه‌چیز واقعی می‌شود.
-const SIM_VERSION = [4, 3, 82];
+const SIM_VERSION = [4, 3, 83];
 let upstreamVersionCache: number[] | null = null;
 
 function versionAtLeast(v: number[], ref: number[]): boolean {
@@ -173,7 +173,15 @@ async function simulateUsersWrite(method: string, path: string, bodyText: string
 
   if (method === "PUT" && idMatch) {
     const id = Number(idMatch[1]);
-    simUserPatches.set(id, { ...(simUserPatches.get(id) ?? {}), ...body });
+    const patch: Record<string, any> = { ...(simUserPatches.get(id) ?? {}), ...body };
+    // role_id عددی → نام نقش هم روی overlay گذاشته می‌شود تا ستون نقش درست نمایش داده شود
+    if (body.role_id !== undefined) {
+      const role = simAllRoles().find(r => r.id === Number(body.role_id));
+      patch.role_id = body.role_id == null ? null : Number(body.role_id);
+      patch.role_name = role ? role.display_name : null;
+      patch.roles = role ? role.display_name : null;
+    }
+    simUserPatches.set(id, patch);
     simDeletedIds.delete(id);
     console.log(`[DEV SIM] users PUT ${id} — patch اعمال شد روی overlay`);
     return json({ success: true, message: "کاربر ویرایش شد (شبیه‌ساز توسعه)", data: null });
@@ -190,13 +198,16 @@ async function simulateUsersWrite(method: string, path: string, bodyText: string
   if (method === "POST" && path === "/users") {
     const id = simNextUserId++;
     const districtId = body.district_id != null ? Number(body.district_id) : null;
+    const role = body.role_id != null ? simAllRoles().find(r => r.id === Number(body.role_id)) : undefined;
     const user = {
       id,
       username: String(body.username ?? ""),
       full_name: String(body.full_name ?? ""),
       email: body.email ?? null,
       status: body.status === "inactive" ? "inactive" : "active",
-      roles: districtId != null ? "کاربر امور" : "مدیر ارشد سیستم",
+      role_id: role ? role.id : null,
+      role_name: role ? role.display_name : null,
+      roles: role ? role.display_name : null,
       district_id: districtId,
       district_name: await simDistrictName(districtId, authHeader),
       module_permissions: body.module_permissions ?? null,
@@ -210,6 +221,116 @@ async function simulateUsersWrite(method: string, path: string, bodyText: string
   return json({ success: false, error: { code: 404, message: "مسیر شبیه‌ساز کاربران پیدا نشد" } }, 404);
 }
 
+// ─── v4.3.83 (فقط توسعه): شبیه‌ساز نقش‌ها — GET/POST/PUT/DELETE /roles ───
+// بک‌اند قدیمی endpoint نقش‌ها ندارد؛ دانه‌های اولیه از dump SQL واقعی هاست ساخته شده‌اند.
+const SIM_SEED_ROLES: any[] = [
+  { id: 1, name: "super_admin", display_name: "مدیر ارشد سیستم", description: "دسترسی کامل به همه ماژول‌ها", is_system: 1, status: "active", module_permissions: null, users_count: 1, created_at: "2026-08-18 18:51:41" },
+  { id: 2, name: "مدیر", display_name: "مدیر", description: "مشاهده داشبورد و گزارش‌ها", is_system: 1, status: "active", module_permissions: null, users_count: 0, created_at: "2026-08-18 18:51:41" },
+  { id: 3, name: "maintenance_mgr", display_name: "مدیر تعمیرات", description: "مدیریت بازدید‌ها و عیوب", is_system: 1, status: "active", module_permissions: null, users_count: 0, created_at: "2026-08-18 18:51:41" },
+  { id: 4, name: "gis_specialist", display_name: "کارشناس GIS", description: "مدیریت خطوط، دکل‌ها و نقشه", is_system: 1, status: "active", module_permissions: null, users_count: 0, created_at: "2026-08-18 18:51:41" },
+  { id: 5, name: "safety_officer", display_name: "کارشناس ایمنی", description: "مدیریت اطلاعات ایمنی", is_system: 1, status: "active", module_permissions: null, users_count: 0, created_at: "2026-08-18 18:51:41" },
+  { id: 6, name: "contract_mgr", display_name: "کارشناس قراردادها", description: "مدیریت قراردادها و پیمانکاران", is_system: 1, status: "active", module_permissions: null, users_count: 0, created_at: "2026-08-18 18:51:41" },
+  { id: 7, name: "financial", display_name: "کارشناس مالی", description: "صورت‌وضعیت و پرداخت‌ها", is_system: 1, status: "active", module_permissions: null, users_count: 0, created_at: "2026-08-18 18:51:41" },
+  { id: 8, name: "پیمانکار", display_name: "پیمانکار", description: "ثبت بازدید و عملیات", is_system: 1, status: "active", module_permissions: null, users_count: 0, created_at: "2026-08-18 18:51:41" },
+  { id: 9, name: "inspector", display_name: "بازرس", description: "ثبت بازدید و عیوب", is_system: 1, status: "active", module_permissions: null, users_count: 0, created_at: "2026-08-18 18:51:41" },
+  { id: 10, name: "اپراتور", display_name: "اپراتور", description: "دسترسی محدود به ثبت اطلاعات", is_system: 1, status: "active", module_permissions: null, users_count: 0, created_at: "2026-08-18 18:51:41" },
+  { id: 11, name: "district_user", display_name: "کاربر امور", description: "کاربر امور بهره‌برداری (سازگار با نسخه‌های قبل)", is_system: 1, status: "active", module_permissions: null, users_count: 0, created_at: "2026-09-01 00:00:00" },
+  // نقش نمونهٔ غیرسیستمی برای پیش‌نمایش تب دسترسی‌ها
+  { id: 12, name: "سیمبان", display_name: "سیمبان", description: "مشاهده خطوط/دکل‌ها و ثبت بازدید و عیب", is_system: 0, status: "active",
+    module_permissions: { maps: true, circuits: { view: true }, lines: true, towers: true, inspections: true, defects: true },
+    users_count: 0, created_at: "2026-09-04 00:00:00" },
+];
+const simRolePatches = new Map<number, Record<string, any>>();
+const simCreatedRoles: any[] = [];
+const simDeletedRoleIds = new Set<number>();
+let simNextRoleId = 900001;
+
+/** فهرست کامل نقش‌های شبیه‌ساز (دانه + ساخته‌شده + patch) */
+function simAllRoles(): any[] {
+  const base = [...SIM_SEED_ROLES, ...simCreatedRoles].filter(r => !simDeletedRoleIds.has(Number(r.id)));
+  return base.map(r => ({ ...r, ...(simRolePatches.get(Number(r.id)) ?? {}) }));
+}
+
+/** پاسخ GET /roles شبیه‌ساز — هم‌شکل Response::paginated بک‌اند */
+function simulateRolesGet(): Response {
+  const rows = simAllRoles();
+  return new NextResponse(JSON.stringify({
+    success: true,
+    message: "فهرست نقش‌ها (شبیه‌ساز توسعه)",
+    data: { data: rows, total: rows.length, page: 1, page_size: 500 },
+  }), {
+    status: 200,
+    headers: { "Content-Type": "application/json; charset=utf-8", "X-Dev-Simulated": "roles" },
+  });
+}
+
+/** شبیه‌سازی نوشتن روی /roles — همیشه فقط در DEV */
+function simulateRolesWrite(method: string, path: string, bodyText: string): Response {
+  let body: any = {};
+  try { body = bodyText ? JSON.parse(bodyText) : {}; } catch { /* خالی */ }
+  const idMatch = /^\/roles\/(\d+)$/.exec(path);
+  const json = (payload: any, status = 200) => new NextResponse(JSON.stringify(payload), {
+    status,
+    headers: { "Content-Type": "application/json; charset=utf-8", "X-Dev-Simulated": "roles" },
+  });
+
+  if (method === "GET") return simulateRolesGet();
+
+  if (method === "PUT" && idMatch) {
+    const id = Number(idMatch[1]);
+    const existing = simAllRoles().find(r => Number(r.id) === id);
+    if (!existing) return json({ success: false, error: { code: 404, message: "نقش پیدا نشد" } }, 404);
+    if (Number(existing.is_system) === 1 && body.display_name !== undefined && String(body.display_name) !== existing.display_name) {
+      return json({ success: false, error: { code: 403, message: "نام نقش سیستمی قابل تغییر نیست" } }, 403);
+    }
+    const patch: Record<string, any> = { ...(simRolePatches.get(id) ?? {}) };
+    if (body.display_name !== undefined) patch.display_name = String(body.display_name);
+    if (body.description !== undefined) patch.description = body.description ?? null;
+    if (body.status !== undefined) patch.status = String(body.status) === "inactive" ? "inactive" : "active";
+    if (body.module_permissions !== undefined) patch.module_permissions = body.module_permissions;
+    simRolePatches.set(id, patch);
+    console.log(`[DEV SIM] roles PUT ${id}`);
+    return json({ success: true, message: "نقش ویرایش شد (شبیه‌ساز توسعه)", data: null });
+  }
+  if (method === "DELETE" && idMatch) {
+    const id = Number(idMatch[1]);
+    const existing = simAllRoles().find(r => Number(r.id) === id);
+    if (!existing) return json({ success: false, error: { code: 404, message: "نقش پیدا نشد" } }, 404);
+    if (Number(existing.is_system) === 1) {
+      return json({ success: false, error: { code: 403, message: "نقش سیستمی حذف نمی‌شود" } }, 403);
+    }
+    if (Number(existing.users_count ?? 0) > 0) {
+      return json({ success: false, error: { code: 409, message: `این نقش به ${existing.users_count} کاربر اختصاص دارد — ابتدا نقش کاربران را تغییر دهید` } }, 409);
+    }
+    simDeletedRoleIds.add(id);
+    simRolePatches.delete(id);
+    const idx = simCreatedRoles.findIndex(r => Number(r.id) === id);
+    if (idx >= 0) simCreatedRoles.splice(idx, 1);
+    console.log(`[DEV SIM] roles DELETE ${id}`);
+    return json({ success: true, message: "نقش حذف شد (شبیه‌ساز توسعه)", data: null });
+  }
+  if (method === "POST" && path === "/roles") {
+    const displayName = String(body.display_name ?? "").trim();
+    if (!displayName) return json({ success: false, error: { code: 400, message: "نام نقش الزامی است" } }, 400);
+    if (simAllRoles().some(r => r.display_name === displayName)) {
+      return json({ success: false, error: { code: 409, message: "این نام نقش قبلاً ثبت شده است" } }, 409);
+    }
+    const id = simNextRoleId++;
+    simCreatedRoles.push({
+      id, name: displayName, display_name: displayName,
+      description: body.description ?? null,
+      is_system: 0,
+      status: String(body.status ?? "active") === "inactive" ? "inactive" : "active",
+      module_permissions: body.module_permissions ?? null,
+      users_count: 0,
+      created_at: new Date().toISOString().slice(0, 19).replace("T", " "),
+    });
+    console.log(`[DEV SIM] roles POST — نقش ${displayName} ساخته شد`);
+    return json({ success: true, message: "نقش ایجاد شد (شبیه‌ساز توسعه)", data: { id } }, 201);
+  }
+  return json({ success: false, error: { code: 404, message: "مسیر شبیه‌ساز نقش‌ها پیدا نشد" } }, 404);
+}
+
 /** اعمال overlay شبیه‌ساز روی پاسخ GET /users (فقط DEV) */
 function applyUsersSimulatorToGet(bodyText: string): string {
   try {
@@ -220,7 +341,13 @@ function applyUsersSimulatorToGet(bodyText: string): string {
     rows = rows.filter((u: any) => !simDeletedIds.has(Number(u.id)));
     rows = rows.map((u: any) => {
       const patch = simUserPatches.get(Number(u.id));
-      return patch ? { ...u, ...patch } : u;
+      let merged = patch ? { ...u, ...patch } : u;
+      // role_id بدون role_name (بک‌اند قدیمی) → نام نقش از شبیه‌ساز نقش‌ها پر می‌شود
+      if (merged.role_id != null && !merged.role_name) {
+        const role = simAllRoles().find(r => Number(r.id) === Number(merged.role_id));
+        if (role) merged = { ...merged, role_name: role.display_name, roles: role.display_name };
+      }
+      return merged;
     });
     // مثل بک‌اند واقعی (ORDER BY id DESC) کاربران ساخته‌شده در ابتدای فهرست می‌آیند
     rows = [...simCreatedUsers.slice().reverse(), ...rows];
@@ -351,24 +478,33 @@ async function handleRequest(request: NextRequest) {
     });
   }
 
-  // v4.3.82 (فقط توسعه): نسخهٔ بک‌اند هاست قدیمی است؟ نسخهٔ بستهٔ فعلی گزارش می‌شود تا
-  // گیت بک‌اند فرانت (users-api) در پیش‌نمایش باز باشد؛ خود هاست با آپلود واقعی می‌رسد.
+  // v4.3.83 (فقط توسعه): نسخهٔ بک‌اند هاست قدیمی است؟ نسخهٔ بستهٔ فعلی گزارش می‌شود تا
+  // گیت بک‌اند فرانت (users-api/roles-api) در پیش‌نمایش باز باشد؛ خود هاست با آپلود واقعی می‌رسد.
   if (DEV_MODE && isGet && path === "/backend-version") {
     const upstream = await upstreamBackendVersion();
     if (!upstream.length || !versionAtLeast(upstream, SIM_VERSION)) {
-      console.log(`[DEV SIM] backend-version هاست ${upstream.join(".") || "?"} قدیمی است — نسخهٔ بستهٔ 4.3.82 گزارش شد`);
+      console.log(`[DEV SIM] backend-version هاست ${upstream.join(".") || "?"} قدیمی است — نسخهٔ بستهٔ 4.3.83 گزارش شد`);
       return NextResponse.json({
         success: true,
         message: "نسخه بک‌اند",
-        data: { version: "v4.3.82", component: "Powerline PHP Backend (dev-sim)" },
+        data: { version: "v4.3.83", component: "Powerline PHP Backend (dev-sim)" },
       });
     }
   }
 
-  // v4.3.82 (فقط توسعه): نوشتن‌های /users — تا آپلود بک‌اند 4.3.82 روی هاست، محلی شبیه‌سازی می‌شوند
-  if (DEV_MODE && !isGet && path.startsWith("/users")) {
+  // v4.3.83 (فقط توسعه): فهرست نقش‌ها — بک‌اند قدیمی endpoint ندارد؛ شبیه‌ساز محلی پاسخ می‌دهد
+  if (DEV_MODE && isGet && path === "/roles") {
     const upstream = await upstreamBackendVersion();
     if (!upstream.length || !versionAtLeast(upstream, SIM_VERSION)) {
+      return simulateRolesGet();
+    }
+  }
+
+  // v4.3.83 (فقط توسعه): نوشتن‌های /users و /roles — تا آپلود بک‌اند 4.3.83 روی هاست، محلی شبیه‌سازی می‌شوند
+  if (DEV_MODE && !isGet && (path.startsWith("/users") || path.startsWith("/roles"))) {
+    const upstream = await upstreamBackendVersion();
+    if (!upstream.length || !versionAtLeast(upstream, SIM_VERSION)) {
+      if (path.startsWith("/roles")) return simulateRolesWrite(request.method, path, bodyText ?? "");
       return await simulateUsersWrite(request.method, path, bodyText ?? "", request.headers.get("authorization") || "");
     }
   }

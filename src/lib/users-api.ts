@@ -1,16 +1,17 @@
 /**
- * users-api.ts — v4.3.82
+ * users-api.ts — v4.3.83
  *
  * پوشش امن فراخوانی‌های نوشتاری /users — قبل از هر نوشتن، نسخهٔ بک‌اند
- * کنترل می‌شود: PUT قدیمی (4.3.81) مقدار آبجکتی ماتریس دسترسی را false ذخیره
- * می‌کرد و POST/DELETE وجود نداشت؛ با این گیت از خراب‌شدن دسترسی‌ها و
- * «موفقیت کاذب» جلوگیری می‌شود. پاسخ GET backend-version کش می‌شود.
+ * کنترل می‌شود: بک‌اند قدیمی (≤4.3.81) مقدار آبجکتی ماتریس دسترسی را false
+ * ذخیره می‌کرد و POST/DELETE وجود نداشت؛ بک‌اند 4.3.82 فیلد role_id را
+ * نادیده می‌گرفت (تخصیص نقش بی‌صدا از دست می‌رفت). با این گیت از
+ * «موفقیت کاذب» و خراب‌شدن دسترسی‌ها جلوگیری می‌شود. پاسخ GET backend-version کش می‌شود.
  */
 
 import { apiClient } from "./api-client";
 import { API_ENDPOINTS } from "./api-config";
 
-const REQUIRED = [4, 3, 82];
+const REQUIRED = [4, 3, 83];
 let backendOk: boolean | null = null;
 let backendChecked = false;
 
@@ -29,9 +30,9 @@ function versionAtLeast(v: number[]): boolean {
 }
 
 const OLD_BACKEND_MESSAGE =
-  "بک‌اند سرور هنوز نسخهٔ 4.3.82 نیست — فایل‌های پوشهٔ Powerline را از بستهٔ zip نسخهٔ 4.3.82 روی هاست آپلود کنید تا ذخیرهٔ کاربران و دسترسی‌ها فعال شود (نوشتن روی بک‌اند قدیمی می‌تواند دسترسی‌ها را خراب کند و انجام نشد)";
+  "بک‌اند سرور هنوز نسخهٔ 4.3.83 نیست — فایل‌های پوشهٔ Powerline را از بستهٔ zip نسخهٔ 4.3.83 روی هاست آپلود کنید تا ذخیرهٔ کاربران/نقش‌ها فعال شود (نوشتن روی بک‌اند قدیمی می‌تواند دسترسی‌ها را خراب کند و انجام نشد)";
 
-/** آیا بک‌اند از ماتریس ابزارها + CRUD کاربران پشتیبانی می‌کند؟ (با کش) */
+/** آیا بک‌اند از نقش‌ها + CRUD کاربران پشتیبانی می‌کند؟ (با کش) */
 export async function backendSupportsUsersTools(): Promise<boolean> {
   if (backendChecked) return backendOk === true;
   backendChecked = true;

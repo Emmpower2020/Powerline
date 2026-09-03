@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import { apiClient } from "@/lib/api-client";
 import { API_ENDPOINTS } from "@/lib/api-config";
 import { putUser, postUser, deleteUser } from "@/lib/users-api";
+import { getRoles, postRole, putRole, deleteRole, type RoleRow } from "@/lib/roles-api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -14,6 +15,7 @@ import {
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DistrictSelect } from "@/components/district-select";
+import { SearchableSelect } from "@/components/searchable-select";
 import { DataTable, type DataTableColumn, type DataTableHandle } from "@/components/data-table";
 import { ImportExcelDialog } from "@/components/import-excel-dialog";
 import { BulkDeleteDialog } from "@/components/bulk-delete-dialog";
@@ -22,26 +24,31 @@ import { useDistrictOptions } from "@/hooks/use-district-options";
 import { useAuth } from "@/lib/auth-context";
 import { useToast } from "@/hooks/use-toast";
 import { toJalali } from "@/lib/jalali";
-import { compactPermissions, presetRows } from "@/lib/module-access";
-import { Loader2, Users as UsersIcon, ShieldCheck } from "lucide-react";
+import { Loader2, Users as UsersIcon, ShieldCheck, IdCard } from "lucide-react";
 import { PermissionsDialog, type UserRow } from "@/components/users/permissions-dialog";
-import { UsersStatusActions, PermissionsBulkActions, AccessSummaryCell } from "@/components/users/users-bulk-actions";
+import { RoleDialog } from "@/components/users/role-dialog";
+import { UsersStatusActions, RolePermissionsBulkActions, PermSummaryCell } from "@/components/users/users-bulk-actions";
 
 /**
- * صفحه کاربران — v4.3.82: بازطراحی کامل با همان الگوی جدول‌های برنامه.
+ * صفحه کاربران — v4.3.83 (RBAC): سه تب
  *
- * تب «کاربران»: جدول هم‌شکل خطوط/پرسنل + نوار ابزار کامل (افزودن/ویرایش/کپی/حذف/
- * ایمپورت اکسل/اکسپورت/چاپ/جستجو/فیلتر/چیدمان ستون) + عملیات گروهی وضعیت و ریست رمز.
+ * تب «اطلاعات کاربران»: جدول هم‌شکل خطوط/پرسنل + نوار ابزار کامل + کمبوباکس نقش
+ * در فرم + عملیات گروهی وضعیت/نقش/ریست رمز.
  *
- * تب «دسترسی‌ها»: جدول انتخاب‌پذیر کاربران + منوی عملیات گروهی (ویرایش گروهی ماتریس،
- * کپی دسترسی از کاربر، پیش‌تنظیم کامل/فقط‌مشاهده/هیچ) + ماتریس ریز ابزار هر بخش.
- * مدیر سیستم (بدون امور) ردیف قفل با دسترسی کامل است.
+ * تب «نقش‌ها»: تعریف نقش‌ها (جدول استاندارد: افزودن/ویرایش/کپی/حذف/ایمپورت اکسل/
+ * اکسپورت/چاپ) — دسترسی‌ها به‌جای هر نفر روی نقش تعریف می‌شود؛ مثلاً ۴۰ سیمبان
+ * فقط نقش «سیمبان» می‌گیرند.
+ *
+ * تب «دسترسی‌ها»: ماتریس ریز بخش×ابزار برای هر نقش (تکی/گروهی/کپی از نقش دیگر).
+ * مدیر سیستم (بدون امور) همیشه دسترسی کامل دارد.
  */
 export function UsersPage() {
   const { toast } = useToast();
   const { user: me } = useAuth();
   const [users, setUsers] = useState<UserRow[]>([]);
+  const [roles, setRoles] = useState<RoleRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [rolesError, setRolesError] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
 
   // ─── تب کاربران: فرم/حذف/ایمپورت ───
@@ -50,22 +57,33 @@ export function UsersPage() {
   const [duplicateFrom, setDuplicateFrom] = useState<UserRow | null>(null);
   const [showImport, setShowImport] = useState(false);
 
-  // حذف انبوه — DELETE زنجیره‌ای با پروگرس
+  // حذف انبوه کاربران — DELETE زنجیره‌ای با پروگرس
   const [pendingDelete, setPendingDelete] = useState<UserRow[] | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [deleteProgress, setDeleteProgress] = useState<{ done: number; total: number } | null>(null);
 
-  // ─── تب دسترسی‌ها ───
-  const [permTargets, setPermTargets] = useState<UserRow[] | null>(null);
-  const [permSource, setPermSource] = useState<UserRow | null>(null);
+  // ─── تب نقش‌ها: فرم/حذف/ایمپورت ───
+  const [showRoleCreate, setShowRoleCreate] = useState(false);
+  const [editRoleRow, setEditRoleRow] = useState<RoleRow | null>(null);
+  const [duplicateRoleFrom, setDuplicateRoleFrom] = useState<RoleRow | null>(null);
+  const [showRoleImport, setShowRoleImport] = useState(false);
+  const [pendingRoleDelete, setPendingRoleDelete] = useState<RoleRow[] | null>(null);
+  const [deletingRoles, setDeletingRoles] = useState(false);
+  const [roleDeleteProgress, setRoleDeleteProgress] = useState<{ done: number; total: number } | null>(null);
+
+  // ─── تب دسترسی‌ها: ماتریس نقش‌ها ───
+  const [permRoleTargets, setPermRoleTargets] = useState<RoleRow[] | null>(null);
+  const [permRoleSource, setPermRoleSource] = useState<RoleRow | null>(null);
 
   const tableRef = useRef<DataTableHandle | null>(null);
+  const rolesTableRef = useRef<DataTableHandle | null>(null);
   const accessTableRef = useRef<DataTableHandle | null>(null);
 
   const { rows: districtRows } = useDistrictOptions();
 
   const load = useCallback(async () => {
     setLoading(true);
+    setRolesError(null);
     try {
       const result = await apiClient.get<any>(API_ENDPOINTS.users, { page: 1, page_size: 500 });
       setUsers(Array.isArray(result) ? result : (result?.data || []));
@@ -76,6 +94,13 @@ export function UsersPage() {
         variant: "destructive",
       });
     } finally { setLoading(false); }
+    // نقش‌ها مستقل بارگذاری می‌شوند — خطای بک‌اند قدیمی نباید تب کاربران را خراب کند
+    try {
+      setRoles(await getRoles());
+    } catch (err: any) {
+      setRoles([]);
+      setRolesError(err?.message || "خطا در دریافت نقش‌ها");
+    }
   }, [toast]);
 
   useEffect(() => {
@@ -90,7 +115,15 @@ export function UsersPage() {
       render: (u) => <span dir="ltr" className="font-medium text-slate-700 dark:text-slate-200">{u.username}</span>,
     },
     { key: "full_name", header: "نام و نام خانوادگی", sortable: true, filterable: true, align: "right" },
-    { key: "roles", header: "نقش", filterable: true, align: "right", render: (u) => u.roles ? <Badge variant="outline" className="text-[11px]">{u.roles}</Badge> : <span className="text-slate-300">—</span> },
+    {
+      key: "role_name", header: "نقش", sortable: true, filterable: true, align: "right",
+      render: (u) => {
+        const name = u.role_name || u.roles;
+        return name
+          ? <Badge variant="outline" className="text-[11px] border-violet-200 text-violet-700 dark:text-violet-300">{name}</Badge>
+          : <Badge variant="outline" className="text-[11px] border-amber-200 text-amber-700 dark:text-amber-300">بدون نقش (فقط مشاهده)</Badge>;
+      },
+    },
     {
       key: "district_name", header: "امور بهره‌برداری", sortable: true, filterable: true, align: "right",
       render: (u) => u.district_id != null
@@ -107,30 +140,59 @@ export function UsersPage() {
     },
   ];
 
-  // ─── ستون‌های تب دسترسی‌ها ───
-  const accessColumns: DataTableColumn<UserRow>[] = [
+  // ─── ستون‌های تب نقش‌ها ───
+  const roleColumns: DataTableColumn<RoleRow>[] = [
     {
-      key: "full_name", header: "کاربر", sortable: true, filterable: true, align: "right",
-      render: (u) => (
-        <div className="flex flex-col">
-          <span className="font-medium text-slate-700 dark:text-slate-100 text-right">{u.full_name}</span>
-          <span className="text-[10px] text-slate-400 text-right" dir="ltr">@{u.username}</span>
+      key: "display_name", header: "نام نقش", sortable: true, filterable: true, align: "right",
+      render: (r) => (
+        <div className="flex items-center gap-1.5">
+          <span className="font-medium text-slate-700 dark:text-slate-200">{r.display_name}</span>
+          {Number(r.is_system) === 1 && <Badge variant="outline" className="text-[10px] px-1 py-0 h-4 border-slate-200 text-slate-400">سیستمی</Badge>}
         </div>
       ),
     },
     {
-      key: "district_name", header: "امور بهره‌برداری", sortable: true, filterable: true, align: "right",
-      render: (u) => u.district_id != null
-        ? <Badge variant="outline" className="text-[11px] border-indigo-200 text-indigo-700 dark:text-indigo-300">{u.district_name || `امور ${u.district_id}`}</Badge>
-        : <Badge variant="outline" className="text-[11px] border-slate-200 text-slate-400">مدیر سیستم</Badge>,
+      key: "description", header: "توضیحات", align: "right",
+      render: (r) => r.description
+        ? <span className="text-xs text-slate-500 dark:text-slate-400">{r.description}</span>
+        : <span className="text-slate-300">—</span>,
     },
+    { key: "users_count", header: "تعداد کاربران", type: "number", sortable: true, align: "right" },
+    { key: "status", header: "وضعیت", type: "status", align: "right" },
     {
-      key: "status", header: "وضعیت", type: "status", align: "right",
+      key: "created_at", header: "تاریخ ایجاد", align: "right",
+      render: (r) => r.created_at ? <span className="text-xs text-slate-500 nums-fa">{toJalali(String(r.created_at))}</span> : <span className="text-slate-300">—</span>,
     },
-    { key: "access", header: "دسترسی‌ها", align: "right", render: (u) => <AccessSummaryCell user={u} /> },
   ];
 
-  // ─── حذف زنجیره‌ای ───
+  // ─── ستون‌های تب دسترسی‌ها (نقش × دسترسی) ───
+  const accessColumns: DataTableColumn<RoleRow>[] = [
+    {
+      key: "display_name", header: "نقش", sortable: true, filterable: true, align: "right",
+      render: (r) => (
+        <div className="flex flex-col">
+          <div className="flex items-center gap-1.5">
+            <span className="font-medium text-slate-700 dark:text-slate-100 text-right">{r.display_name}</span>
+            {Number(r.is_system) === 1 && <Badge variant="outline" className="text-[10px] px-1 py-0 h-4 border-slate-200 text-slate-400">سیستمی</Badge>}
+          </div>
+          {r.name && r.name !== r.display_name && (
+            <span className="text-[10px] text-slate-400 text-right" dir="ltr">{r.name}</span>
+          )}
+        </div>
+      ),
+    },
+    {
+      key: "description", header: "توضیحات", align: "right",
+      render: (r) => r.description
+        ? <span className="text-xs text-slate-500 dark:text-slate-400">{r.description}</span>
+        : <span className="text-slate-300">—</span>,
+    },
+    { key: "users_count", header: "کاربران", type: "number", sortable: true, align: "right" },
+    { key: "status", header: "وضعیت", type: "status", align: "right" },
+    { key: "access", header: "دسترسی‌ها", align: "right", render: (r) => <PermSummaryCell map={r.module_permissions} /> },
+  ];
+
+  // ─── حذف زنجیره‌ای کاربران ───
   const confirmDelete = async () => {
     if (!pendingDelete) return;
     setDeleting(true);
@@ -161,11 +223,49 @@ export function UsersPage() {
     setRefreshKey(k => k + 1);
   };
 
+  // ─── حذف زنجیره‌ای نقش‌ها ───
+  const confirmRoleDelete = async () => {
+    if (!pendingRoleDelete) return;
+    setDeletingRoles(true);
+    const prog = { done: 0, total: pendingRoleDelete.length };
+    setRoleDeleteProgress({ ...prog });
+    let failed = 0;
+    let firstError: string | null = null;
+    for (const role of pendingRoleDelete) {
+      try {
+        await deleteRole(role.id);
+      } catch (err) {
+        failed++;
+        firstError ??= err instanceof Error ? err.message : "خطای نامشخص";
+      }
+      prog.done++;
+      setRoleDeleteProgress({ ...prog });
+    }
+    setDeletingRoles(false);
+    setRoleDeleteProgress(null);
+    setPendingRoleDelete(null);
+    toast({
+      title: failed ? "حذف نقش‌ها ناقص ماند" : "نقش‌ها حذف شدند",
+      description: failed
+        ? `${failed.toLocaleString("fa-IR")} نقش حذف نشد — ${firstError ?? ""}`
+        : `${prog.total.toLocaleString("fa-IR")} نقش حذف شد`,
+      variant: failed ? "destructive" : undefined,
+    });
+    setRefreshKey(k => k + 1);
+  };
+
   // ─── ایمپورت کاربران از اکسل ───
   const resolveDistrictIdByName = (name: unknown): number | null => {
     const n = String(name ?? "").trim();
     if (!n) return null;
     const hit = districtRows.find(d => d.name === n || d.name.includes(n) || n.includes(d.name));
+    return hit ? hit.id : null;
+  };
+
+  const resolveRoleIdByName = (name: unknown): number | null => {
+    const n = String(name ?? "").trim();
+    if (!n || n === "نامشخص") return null;
+    const hit = roles.find(r => r.display_name === n || r.name === n);
     return hit ? hit.id : null;
   };
 
@@ -180,10 +280,16 @@ export function UsersPage() {
       district_id: districtId,
       status: "active",
     };
+    if (row.role_name) {
+      const roleId = resolveRoleIdByName(row.role_name);
+      if (roleId == null) {
+        throw new Error(`نقش «${String(row.role_name)}» پیدا نشد — ابتدا از تب «نقش‌ها» بسازید یا ستون نقش را خالی بگذارید`);
+      }
+      payload.role_id = roleId;
+    }
     if (isCreate) {
       payload.username = String(row.username ?? "").trim();
       payload.password = row.password ? String(row.password) : "123456";
-      payload.module_permissions = compactPermissions(presetRows("view-only"));
     } else if (row.password) {
       payload.password = String(row.password);
     }
@@ -225,20 +331,70 @@ export function UsersPage() {
     "ایمیل": "email",
     "امور بهره‌برداری": "district_name",
     "امور": "district_name",
+    "نقش": "role_name",
   };
   const importTemplateColumns = [
     { key: "username", header: "نام کاربری (کد ملی)" },
     { key: "full_name", header: "نام و نام خانوادگی" },
     { key: "district_name", header: "امور بهره‌برداری" },
+    { key: "role_name", header: "نقش (خالی = بدون نقش)" },
     { key: "email", header: "ایمیل (اختیاری)" },
     { key: "password", header: "رمز عبور (خالی = 123456)" },
+  ];
+
+  // ─── ایمپورت نقش‌ها از اکسل ───
+  const roleImportPayload = (row: Record<string, unknown>) => {
+    const displayName = String(row.display_name ?? "").trim();
+    if (!displayName) throw new Error("نام نقش الزامی است");
+    return {
+      display_name: displayName,
+      description: row.description ? String(row.description).trim() : null,
+      status: "active",
+    };
+  };
+
+  const handleRoleImportRow = async (row: Record<string, unknown>, mode: "insert" | "update", existingId?: number) => {
+    const payload = roleImportPayload(row);
+    if (mode === "update" && existingId) {
+      await putRole(existingId, { description: payload.description });
+    } else {
+      await postRole(payload);
+    }
+  };
+
+  const handleRoleImportBatch = async (
+    items: Array<{ row: Record<string, unknown>; mode: "insert" | "update"; existingId?: number }>
+  ): Promise<Array<{ status: "inserted" | "updated" | "skipped" | "failed"; error?: string }>> => {
+    const results: Array<{ status: "inserted" | "updated" | "skipped" | "failed"; error?: string }> = [];
+    for (const it of items) {
+      try {
+        await handleRoleImportRow(it.row, it.mode, it.existingId);
+        results.push({ status: it.mode === "update" && it.existingId ? "updated" : "inserted" });
+      } catch (err) {
+        results.push({ status: "failed", error: err instanceof Error ? err.message : "خطای نامشخص" });
+      }
+    }
+    return results;
+  };
+
+  const roleImportHeaderMap: Record<string, string> = {
+    "نام نقش": "display_name",
+    "عنوان نقش": "display_name",
+    "توضیحات": "description",
+    "شرح": "description",
+    "توضیح": "description",
+  };
+  const roleImportTemplateColumns = [
+    { key: "display_name", header: "نام نقش" },
+    { key: "description", header: "توضیحات (اختیاری)" },
   ];
 
   return (
     <div className="space-y-4">
       <Tabs defaultValue="info" dir="rtl" className="w-full">
-        <TabsList className="grid w-full max-w-lg grid-cols-2">
+        <TabsList className="grid w-full max-w-xl grid-cols-3">
           <TabsTrigger value="info" className="text-xs gap-1.5"><UsersIcon className="w-3.5 h-3.5" />اطلاعات کاربران</TabsTrigger>
+          <TabsTrigger value="roles" className="text-xs gap-1.5"><IdCard className="w-3.5 h-3.5" />نقش‌ها</TabsTrigger>
           <TabsTrigger value="access" className="text-xs gap-1.5"><ShieldCheck className="w-3.5 h-3.5" />دسترسی‌ها</TabsTrigger>
         </TabsList>
 
@@ -248,7 +404,7 @@ export function UsersPage() {
             data={users}
             columns={columns}
             loading={loading}
-            searchKeys={["username", "full_name", "email", "roles", "district_name"]}
+            searchKeys={["username", "full_name", "email", "role_name", "roles", "district_name"]}
             title="کاربران"
             layoutKey="users"
             accessKey="users"
@@ -272,6 +428,7 @@ export function UsersPage() {
             toolbarExtra={(selected) => (
               <UsersStatusActions
                 selectedUsers={selected}
+                roles={roles}
                 onApplied={() => setRefreshKey(k => k + 1)}
                 selfUserId={me?.id}
               />
@@ -279,38 +436,66 @@ export function UsersPage() {
           />
         </TabsContent>
 
-        {/* ─── تب ۲: دسترسی‌ها — جدول + ماتریس + عملیات گروهی ─── */}
-        <TabsContent value="access" className="mt-4">
-          <div className="bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-100 dark:border-indigo-900 rounded-lg p-3 text-xs text-slate-600 dark:text-slate-300 leading-6">
-            برای هر کاربر مشخص کنید <b>کدام بخش‌ها</b> را می‌بیند و در هر بخش به <b>کدام ابزارها</b> (ایجاد/ویرایش/حذف/ایمپورت/اکسپورت) دسترسی دارد.
-            یک یا چند کاربر را انتخاب کنید و از منوی «عملیات گروهی» همه را هم‌زمان تغییر دهید. مدیر سیستم همیشه دسترسی کامل دارد.
-          </div>
+        {/* ─── تب ۲: نقش‌ها — تعریف نقش‌های سازمان (جدول استاندارد) ─── */}
+        <TabsContent value="roles" className="mt-4">
+          {rolesError && (
+            <div className="bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-900 rounded-lg p-3 text-xs text-red-700 dark:text-red-300 leading-6 mb-3">
+              {rolesError}
+            </div>
+          )}
           <DataTable
-            data={users}
+            data={roles}
+            columns={roleColumns}
+            loading={loading}
+            searchKeys={["display_name", "name", "description"]}
+            title="نقش‌ها"
+            layoutKey="roles"
+            accessKey="users"
+            tableRef={rolesTableRef}
+            onAdd={() => { setEditRoleRow(null); setDuplicateRoleFrom(null); setShowRoleCreate(true); }}
+            onRefresh={() => setRefreshKey(k => k + 1)}
+            onRowClick={(row) => { setDuplicateRoleFrom(null); setEditRoleRow(row); }}
+            onEdit={(row) => { setDuplicateRoleFrom(null); setEditRoleRow(row); }}
+            onDuplicate={(row) => { setEditRoleRow(null); setDuplicateRoleFrom(row); setShowRoleCreate(true); }}
+            onCopy={(rows) => {
+              if (!rows.length) {
+                toast({ title: "هیچ ردیفی انتخاب نشده", description: "برای کپی، ابتدا ردیف(های) مورد نظر را انتخاب کنید" });
+                return;
+              }
+              toast({
+                title: "کپی شد",
+                description: `${rows.length.toLocaleString("fa-IR")} ردیف به‌صورت TSV در کلیپ‌بورد کپی شد — آماده پیست در اکسل`,
+              });
+            }}
+            onDelete={(rows) => setPendingRoleDelete(rows)}
+            onImport={() => setShowRoleImport(true)}
+          />
+        </TabsContent>
+
+        {/* ─── تب ۳: دسترسی‌ها — ماتریس نقش × ابزار ─── */}
+        <TabsContent value="access" className="mt-4">
+          {rolesError && (
+            <div className="bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-900 rounded-lg p-3 text-xs text-red-700 dark:text-red-300 leading-6 mb-3">
+              {rolesError}
+            </div>
+          )}
+          <DataTable
+            data={roles}
             columns={accessColumns}
             loading={loading}
-            searchKeys={["username", "full_name", "roles", "district_name"]}
-            title="دسترسی کاربران"
-            layoutKey="users-access"
+            searchKeys={["display_name", "name", "description"]}
+            title="دسترسی نقش‌ها"
+            layoutKey="roles-access"
             accessKey="users"
             tableRef={accessTableRef}
             onRefresh={() => setRefreshKey(k => k + 1)}
-            onRowClick={(row) => {
-              if (row.district_id != null) { setPermSource(null); setPermTargets([row]); }
-            }}
-            onEdit={(row) => {
-              if (row.district_id == null) {
-                toast({ title: "مدیر سیستم", description: "دسترسی مدیر سیستم (بدون امور) همیشه کامل و تغییرناپذیر است" });
-                return;
-              }
-              setPermSource(null);
-              setPermTargets([row]);
-            }}
+            onRowClick={(row) => { setPermRoleSource(null); setPermRoleTargets([row]); }}
+            onEdit={(row) => { setPermRoleSource(null); setPermRoleTargets([row]); }}
             toolbarExtra={(selected) => (
-              <PermissionsBulkActions
-                selectedUsers={selected}
-                allUsers={users}
-                onOpenMatrix={(targets, source) => { setPermSource(source); setPermTargets(targets); }}
+              <RolePermissionsBulkActions
+                selectedRoles={selected}
+                allRoles={roles}
+                onOpenMatrix={(targets, source) => { setPermRoleSource(source); setPermRoleTargets(targets); }}
                 onApplied={() => setRefreshKey(k => k + 1)}
               />
             )}
@@ -323,9 +508,19 @@ export function UsersPage() {
         open={showCreate || editRow !== null}
         editRow={editRow}
         duplicateFrom={duplicateFrom}
+        roles={roles}
         selfUserId={me?.id}
         onClose={() => { setShowCreate(false); setEditRow(null); setDuplicateFrom(null); }}
         onSaved={() => { setShowCreate(false); setEditRow(null); setDuplicateFrom(null); setRefreshKey(k => k + 1); }}
+      />
+
+      {/* فرم ایجاد/ویرایش/کپی نقش */}
+      <RoleDialog
+        open={showRoleCreate || editRoleRow !== null}
+        editRow={editRoleRow}
+        duplicateFrom={duplicateRoleFrom}
+        onClose={() => { setShowRoleCreate(false); setEditRoleRow(null); setDuplicateRoleFrom(null); }}
+        onSaved={() => { setShowRoleCreate(false); setEditRoleRow(null); setDuplicateRoleFrom(null); setRefreshKey(k => k + 1); }}
       />
 
       {/* ایمپورت کاربران از اکسل */}
@@ -342,7 +537,21 @@ export function UsersPage() {
         templateColumns={importTemplateColumns}
       />
 
-      {/* تأیید حذف با پروگرس — همان ظاهر بقیه جدول‌ها */}
+      {/* ایمپورت نقش‌ها از اکسل */}
+      <ImportExcelDialog
+        open={showRoleImport}
+        onClose={() => { setShowRoleImport(false); setRefreshKey(k => k + 1); }}
+        onImportRow={handleRoleImportRow}
+        onImportBatch={handleRoleImportBatch}
+        getExistingRows={async () => roles as any}
+        defaultUniqueKey="display_name"
+        uniqueKeyOptions={[{ value: "display_name", label: "نام نقش" }]}
+        entityName="نقش"
+        headerMap={roleImportHeaderMap}
+        templateColumns={roleImportTemplateColumns}
+      />
+
+      {/* تأیید حذف کاربران با پروگرس — همان ظاهر بقیه جدول‌ها */}
       <BulkDeleteDialog
         open={pendingDelete !== null}
         rowsCount={pendingDelete?.length ?? 0}
@@ -356,23 +565,38 @@ export function UsersPage() {
         onConfirm={confirmDelete}
       />
 
-      {/* ماتریس دسترسی — تکی یا گروهی */}
+      {/* تأیید حذف نقش‌ها با پروگرس */}
+      <BulkDeleteDialog
+        open={pendingRoleDelete !== null}
+        rowsCount={pendingRoleDelete?.length ?? 0}
+        entityName="نقش"
+        description={(pendingRoleDelete?.length ?? 0) === 1
+          ? `نقش «${pendingRoleDelete?.[0].display_name}» حذف می‌شود. نقش‌هایی که کاربر دارند حذف نمی‌شوند — ابتدا نقش کاربران را تغییر دهید.`
+          : `${(pendingRoleDelete?.length ?? 0).toLocaleString("fa-IR")} نقش انتخاب‌شده حذف می‌شوند. نقش‌هایی که کاربر دارند حذف نمی‌شوند — ابتدا نقش کاربران را تغییر دهید.`}
+        isDeleting={deletingRoles}
+        progress={roleDeleteProgress}
+        onCancel={() => { if (!deletingRoles) setPendingRoleDelete(null); }}
+        onConfirm={confirmRoleDelete}
+      />
+
+      {/* ماتریس دسترسی نقش — تکی یا گروهی */}
       <PermissionsDialog
-        open={permTargets !== null}
-        targets={permTargets ?? []}
-        sourceUser={permSource}
-        onClose={() => { setPermTargets(null); setPermSource(null); }}
+        open={permRoleTargets !== null}
+        targets={permRoleTargets ?? []}
+        sourceRole={permRoleSource}
+        onClose={() => { setPermRoleTargets(null); setPermRoleSource(null); }}
         onSaved={() => setRefreshKey(k => k + 1)}
       />
     </div>
   );
 }
 
-/** فرم کاربر — ایجاد / ویرایش / کپی (مثل فرم پرسنل) */
-function UserDialog({ open, editRow, duplicateFrom, selfUserId, onClose, onSaved }: {
+/** فرم کاربر — ایجاد / ویرایش / کپی (مثل فرم پرسنل) — v4.3.83: کمبوباکس نقش */
+function UserDialog({ open, editRow, duplicateFrom, roles, selfUserId, onClose, onSaved }: {
   open: boolean;
   editRow: UserRow | null;
   duplicateFrom: UserRow | null;
+  roles: RoleRow[];
   selfUserId?: number | null;
   onClose: () => void;
   onSaved: () => void;
@@ -381,7 +605,7 @@ function UserDialog({ open, editRow, duplicateFrom, selfUserId, onClose, onSaved
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState({
     username: "", full_name: "", password: "", email: "",
-    district_id: "", status: "active", preset: "view-only",
+    district_id: "", status: "active", role_id: "",
   });
 
   const sourceRow = editRow || duplicateFrom;
@@ -398,7 +622,8 @@ function UserDialog({ open, editRow, duplicateFrom, selfUserId, onClose, onSaved
         email: sourceRow?.email || "",
         district_id: sourceRow?.district_id != null ? String(sourceRow.district_id) : "",
         status: sourceRow?.status === "inactive" ? "inactive" : "active",
-        preset: "view-only",
+        // v4.3.83: نقش کاربر — کپی از روی کاربر مبدأ
+        role_id: (duplicateFrom?.role_id ?? sourceRow?.role_id) != null ? String(duplicateFrom?.role_id ?? sourceRow?.role_id) : "",
       });
     }
   }, [open, sourceRow, duplicateFrom]);
@@ -409,14 +634,18 @@ function UserDialog({ open, editRow, duplicateFrom, selfUserId, onClose, onSaved
     if (!editRow && !form.username.trim()) { setError("نام کاربری الزامی است (پیشنهاد: کد ملی)"); return; }
     setSubmitting(true); setError(null);
     try {
+      const roleId = form.role_id && form.role_id !== "__unknown__" ? Number(form.role_id) : null;
       if (editRow) {
         const payload: Record<string, unknown> = {
           full_name: form.full_name.trim(),
           email: form.email.trim() || null,
           status: form.status,
         };
-        // مدیر سیستم نمی‌تواند امور/وضعیت خودش را محدود کند
-        if (!editingSelf) payload.district_id = form.district_id ? Number(form.district_id) : null;
+        // مدیر سیستم نمی‌تواند امور/وضعیت/نقش خودش را محدود کند
+        if (!editingSelf) {
+          payload.district_id = form.district_id ? Number(form.district_id) : null;
+          payload.role_id = roleId;
+        }
         if (form.password.trim()) payload.password = form.password.trim();
         await putUser(editRow.id, payload);
       } else {
@@ -427,7 +656,7 @@ function UserDialog({ open, editRow, duplicateFrom, selfUserId, onClose, onSaved
           email: form.email.trim() || null,
           district_id: form.district_id ? Number(form.district_id) : null,
           status: form.status,
-          module_permissions: compactPermissions(presetRows(form.preset as "full" | "view-only" | "none")),
+          role_id: roleId,
         });
       }
       onSaved();
@@ -515,21 +744,34 @@ function UserDialog({ open, editRow, duplicateFrom, selfUserId, onClose, onSaved
                 </Select>
               </div>
             </div>
+          </FormSection>
 
-            {!editRow && (
-              <div className="space-y-2">
-                <Label className="text-right block">دسترسی اولیه</Label>
-                <Select value={form.preset} onValueChange={v => setForm({ ...form, preset: v })}>
-                  <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="view-only">فقط مشاهدهٔ همهٔ بخش‌ها (پیش‌فرض)</SelectItem>
-                    <SelectItem value="full">دسترسی کامل به همهٔ ابزارها</SelectItem>
-                    <SelectItem value="none">بدون دسترسی به هیچ بخشی</SelectItem>
-                  </SelectContent>
-                </Select>
-                <p className="text-[10px] text-slate-400 text-right leading-5">بعداً از تب «دسترسی‌ها» به‌صورت ریز (بخش × ابزار) تنظیم می‌شود</p>
-              </div>
-            )}
+          <FormSection title="نقش و دسترسی">
+            <div className="space-y-2">
+              <Label className="text-right block">نقش کاربر</Label>
+              <SearchableSelect
+                value={form.role_id}
+                onChange={v => setForm({ ...form, role_id: v })}
+                placeholder="انتخاب نقش..."
+                disabled={editingSelf}
+                options={roles.map(r => {
+                  const inactive = String(r.status ?? "active") === "inactive";
+                  return {
+                    value: String(r.id),
+                    label: r.display_name,
+                    description: inactive
+                      ? `${Number(r.users_count ?? 0).toLocaleString("fa-IR")} کاربر · غیرفعال`
+                      : `${Number(r.users_count ?? 0).toLocaleString("fa-IR")} کاربر`,
+                  };
+                })}
+              />
+              {editingSelf && <p className="text-[10px] text-amber-600 text-right">نقش حساب خودتان قابل تغییر نیست</p>}
+              {!editingSelf && !form.role_id && (
+                <p className="text-[10px] text-slate-400 text-right leading-5">
+                  بدون نقش = همهٔ بخش‌ها فقط مشاهده — با انتخاب نقش، دسترسی‌های همان نقش اعمال می‌شود (تنظیم از تب «دسترسی‌ها»)
+                </p>
+              )}
+            </div>
           </FormSection>
 
           <DialogFooter>

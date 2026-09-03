@@ -19,6 +19,8 @@ export const API_ENDPOINTS = {
   dashboardStats: "/dashboard/stats", dashboardRecentDefects: "/dashboard/recent-defects",
   dashboardDefectsByCategory: "/dashboard/defects-by-category",
   users: "/users",
+  // v4.3.83: نقش‌ها — دسترسی‌ها روی نقش تعریف و به کاربران تخصیص داده می‌شوند
+  roles: "/roles",
   contracts: "/contracts", invoices: "/invoices",
   safetyIncidents: "/safety-incidents",
   personnel: "/personnel", contractors: "/contractors",
