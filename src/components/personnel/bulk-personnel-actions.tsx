@@ -6,7 +6,7 @@ import { API_ENDPOINTS } from "@/lib/api-config";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Loader2, ListChecks, Power, PowerOff, UserCog, Briefcase, FileText } from "lucide-react";
+import { Loader2, ListChecks, Power, PowerOff, UserCog, Briefcase, FileText, MapPin } from "lucide-react";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { SearchableSelect } from "@/components/searchable-select";
 import { ContractSelect } from "@/components/contract-select";
+import { DistrictSelect } from "@/components/district-select";
 import { usePersonnelOptions } from "@/hooks/use-personnel-options";
 import { useToast } from "@/hooks/use-toast";
 import { BulkOperationPanel, type BulkOperationProgress } from "@/components/bulk-operation-dialog";
@@ -27,12 +28,13 @@ interface BulkPersonnelActionsProps {
   positionOptions?: Array<{ value: string; label: string }>;
 }
 
-type FieldAction = "position" | "supervisor" | "contract";
+type FieldAction = "position" | "supervisor" | "contract" | "district";
 
 const actionMeta: Record<FieldAction, { title: string; label: string }> = {
   position:   { title: "تغییر گروهی سمت", label: "تغییر سمت" },
   supervisor: { title: "تغییر گروهی سرپرست", label: "تغییر سرپرست" },
   contract:   { title: "تغییر گروهی قرارداد", label: "تغییر قرارداد" },
+  district:   { title: "تغییر گروهی امور بهره‌برداری", label: "تغییر امور بهره‌برداری" },
 };
 
 /**
@@ -110,7 +112,7 @@ export function BulkPersonnelActions({ getSelection, onApplied, positionOptions 
 
   const confirmField = () => {
     if (!fieldAction) return;
-    if (fieldAction !== "contract" && !value.trim()) {
+    if (fieldAction !== "contract" && fieldAction !== "district" && !value.trim()) {
       toast({ title: "یک مقدار انتخاب/وارد کنید" });
       return;
     }
@@ -126,6 +128,11 @@ export function BulkPersonnelActions({ getSelection, onApplied, positionOptions 
       case "contract":
         patch = { contract_id: value === "__unknown__" ? null : (value ? Number(value) : null) };
         label = value === "__unknown__" ? "پاک کردن قرارداد" : "انتقال به قرارداد";
+        break;
+      // v4.3.79: ویرایش گروهی امور بهره‌برداری پرسنل — «نامشخص» یعنی پاک کردن امور
+      case "district":
+        patch = { district_id: value === "__unknown__" ? null : (value ? Number(value) : null) };
+        label = value === "__unknown__" ? "پاک کردن امور بهره‌برداری" : "انتقال به امور بهره‌برداری";
         break;
       default: return;
     }
@@ -151,6 +158,7 @@ export function BulkPersonnelActions({ getSelection, onApplied, positionOptions 
           <ItemRow icon={<Briefcase className="w-4 h-4 text-indigo-600" />} label="سمت" onClick={() => startFieldAction("position")} />
           <ItemRow icon={<UserCog className="w-4 h-4 text-indigo-600" />} label="سرپرست" onClick={() => startFieldAction("supervisor")} />
           <ItemRow icon={<FileText className="w-4 h-4 text-indigo-600" />} label="قرارداد" onClick={() => startFieldAction("contract")} />
+          <ItemRow icon={<MapPin className="w-4 h-4 text-emerald-600" />} label="امور بهره‌برداری" onClick={() => startFieldAction("district")} />
         </DropdownMenuContent>
       </DropdownMenu>
 
@@ -214,6 +222,13 @@ export function BulkPersonnelActions({ getSelection, onApplied, positionOptions 
                   <Label className="text-right block">قرارداد</Label>
                   <ContractSelect value={value} onChange={setValue} preserveUnknownValue />
                   <p className="text-[11px] text-slate-400 text-right">برای پاک کردن قرارداد «نامشخص» را انتخاب کنید</p>
+                </div>
+              ) : fieldAction === "district" ? (
+                // v4.3.79: ویرایش گروهی امور بهره‌برداری پرسنل
+                <div className="space-y-2">
+                  <Label className="text-right block">امور بهره‌برداری</Label>
+                  <DistrictSelect value={value} onChange={setValue} />
+                  <p className="text-[11px] text-slate-400 text-right">برای پاک کردن امور «نامشخص» را انتخاب کنید</p>
                 </div>
               ) : null}
             </div>

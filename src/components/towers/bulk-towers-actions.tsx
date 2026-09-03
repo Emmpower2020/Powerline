@@ -6,7 +6,7 @@ import { API_ENDPOINTS } from "@/lib/api-config";
 import { INSULATOR_TYPES } from "@/components/towers/create-tower-dialog";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { FileText, Loader2, ListChecks, Power, PowerOff, Building2, Radio, Layers, Cable, UserCog, Link2 as Link2Icon } from "lucide-react";
+import { FileText, Loader2, ListChecks, Power, PowerOff, Building2, Radio, Layers, Cable, UserCog, Link2 as Link2Icon, MapPin } from "lucide-react";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
@@ -17,6 +17,7 @@ import {
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { SearchableSelect } from "@/components/searchable-select";
 import { ContractSelect } from "@/components/contract-select";
+import { DistrictSelect } from "@/components/district-select";
 import { usePersonnelOptions } from "@/hooks/use-personnel-options";
 import { useTowerReferences } from "@/hooks/use-tower-references";
 import { useToast } from "@/hooks/use-toast";
@@ -30,7 +31,7 @@ interface BulkTowersActionsProps {
 
 type FieldAction =
   | "tower_structure" | "tower_type" | "tower_type_code"
-  | "insulator_all" | "line_supervisor" | "line_id" | "contract";
+  | "insulator_all" | "line_supervisor" | "line_id" | "contract" | "district";
 
 const TOWER_TYPES = ["کششی", "آویزی"];
 
@@ -42,6 +43,7 @@ const actionMeta: Record<FieldAction, { title: string; label: string; placeholde
   line_supervisor:      { title: "تغییر گروهی سرپرست خط", label: "نام سرپرست خط", placeholder: "مثلاً: یادگار میری" },
   line_id:              { title: "اتصال گروهی دکل‌ها به خط", label: "خط" },
   contract:             { title: "تغییر گروهی قرارداد", label: "قرارداد" },
+  district:             { title: "تغییر گروهی امور بهره‌برداری", label: "امور بهره‌برداری" },
 };
 
 /**
@@ -154,7 +156,8 @@ export function BulkTowersActions({ getSelection, onApplied }: BulkTowersActions
   const confirmField = async () => {
     if (!fieldAction) return;
     const isText = ["line_supervisor"].includes(fieldAction);
-    const isSelect = ["tower_type", "insulator_all", "line_id", "contract"].includes(fieldAction);
+    // v4.3.79: امور بهره‌برداری هم مثل قرارداد انتخابی است
+    const isSelect = ["tower_type", "insulator_all", "line_id", "contract", "district"].includes(fieldAction);
 
     if (isText && !value.trim()) {
       toast({ title: "مقدار را وارد کنید" });
@@ -174,6 +177,8 @@ export function BulkTowersActions({ getSelection, onApplied }: BulkTowersActions
       case "line_id":              patch = { line_id: Number(value) }; break;
       // «نامشخص» → پاک شدن قرارداد (NULL)؛ بک‌اند contract_id=null را می‌پذیرد
       case "contract":             patch = { contract_id: value === "__unknown__" ? null : Number(value) }; break;
+      // v4.3.79: ویرایش گروهی امور بهره‌برداری دکل‌ها — «نامشخص» یعنی پاک کردن امور
+      case "district":             patch = { district_id: value === "__unknown__" ? null : Number(value) }; break;
       case "insulator_all":
         // یک نوع مقره روی هر ۶ فاز/مدار اعمال می‌شود
         patch = {
@@ -228,6 +233,7 @@ export function BulkTowersActions({ getSelection, onApplied }: BulkTowersActions
           <ItemRow icon={<UserCog className="w-4 h-4 text-indigo-600" />} label="سرپرست خط" onClick={() => startFieldAction("line_supervisor")} />
           <ItemRow icon={<Link2Icon className="w-4 h-4 text-emerald-600" />} label="اتصال به خط" onClick={() => startFieldAction("line_id")} />
           <ItemRow icon={<FileText className="w-4 h-4 text-indigo-600" />} label="قرارداد" onClick={() => startFieldAction("contract")} />
+          <ItemRow icon={<MapPin className="w-4 h-4 text-emerald-600" />} label="امور بهره‌برداری" onClick={() => startFieldAction("district")} />
         </DropdownMenuContent>
       </DropdownMenu>
 
@@ -261,6 +267,13 @@ export function BulkTowersActions({ getSelection, onApplied }: BulkTowersActions
               <div className="space-y-2">
                 <Label className="text-right block">قرارداد</Label>
                 <ContractSelect value={value} onChange={setValue} preserveUnknownValue />
+              </div>
+            ) : fieldAction === "district" ? (
+              // v4.3.79: ویرایش گروهی امور بهره‌برداری دکل‌ها
+              <div className="space-y-2">
+                <Label className="text-right block">امور بهره‌برداری</Label>
+                <DistrictSelect value={value} onChange={setValue} />
+                <p className="text-[11px] text-slate-400 text-right">برای پاک کردن امور «نامشخص» را انتخاب کنید</p>
               </div>
             ) : fieldAction === "line_id" ? (
               <div className="space-y-2">

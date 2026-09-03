@@ -423,6 +423,7 @@ export function DefectsPage() {
             canToggleStatus
             statusField="activity_status"
             canChangeContract
+            canChangeDistrict
             additionalActions={<>
               <ItemRow icon={<Flame className="w-4 h-4 text-orange-500" />} label="شدت" onClick={() => startBulk("severity")} />
               <ItemRow icon={<Gauge className="w-4 h-4 text-amber-500" />} label="اولویت" onClick={() => startBulk("priority")} />

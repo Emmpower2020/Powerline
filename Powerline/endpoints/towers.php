@@ -173,11 +173,15 @@ function registerTowerRoutes(Router $router): void
         Auth::requirePermission('towers.view');
 
         $db = Database::getInstance();
+        // v4.3.79: امور بهره‌برداری در جزئیات دکل هم برگردانده می‌شود
+        $disJoin = Helpers::districtJoin('t', 'towers');
+        $disSel = Helpers::districtSelect();
         $row = $db->fetchOne(
-            "SELECT t.*, l.line_code, l.name AS line_name, l.voltage_kv, ct.title AS contract_title
+            "SELECT t.*, l.line_code, l.name AS line_name, l.voltage_kv, ct.title AS contract_title$disSel
              FROM towers t
              LEFT JOIN `lines` l ON l.id = t.line_id
              LEFT JOIN contracts ct ON ct.id = t.contract_id
+             $disJoin
              WHERE t.id = ?",
             [(int) $id]
         );
@@ -818,6 +822,9 @@ function formatTowerRow(array $row): array
         'gps_lng'           => $num($row['gps_lng'] ?? null),
         'line_supervisor'   => $row['line_supervisor'] ?? null,
         'status'          => (string) $row['status'],
+        // v4.3.79: امور بهره‌برداری دکل — قبلاً در فرمول‌ساز پاسخ جا افتاده بود
+        'district_id'       => !empty($row['district_id']) ? (int) $row['district_id'] : null,
+        'district_name'     => $row['district_name'] ?? null,
         'created_at'        => $row['created_at'] ?? null,
         'updated_at'        => $row['updated_at'] ?? null,
     ];

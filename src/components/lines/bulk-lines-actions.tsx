@@ -6,7 +6,7 @@ import { API_ENDPOINTS } from "@/lib/api-config";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Loader2, ListChecks, Power, PowerOff, UserCog, Layers, Zap, Cable, Building2, FileText } from "lucide-react";
+import { Loader2, ListChecks, Power, PowerOff, UserCog, Layers, Zap, Cable, Building2, FileText, MapPin } from "lucide-react";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
@@ -21,6 +21,7 @@ import { usePersonnelOptions } from "@/hooks/use-personnel-options";
 import { useToast } from "@/hooks/use-toast";
 import { useTowerReferences } from "@/hooks/use-tower-references";
 import { ContractSelect } from "@/components/contract-select";
+import { DistrictSelect } from "@/components/district-select";
 import { BulkOperationPanel, type BulkOperationProgress } from "@/components/bulk-operation-dialog";
 
 interface BulkLinesActionsProps {
@@ -32,7 +33,7 @@ interface BulkLinesActionsProps {
 
 /** اعمالی که با دیالوگ مقدار انجام می‌شوند */
 type FieldAction =
-  | "supervisor" | "expert" | "contractor" | "contract"
+  | "supervisor" | "expert" | "contractor" | "contract" | "district"
   | "voltage" | "conductor_type" | "tower_structure";
 
 const VOLTAGE_OPTIONS = [63, 132, 230, 400];
@@ -42,6 +43,7 @@ const actionMeta: Record<FieldAction, { title: string; label: string; placeholde
   expert:              { title: "تغییر گروهی کارشناس خط", label: "نام کارشناس خط", placeholder: "مثلاً: وحید سلیمانی" },
   contractor:          { title: "تغییر گروهی پیمانکار", label: "پیمانکار" },
   contract:            { title: "تغییر گروهی قرارداد", label: "قرارداد" },
+  district:            { title: "تغییر گروهی امور بهره‌برداری", label: "امور بهره‌برداری" },
   voltage:             { title: "تغییر گروهی ولتاژ", label: "ولتاژ (kV)" },
   conductor_type:      { title: "تغییر گروهی نوع سیم", label: "نوع سیم", placeholder: "مثلاً: لینکس (Lynx)" },
   tower_structure:{ title: "تغییر گروهی نوع سازه دکل", label: "نوع سازه دکل", placeholder: "مثلاً: مشبک فلزی" },
@@ -148,7 +150,8 @@ export function BulkLinesActions({ getSelection, onApplied }: BulkLinesActionsPr
   const confirmField = async () => {
     if (!fieldAction) return;
     const isText = ["supervisor", "expert"].includes(fieldAction); // v3.4.1+: نوع سیم/سازه کمبوباکس شدند (سیم از جدول conductors — v3.5.0)
-    const isSelect = ["contractor", "contract", "voltage"].includes(fieldAction);
+    // v4.3.79: اعتبارسنجی — امور بهره‌برداری هم مثل قرارداد انتخابی است
+    const isSelect = ["contractor", "contract", "voltage", "district"].includes(fieldAction);
 
     if (isText && !value.trim()) {
       toast({ title: "مقدار را وارد کنید" });
@@ -167,6 +170,8 @@ export function BulkLinesActions({ getSelection, onApplied }: BulkLinesActionsPr
       case "tower_structure": patch = { tower_structure: value.trim() }; break;
       case "contractor":           patch = { contractor_id: Number(value) }; break;
       case "contract":             patch = { contract_id: value === "__unknown__" ? null : Number(value) }; break;
+      // v4.3.79: ویرایش گروهی امور بهره‌برداری خطوط — «نامشخص» یعنی پاک کردن امور
+      case "district":             patch = { district_id: value === "__unknown__" ? null : Number(value) }; break;
       case "voltage": {
         const v = Number(value);
         // فقط ستون واقعی دیتابیس lines استفاده می‌شود: voltage_kv
@@ -216,6 +221,7 @@ export function BulkLinesActions({ getSelection, onApplied }: BulkLinesActionsPr
           <ItemRow icon={<UserCog className="w-4 h-4 text-indigo-600" />} label="کارشناس خط" onClick={() => startFieldAction("expert")} />
           <ItemRow icon={<UserCog className="w-4 h-4 text-indigo-600" />} label="پیمانکار" onClick={() => startFieldAction("contractor")} />
           <ItemRow icon={<FileText className="w-4 h-4 text-indigo-600" />} label="قرارداد" onClick={() => startFieldAction("contract")} />
+          <ItemRow icon={<MapPin className="w-4 h-4 text-emerald-600" />} label="امور بهره‌برداری" onClick={() => startFieldAction("district")} />
         </DropdownMenuContent>
       </DropdownMenu>
 
@@ -249,6 +255,13 @@ export function BulkLinesActions({ getSelection, onApplied }: BulkLinesActionsPr
               <div className="space-y-2">
                 <Label className="text-right block">قرارداد</Label>
                 <ContractSelect value={value} onChange={setValue} preserveUnknownValue />
+              </div>
+            ) : fieldAction === "district" ? (
+              // v4.3.79: ویرایش گروهی امور بهره‌برداری خطوط
+              <div className="space-y-2">
+                <Label className="text-right block">امور بهره‌برداری</Label>
+                <DistrictSelect value={value} onChange={setValue} />
+                <p className="text-[11px] text-slate-400 text-right">برای پاک کردن امور «نامشخص» را انتخاب کنید</p>
               </div>
             ) : fieldAction === "contractor" ? (
               <div className="space-y-2">

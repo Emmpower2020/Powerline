@@ -362,7 +362,11 @@ export function GenericModulePage({ moduleKey, endpoint }: { moduleKey: string; 
       setLoading(true);
       try {
         const result = await apiClient.get<PaginatedResponse<GenericItem>>(endpoint, { page: 1, page_size: 500, search: search || undefined });
-        setData(result?.data || []);
+        // v4.3.79: مقاوم به هر دو شکل پاسخ — بک‌اند قدیمی (۴.۳.۷۸) آرایهٔ خام و
+        // بک‌اند جدید پاسخ صفحه‌بندی‌شده برمی‌گرداند؛ بدون این سازگاری جدول
+        // «امور بهره‌برداری» در داده‌های پایه خالی نمایش داده می‌شد.
+        const list = Array.isArray(result) ? result : (result?.data || []);
+        setData(list);
       } catch (err) { console.error("خطا:", err); } finally { setLoading(false); }
     };
     const d = setTimeout(load, 250);
@@ -462,9 +466,9 @@ export function GenericModulePage({ moduleKey, endpoint }: { moduleKey: string; 
       onImport={() => setShowImport(true)}
       onLoadAllRows={async () => {
         const result = await apiClient.get<PaginatedResponse<GenericItem>>(endpoint, { page: 1, page_size: 100000 });
-        return result?.data || [];
+        return Array.isArray(result) ? result : (result?.data || []);
       }}
-      toolbarExtra={(rows) => <GenericBulkActions rows={rows} endpoint={endpoint} entityName={config.singular} onApplied={() => setRefreshKey(k => k + 1)} canToggleStatus statusField={config.statusField} canChangeContract={!!config.editKeys?.includes("contract_id")} />}
+      toolbarExtra={(rows) => <GenericBulkActions rows={rows} endpoint={endpoint} entityName={config.singular} onApplied={() => setRefreshKey(k => k + 1)} canToggleStatus statusField={config.statusField} canChangeContract={!!config.editKeys?.includes("contract_id")} canChangeDistrict={!!config.editKeys?.includes("district_id")} />}
     />
     <EditorDialog open={editor.open} row={editor.row} keys={selectedKeys} singular={config.singular} moduleKey={moduleKey} mode={editor.mode} endpoint={endpoint} onClose={() => setEditor(prev => ({...prev, open:false, row:null}))} onSaved={() => { setEditor(prev => ({...prev, open:false, row:null})); setRefreshKey(k => k + 1); }} />
 

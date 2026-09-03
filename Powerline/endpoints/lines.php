@@ -90,14 +90,18 @@ function registerLineRoutes(Router $router): void
         $lineColumns = [];
         foreach ($db->fetchAll("SHOW COLUMNS FROM `lines`") as $cr) if (isset($cr['Field'])) $lineColumns[(string)$cr['Field']] = true;
         $resolvedStructure = isset($lineColumns['tower_structure']) ? 'l.tower_structure' : 'NULL';
+        // v4.3.79: امور بهره‌برداری در جزئیات خط هم برگردانده می‌شود
+        $disJoin = Helpers::districtJoin('l', 'lines');
+        $disSel = Helpers::districtSelect();
         $row = $db->fetchOne(
-            "SELECT l.*, o.name AS owner_org_name, c.contractor_name AS contractor_name, ct.title AS contract_title,
+            "SELECT l.*, o.name AS owner_org_name, c.contractor_name AS contractor_name, ct.title AS contract_title$disSel,
                     (SELECT COUNT(*) FROM towers tt WHERE tt.line_id = l.id AND tt.status = 'active') AS tower_count,
                     $resolvedStructure AS resolved_tower_structure
              FROM `lines` l
              LEFT JOIN organization o ON o.id = l.owner_org_id
              LEFT JOIN contractors c ON c.id = l.contractor_id
              LEFT JOIN contracts ct ON ct.id = l.contract_id
+             $disJoin
              WHERE l.id = ?",
             [(int) $id]
         );
@@ -611,6 +615,10 @@ function formatLineRow(array $row): array
         'line_supervisor'    => $row['line_supervisor'] ?? null,
         'line_expert'        => $row['line_expert'] ?? null,
         'status'          => (string) ($row['status'] ?? 'active'),
+        // v4.3.79: امور بهره‌برداری خط — قبلاً در فرمول‌ساز پاسخ جا افتاده بود و
+        // ستون امور در جدول خطوط همیشه «—» نشان می‌داد (با اینکه ذخیره می‌شد)
+        'district_id'       => !empty($row['district_id']) ? (int) $row['district_id'] : null,
+        'district_name'     => $row['district_name'] ?? null,
         'created_at'         => $row['created_at'] ?? null,
         'updated_at'         => $row['updated_at'] ?? null,
     ];

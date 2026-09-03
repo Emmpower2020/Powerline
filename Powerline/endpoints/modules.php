@@ -330,10 +330,15 @@ function registerModuleRoutes(Router $router): void
     // لیست امور — برای همهٔ کاربران لاگین‌شده قابل خواندن است (کمبوباکس فرم‌ها)
     $router->get('districts', function () {
         Auth::authenticate();
-        if (!Helpers::districtsReady()) Response::success([]);
+        if (!Helpers::districtsReady()) Response::paginated([], 1, 1, 0);
         $rows = Database::getInstance()->getConnection()
             ->query("SELECT id, name, status, created_at, updated_at FROM districts ORDER BY id ASC")->fetchAll();
-        Response::success($rows);
+        // v4.3.79: پاسخ صفحه‌بندی‌شده (هم‌شکل بقیهٔ ماژول‌ها) — قبلاً آرایهٔ خام
+        // برمی‌گشت؛ apiClient پاسخ بدون pagination را به آرایهٔ خالی تبدیل می‌کرد و
+        // جدول «امور بهره‌برداری» در صفحهٔ داده‌های پایه خالی نمایش داده می‌شد
+        // (در حالی که ثبت تکراری درست پیام «قبلاً ثبت شده» می‌داد).
+        $total = count($rows);
+        Response::paginated($rows, 1, max(1, $total), $total);
     });
 
     $router->post('districts', function () use ($guardedDelete) {
