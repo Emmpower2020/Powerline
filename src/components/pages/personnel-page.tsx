@@ -401,7 +401,7 @@ function PersonnelDialog({ open, editRow, duplicateFrom, onClose, onSaved }: {
             {editRow
               ? `ویرایش پرسنل: ${editRow.first_name} ${editRow.last_name}`
               : duplicateFrom
-                ? `کپی پرسنل جدید (از: ${duplicateFrom.first_name} ${duplicateFrom.last_name})`
+                ? `ثبت پرسنل جدید (کپی از: ${duplicateFrom.first_name} ${duplicateFrom.last_name})`
                 : "ثبت پرسنل جدید"}
           </DialogTitle>
         </DialogHeader>
@@ -411,7 +411,7 @@ function PersonnelDialog({ open, editRow, duplicateFrom, onClose, onSaved }: {
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div className="space-y-2">
-              <Label className="text-right block text-xs text-slate-600 dark:text-slate-300">کد پرسنلی</Label>
+              <Label className="text-right block">کد پرسنلی</Label>
               <Input
                 value={form.personnel_code}
                 onChange={e => setForm({ ...form, personnel_code: e.target.value })}
@@ -420,52 +420,52 @@ function PersonnelDialog({ open, editRow, duplicateFrom, onClose, onSaved }: {
               />
             </div>
             <div className="space-y-2">
-              <Label className="text-right block text-xs text-slate-600 dark:text-slate-300">نام (اجباری)</Label>
+              <Label className="text-right block">نام (اجباری)</Label>
               <Input value={form.first_name} onChange={e => setForm({ ...form, first_name: e.target.value })} className="text-right" autoFocus />
             </div>
             <div className="space-y-2">
-              <Label className="text-right block text-xs text-slate-600 dark:text-slate-300">نام خانوادگی</Label>
+              <Label className="text-right block">نام خانوادگی</Label>
               <Input value={form.last_name} onChange={e => setForm({ ...form, last_name: e.target.value })} className="text-right" />
             </div>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div className="space-y-2">
-              <Label className="text-right block text-xs text-slate-600 dark:text-slate-300">کد ملی</Label>
+              <Label className="text-right block">کد ملی</Label>
               <Input value={form.national_id} onChange={e => setForm({ ...form, national_id: e.target.value.replace(/[^0-9]/g, "") })} dir="ltr" className="text-left" />
             </div>
             <div className="space-y-2">
-              <Label className="text-right block text-xs text-slate-600 dark:text-slate-300">نام پدر</Label>
+              <Label className="text-right block">نام پدر</Label>
               <Input value={form.father_name} onChange={e => setForm({ ...form, father_name: e.target.value })} className="text-right" />
             </div>
             <div className="space-y-2">
-              <Label className="text-right block text-xs text-slate-600 dark:text-slate-300">تاریخ شروع همکاری</Label>
+              <Label className="text-right block">تاریخ شروع همکاری</Label>
               <Input value={form.collaboration_start} onChange={e => setForm({ ...form, collaboration_start: e.target.value })} placeholder="1404/02/01" dir="ltr" className="text-left" />
             </div>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="space-y-2">
-              <Label className="text-right block text-xs text-slate-600 dark:text-slate-300">قرارداد</Label>
+              <Label className="text-right block">قرارداد</Label>
               <ContractSelect value={form.contract_id} onChange={v => setForm({ ...form, contract_id: v })} />
             </div>
             <div className="space-y-2">
-              <Label className="text-right block text-xs text-slate-600 dark:text-slate-300">سمت</Label>
+              <Label className="text-right block">سمت</Label>
               <Input value={form.position} onChange={e => setForm({ ...form, position: e.target.value })} className="text-right" />
             </div>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div className="space-y-2">
-              <Label className="text-right block text-xs text-slate-600 dark:text-slate-300">موبایل</Label>
+              <Label className="text-right block">موبایل</Label>
               <Input value={form.mobile} onChange={e => setForm({ ...form, mobile: e.target.value })} dir="ltr" className="text-left" />
             </div>
             <div className="space-y-2">
-              <Label className="text-right block text-xs text-slate-600 dark:text-slate-300">تلفن</Label>
+              <Label className="text-right block">تلفن</Label>
               <Input value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} dir="ltr" className="text-left" />
             </div>
             <div className="space-y-2">
-              <Label className="text-right block text-xs text-slate-600 dark:text-slate-300">سرپرست</Label>
+              <Label className="text-right block">سرپرست</Label>
               <Input value={form.supervisor_name} onChange={e => setForm({ ...form, supervisor_name: e.target.value })} className="text-right" />
             </div>
           </div>

@@ -510,7 +510,7 @@ export function ImportExcelDialog({
           {/* انتخاب فایل + دانلود قالب */}
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <Label className="text-right block text-xs text-slate-600 dark:text-slate-300">فایل اکسل</Label>
+              <Label className="text-right block">فایل اکسل</Label>
               {templateColumns && templateColumns.length > 0 && (
                 <Button
                   type="button"

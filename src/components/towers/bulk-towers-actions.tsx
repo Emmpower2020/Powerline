@@ -259,12 +259,12 @@ export function BulkTowersActions({ getSelection, onApplied }: BulkTowersActions
 
             {fieldAction === "contract" ? (
               <div className="space-y-2">
-                <Label className="text-right block text-xs text-slate-600 dark:text-slate-300">قرارداد</Label>
+                <Label className="text-right block">قرارداد</Label>
                 <ContractSelect value={value} onChange={setValue} preserveUnknownValue />
               </div>
             ) : fieldAction === "line_id" ? (
               <div className="space-y-2">
-                <Label className="text-right block text-xs text-slate-600 dark:text-slate-300">{actionMeta.line_id.label}</Label>
+                <Label className="text-right block">{actionMeta.line_id.label}</Label>
                 {linesLoaded ? (
                   <Select value={value} onValueChange={setValue}>
                     <SelectTrigger className="w-full bg-white"><SelectValue placeholder="انتخاب خط..." /></SelectTrigger>
@@ -285,7 +285,7 @@ export function BulkTowersActions({ getSelection, onApplied }: BulkTowersActions
             ) : fieldAction === "line_supervisor" ? (
               // v3.0.0: سرپرست خط از پرسنل با کمبوباکس قابل جستجو
               <div className="space-y-2">
-                <Label className="text-right block text-xs text-slate-600 dark:text-slate-300">{actionMeta.line_supervisor.label}</Label>
+                <Label className="text-right block">{actionMeta.line_supervisor.label}</Label>
                 <SearchableSelect
                   value={value}
                   onChange={setValue}
@@ -296,7 +296,7 @@ export function BulkTowersActions({ getSelection, onApplied }: BulkTowersActions
               </div>
             ) : fieldAction === "tower_structure" ? (
               <div className="space-y-2">
-                <Label className="text-right block text-xs text-slate-600 dark:text-slate-300">{actionMeta.tower_structure.label}</Label>
+                <Label className="text-right block">{actionMeta.tower_structure.label}</Label>
                 {towerReferencesLoading ? (
                   <div className="flex items-center gap-2 text-sm text-slate-400 p-2">
                     <Loader2 className="w-4 h-4 animate-spin" /> در حال دریافت ساختارهای دکل...
@@ -314,7 +314,7 @@ export function BulkTowersActions({ getSelection, onApplied }: BulkTowersActions
               </div>
             ) : fieldAction === "tower_type_code" ? (
               <div className="space-y-2">
-                <Label className="text-right block text-xs text-slate-600 dark:text-slate-300">{actionMeta.tower_type_code.label}</Label>
+                <Label className="text-right block">{actionMeta.tower_type_code.label}</Label>
                 {towerReferencesLoading ? (
                   <div className="flex items-center gap-2 text-sm text-slate-400 p-2">
                     <Loader2 className="w-4 h-4 animate-spin" /> در حال دریافت کدهای نوع دکل...
@@ -332,7 +332,7 @@ export function BulkTowersActions({ getSelection, onApplied }: BulkTowersActions
               </div>
             ) : fieldAction === "tower_type" ? (
               <div className="space-y-2">
-                <Label className="text-right block text-xs text-slate-600 dark:text-slate-300">{actionMeta.tower_type.label}</Label>
+                <Label className="text-right block">{actionMeta.tower_type.label}</Label>
                 <Select value={value} onValueChange={setValue}>
                   <SelectTrigger className="w-full bg-white"><SelectValue placeholder="انتخاب نوع دکل..." /></SelectTrigger>
                   <SelectContent>
@@ -344,7 +344,7 @@ export function BulkTowersActions({ getSelection, onApplied }: BulkTowersActions
               </div>
             ) : fieldAction === "insulator_all" ? (
               <div className="space-y-2">
-                <Label className="text-right block text-xs text-slate-600 dark:text-slate-300">{actionMeta.insulator_all.label}</Label>
+                <Label className="text-right block">{actionMeta.insulator_all.label}</Label>
                 <Select value={value} onValueChange={setValue}>
                   <SelectTrigger className="w-full bg-white"><SelectValue placeholder="انتخاب نوع مقره..." /></SelectTrigger>
                   <SelectContent>

@@ -475,7 +475,7 @@ export function DefectsPage() {
             </p>
             {bulkField && (
               <div className="space-y-2">
-                <Label className="text-right block text-xs text-slate-600 dark:text-slate-300">مقدار جدید</Label>
+                <Label className="text-right block">مقدار جدید</Label>
                 <SearchableSelect
                   value={bulkValue}
                   onChange={setBulkValue}

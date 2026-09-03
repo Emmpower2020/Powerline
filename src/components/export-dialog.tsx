@@ -213,7 +213,7 @@ export function ExportDialog({
         <div className="space-y-4">
           {/* نام فایل */}
           <div className="space-y-2">
-            <Label className="text-right block text-xs text-slate-600 dark:text-slate-300">نام فایل خروجی</Label>
+            <Label className="text-right block">نام فایل خروجی</Label>
             <Input
               value={options.fileName}
               onChange={e => setOptions(o => ({ ...o, fileName: e.target.value }))}
@@ -226,7 +226,7 @@ export function ExportDialog({
 
           {/* فرمت */}
           <div className="space-y-2">
-            <Label className="text-right block text-xs text-slate-600 dark:text-slate-300">فرمت فایل</Label>
+            <Label className="text-right block">فرمت فایل</Label>
             <div className="grid grid-cols-2 gap-2">
               <button
                 type="button"
@@ -264,7 +264,7 @@ export function ExportDialog({
 
           {/* محدوده */}
           <div className="space-y-2">
-            <Label className="text-right block text-xs text-slate-600 dark:text-slate-300">محدوده خروجی</Label>
+            <Label className="text-right block">محدوده خروجی</Label>
             <div className="space-y-2">
               <button
                 type="button"
@@ -334,7 +334,7 @@ export function ExportDialog({
 
           {/* ستون‌ها */}
           <div className="space-y-2">
-            <Label className="text-right block text-xs text-slate-600 dark:text-slate-300">ستون‌های خروجی</Label>
+            <Label className="text-right block">ستون‌های خروجی</Label>
             <div className="grid grid-cols-2 gap-2">
               <button
                 type="button"

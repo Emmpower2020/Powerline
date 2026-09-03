@@ -182,7 +182,7 @@ export function BulkPersonnelActions({ getSelection, onApplied, positionOptions 
 
               {fieldAction === "position" ? (
                 <div className="space-y-2">
-                  <Label className="text-right block text-xs text-slate-600 dark:text-slate-300">سمت</Label>
+                  <Label className="text-right block">سمت</Label>
                   <SearchableSelect
                     value={value}
                     onChange={setValue}
@@ -200,7 +200,7 @@ export function BulkPersonnelActions({ getSelection, onApplied, positionOptions 
                 </div>
               ) : fieldAction === "supervisor" ? (
                 <div className="space-y-2">
-                  <Label className="text-right block text-xs text-slate-600 dark:text-slate-300">سرپرست</Label>
+                  <Label className="text-right block">سرپرست</Label>
                   <SearchableSelect
                     value={value}
                     onChange={setValue}
@@ -211,7 +211,7 @@ export function BulkPersonnelActions({ getSelection, onApplied, positionOptions 
                 </div>
               ) : fieldAction === "contract" ? (
                 <div className="space-y-2">
-                  <Label className="text-right block text-xs text-slate-600 dark:text-slate-300">قرارداد</Label>
+                  <Label className="text-right block">قرارداد</Label>
                   <ContractSelect value={value} onChange={setValue} preserveUnknownValue />
                   <p className="text-[11px] text-slate-400 text-right">برای پاک کردن قرارداد «نامشخص» را انتخاب کنید</p>
                 </div>
