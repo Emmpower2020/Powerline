@@ -23,6 +23,7 @@ import { ContractSelect } from "@/components/contract-select";
 import { DistrictSelect } from "@/components/district-select";
 import { currentUserDistrictId } from "@/hooks/use-district-options";
 import { logError } from "@/lib/error-log";
+import { cn } from "@/lib/utils";
 import { Loader2, Zap } from "lucide-react";
 
 /**
@@ -55,10 +56,21 @@ interface Circuit {
 const VOLTAGE_OPTIONS = [400, 230, 132, 63];
 
 const voltageBadge: Record<string, { label: string; color: string }> = {
-  "400": { label: "۴۰۰ کیلوولت", color: "bg-purple-100 text-purple-700 hover:bg-purple-100" },
-  "230": { label: "۲۳۰ کیلوولت", color: "bg-red-100 text-red-700 hover:bg-red-100" },
-  "132": { label: "۱۳۲ کیلوولت", color: "bg-green-100 text-green-700 hover:bg-green-100" },
-  "63": { label: "۶۳ کیلوولت", color: "bg-blue-100 text-blue-700 hover:bg-blue-100" },
+  "400": { label: "۴۰۰ کیلوولت", color: "bg-purple-100 text-purple-700 hover:bg-purple-100 dark:bg-purple-950/60 dark:text-purple-400" },
+  "230": { label: "۲۳۰ کیلوولت", color: "bg-red-100 text-red-700 hover:bg-red-100 dark:bg-red-950/60 dark:text-red-400" },
+  "132": { label: "۱۳۲ کیلوولت", color: "bg-green-100 text-green-700 hover:bg-green-100 dark:bg-green-950/60 dark:text-green-400" },
+  "63": { label: "۶۳ کیلوولت", color: "bg-blue-100 text-blue-700 hover:bg-blue-100 dark:bg-blue-950/60 dark:text-blue-400" },
+};
+
+// v4.3.80: رنگ‌بندی بر اساس ولتاژ — همان الگوی دکل‌ها/خطوط (۴۰۰ بنفش | ۲۳۰ قرمز | ۱۳۲ سبز | ۶۳ آبی)
+const voltageBgClass = (voltageKv?: number | null) => {
+  switch (Number(voltageKv)) {
+    case 400: return "bg-purple-100 text-purple-700 dark:bg-purple-950/60 dark:text-purple-400";
+    case 230: return "bg-red-100 text-red-700 dark:bg-red-950/60 dark:text-red-400";
+    case 132: return "bg-green-100 text-green-700 dark:bg-green-950/60 dark:text-green-400";
+    case 63: return "bg-blue-100 text-blue-700 dark:bg-blue-950/60 dark:text-blue-400";
+    default: return "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300";
+  }
 };
 
 export function CircuitsPage() {
@@ -125,7 +137,15 @@ export function CircuitsPage() {
     { key: "contract_title", header: "قرارداد", sortable: true, filterable: true, wrap: true, align: "right" },
     // v4.3.78: امور بهره‌برداری + وضعیت فعال/غیرفعال
     { key: "district_name", header: "امور بهره‌برداری", sortable: true, filterable: true, align: "right" },
-    { key: "name", header: "نام مدار", sortable: true, filterable: true, wrap: true, align: "right" },
+    // v4.3.80: نام مدار با بج رنگی بر اساس ولتاژ — همان الگوی نام خط در خطوط/دکل‌ها
+    {
+      key: "name", header: "نام مدار", sortable: true, filterable: true, wrap: true, align: "right",
+      render: (row) => row.name ? (
+        <span className={cn("inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium break-all", voltageBgClass(row.voltage))}>
+          {row.name}
+        </span>
+      ) : <span className="text-slate-300">—</span>,
+    },
     {
       key: "voltage", header: "ولتاژ", sortable: true, filterable: true, type: "badge", align: "right",
       badgeLabels: { "400": "۴۰۰", "230": "۲۳۰", "132": "۱۳۲", "63": "۶۳" },

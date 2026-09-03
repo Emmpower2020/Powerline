@@ -140,18 +140,20 @@ export function GenericBulkActions({
       <DropdownMenuContent align="start" className="w-60">
         <DropdownMenuLabel className="text-xs text-right">عملیات گروهی</DropdownMenuLabel>
         <DropdownMenuSeparator/>
+        {/* v4.3.80: فعال/غیرفعال همیشه بالای منو — الگوی واحد با خطوط/دکل‌ها/پرسنل */}
+        {canToggleStatus && <>
+          <DropdownMenuItem className="gap-2 cursor-pointer" onClick={() => requestRun({[statusField]: "active"}, "فعال کردن") }><Power className="w-4 h-4 text-emerald-600"/>فعال کردن</DropdownMenuItem>
+          <DropdownMenuItem className="gap-2 cursor-pointer" onClick={() => requestRun({[statusField]: "inactive"}, "غیرفعال کردن") }><PowerOff className="w-4 h-4 text-slate-500"/>غیرفعال کردن</DropdownMenuItem>
+        </>}
+        {canToggleStatus && (canChangeContract || canChangeDistrict || additionalActions) && <DropdownMenuSeparator />}
         {canChangeContract && <DropdownMenuItem className="gap-2 cursor-pointer" onClick={openContractDialog}>
           <FileText className="w-4 h-4 text-indigo-600" /> تغییر قرارداد
         </DropdownMenuItem>}
         {canChangeDistrict && <DropdownMenuItem className="gap-2 cursor-pointer" onClick={openDistrictDialog}>
           <MapPin className="w-4 h-4 text-emerald-600" /> تغییر امور بهره‌برداری
         </DropdownMenuItem>}
-        {(canChangeContract || canChangeDistrict) && (canToggleStatus || true) && <DropdownMenuSeparator />}
-        {additionalActions}{additionalActions && (canToggleStatus || canChangeContract) && <DropdownMenuSeparator />}
-        {canToggleStatus && <>
-          <DropdownMenuItem className="gap-2 cursor-pointer" onClick={() => requestRun({[statusField]: "active"}, "فعال کردن") }><Power className="w-4 h-4 text-emerald-600"/>فعال کردن</DropdownMenuItem>
-          <DropdownMenuItem className="gap-2 cursor-pointer" onClick={() => requestRun({[statusField]: "inactive"}, "غیرفعال کردن") }><PowerOff className="w-4 h-4 text-slate-500"/>غیرفعال کردن</DropdownMenuItem>
-        </>}
+        {(canChangeContract || canChangeDistrict) && additionalActions && <DropdownMenuSeparator />}
+        {additionalActions}
       </DropdownMenuContent>
     </DropdownMenu>
 

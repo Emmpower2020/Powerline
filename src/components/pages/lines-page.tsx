@@ -311,7 +311,26 @@ export function LinesPage() {
     { key: "contract_title", header: "قرارداد", sortable: true, filterable: true, wrap: true, align: "right" },
     { key: "dispatch_code", header: "کد دیسپاچینگ", sortable: true, filterable: true, align: "right" },
     // v2.5.0: ستون «نام مجموعه خط» به‌صورت ستون مستقل و به‌طور پیش‌فرض قبل از «نام خط»
-    { key: "group_name", header: "نام مجموعه خط", sortable: true, filterable: true, width: "340px", wrap: true, align: "right" },
+    // v4.3.80: بج رنگی بر اساس ولتاژ خط — هماهنگ با ستون «نام خط» (الگوی دکل‌ها)
+    {
+      key: "group_name",
+      header: "نام مجموعه خط",
+      sortable: true,
+      filterable: true,
+      width: "340px",
+      wrap: true,
+      align: "right",
+      render: (row: any) => row.group_name ? (
+        <span
+          className={cn(
+            "inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium break-all",
+            voltageBgClass(row.voltage_kv)
+          )}
+        >
+          {row.group_name}
+        </span>
+      ) : <span className="text-slate-300">—</span>,
+    },
     {
       key: "name",
       header: "نام خط",
@@ -332,7 +351,15 @@ export function LinesPage() {
         </span>
       ),
     },
-    { key: "voltage_kv", header: "ولتاژ (kV)", sortable: true, filterable: true, type: "number", align: "right" },
+    // v4.3.80: ولتاژ با بج رنگی — همان الگوی دکل‌ها (۴۰۰ بنفش | ۲۳۰ قرمز | ۱۳۲ سبز | ۶۳ آبی)
+    {
+      key: "voltage_kv", header: "ولتاژ (kV)", sortable: true, filterable: true, type: "number", align: "right",
+      render: (row: any) => row.voltage_kv != null ? (
+        <span className={cn("inline-flex items-center rounded-md px-2 py-0.5 text-[11px] font-bold nums-fa", voltageBgClass(row.voltage_kv))}>
+          {Number(row.voltage_kv).toLocaleString("fa-IR")}
+        </span>
+      ) : <span className="text-slate-300">—</span>,
+    },
     // v4.3.78: امور بهره‌برداری خط
     { key: "district_name", header: "امور بهره‌برداری", sortable: true, filterable: true, align: "right" },
     { key: "circuit_count", header: "مدار", sortable: true, filterable: true, type: "number", align: "right" },
