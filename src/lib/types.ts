@@ -22,6 +22,9 @@ export interface Line {
   construction_date: string | null;
   commission_date: string | null;
   status: boolean;
+  // v4.3.78: امور بهره‌برداری خط
+  district_id?: number | null;
+  district_name?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -61,6 +64,9 @@ export interface Tower {
   gps_lng: number | null;
   line_supervisor: string | null;
   status: boolean;
+  // v4.3.78: امور بهره‌برداری دکل
+  district_id?: number | null;
+  district_name?: string | null;
   created_at: string;
   updated_at: string;
   distance_meters?: number;
@@ -105,6 +111,10 @@ export interface Defect {
   gps_lng: number | null;
   location_desc: string | null;
   notes: string | null;
+  // v4.3.78: وضعیت فعال/غیرفعال + امور بهره‌برداری عیب
+  activity_status?: string | null;
+  district_id?: number | null;
+  district_name?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -158,6 +168,10 @@ export interface Inspection {
   priority: "routine" | "emergency" | "follow_up" | "commissioning";
   weather: string | null;
   notes: string | null;
+  // v4.3.78: وضعیت فعال/غیرفعال + امور بهره‌برداری بازدید
+  activity_status?: string | null;
+  district_id?: number | null;
+  district_name?: string | null;
   created_at: string;
 }
 
@@ -198,6 +212,10 @@ export interface WorkOrder {
   equipment_used: string | null;
   materials_used: string | null;
   notes: string | null;
+  // v4.3.78: وضعیت فعال/غیرفعال + امور بهره‌برداری دستورکار
+  activity_status?: string | null;
+  district_id?: number | null;
+  district_name?: string | null;
   created_at: string;
   updated_at: string;
 }

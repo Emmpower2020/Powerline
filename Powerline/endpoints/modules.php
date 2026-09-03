@@ -107,10 +107,15 @@ function registerModuleRoutes(Router $router): void
             Response::error(404, "$label پیدا نشد یا قبلاً حذف شده است");
         }
         // v4.3.77: هیچ رکوردِ «فعالی» در هیچ جدولی حذف نمی‌شود (امنیت داده).
+        // v4.3.78: جداول گردش‌کاری (بازدید/عیب/دستورکار/صورت‌وضعیت/حادثه) وضعیت
+        // فعال/غیرفعال را در activity_status نگه می‌دارند؛ ستون status آنها «مرحلهٔ کار» است.
         // مقدار وضعیت بسته به اسکیما varchar ('active'/'inactive' یا مقدار قدیمی 'deactive')
         // یا tinyint (1/0) است — همه به‌صورت واحد نرمال‌سازی می‌شود.
         // قرارداد و پیمانکار پیام اختصاصی خود را حفظ می‌کنند (از v4.3.59).
-        $statusActive = in_array(strtolower(trim((string)($row['status'] ?? ''))), ['active', '1', 'true'], true);
+        $rawStatus = array_key_exists('activity_status', $row)
+            ? ($row['activity_status'] ?? '')
+            : ($row['status'] ?? '');
+        $statusActive = in_array(strtolower(trim((string)$rawStatus)), ['active', '1', 'true'], true);
         if ($statusActive) {
             $specific = $table === 'contracts'
                 ? 'قرارداد فعال است و برای جلوگیری از حذف ناخواسته تا زمانی که وضعیت آن را از «فعال» خارج نکنید، حذف نمی‌شود.'
@@ -313,6 +318,66 @@ function registerModuleRoutes(Router $router): void
         Database::getInstance()->execute("DELETE FROM tower_type_codes WHERE id=?",[(int)$id]); Response::success(null,'کد نوع دکل حذف شد'); });
 
     // ============================================================
+    //  امور بهره‌برداری (Districts) — v4.3.78
+    //  جدول داده‌های پایه برای تعریف امورهای مختلف (کردستان، ایلام، ...)
+    //  کاربر اموردار فقط داده‌های امور خودش را می‌بیند؛ مدیر (district_id=NULL) همه را می‌بیند.
+    //  تا قبل از اجرای migration (ساخت جدول districts) همهٔ مسیرها پاسخ خالی می‌دهند.
+    // ============================================================
+    $districtsReady = function (): bool {
+        return Helpers::districtsReady();
+    };
+
+    // لیست امور — برای همهٔ کاربران لاگین‌شده قابل خواندن است (کمبوباکس فرم‌ها)
+    $router->get('districts', function () {
+        Auth::authenticate();
+        if (!Helpers::districtsReady()) Response::success([]);
+        $rows = Database::getInstance()->getConnection()
+            ->query("SELECT id, name, status, created_at, updated_at FROM districts ORDER BY id ASC")->fetchAll();
+        Response::success($rows);
+    });
+
+    $router->post('districts', function () use ($guardedDelete) {
+        Auth::authenticate(); Auth::requirePermissionSoft('districts.create');
+        $b = Helpers::getJsonBody();
+        $name = trim((string)($b['name'] ?? ''));
+        if ($name === '') Response::error(400, 'نام امور بهره‌برداری الزامی است');
+        if (!Helpers::districtsReady()) Response::error(500, 'جدول امور بهره‌برداری هنوز ایجاد نشده — ابتدا فایل migration نسخه 4.3.78 را اجرا کنید');
+        $pdo = Database::getInstance()->getConnection();
+        // v4.3.78: طبق سیاست امنیت داده، ثبت جدید پیش‌فرض «غیرفعال» است
+        $st = $pdo->prepare("INSERT INTO districts (name, status, created_at) VALUES (?, 'inactive', NOW())");
+        try { $st->execute([$name]); }
+        catch (PDOException $e) { Response::error(409, 'این امور بهره‌برداری قبلاً ثبت شده است'); }
+        Response::success(['id' => (int)$pdo->lastInsertId()], 'امور بهره‌برداری ایجاد شد', 201);
+    });
+
+    $router->put('districts/{id}', function ($id) {
+        Auth::authenticate(); Auth::requirePermissionSoft('districts.update');
+        $b = Helpers::getJsonBody();
+        $pdo = Database::getInstance()->getConnection();
+        $fields = []; $params = [];
+        if (array_key_exists('name', $b)) {
+            $name = trim((string)$b['name']);
+            if ($name === '') Response::error(400, 'نام امور بهره‌برداری نمی‌تواند خالی باشد');
+            $fields[] = '`name` = ?'; $params[] = $name;
+        }
+        if (array_key_exists('status', $b)) {
+            $fields[] = '`status` = ?'; $params[] = ((string)$b['status'] === 'inactive') ? 'inactive' : 'active';
+        }
+        if (!$fields) Response::error(400, 'فیلدی برای ویرایش ارسال نشده');
+        $fields[] = 'updated_at = NOW()';
+        $params[] = (int)$id;
+        try { $pdo->prepare("UPDATE districts SET " . implode(',', $fields) . " WHERE id = ?")->execute($params); }
+        catch (PDOException $e) { Response::error(409, 'ویرایش امور ناموفق بود: ' . fa_db_error($e)); }
+        Response::success(null, 'امور بهره‌برداری ویرایش شد');
+    });
+
+    // حذف امور — فقط رکورد غیرفعال؛ وابستگی‌ها (خطوط/دکل‌ها/...) از طریق FK بررسی می‌شوند
+    $router->delete('districts/{id}', function ($id) use ($guardedDelete) {
+        Auth::authenticate(); Auth::requirePermissionSoft('districts.delete');
+        $guardedDelete('districts', 'امور بهره‌برداری', (int)$id);
+    });
+
+    // ============================================================
     //  Endpoint تجمیعی داده‌های مرجع — v3.5.2
     //  یک درخواست = پرسنل + مدارها + سیم‌ها + خطوط (سبک)
     //  هدف: باز شدن صفحه از ~۹ درخواست به ۱-۲ درخواست — هم سرعت، هم
@@ -449,8 +514,14 @@ function registerModuleRoutes(Router $router): void
         if ($end < $start) Response::error(400, 'تاریخ پایان نمی‌تواند قبل از شروع باشد');
         $type = (string)($body['contract_type'] ?? 'maintenance');
         if (!in_array($type, ['maintenance','construction','inspection','consulting','supply'], true)) Response::error(400, 'نوع قرارداد نامعتبر است');
-        $status = (string)($body['status'] ?? 'draft');
-        if (!in_array($status, ['draft','active','expired','completed'], true)) Response::error(400, 'وضعیت قرارداد نامعتبر است');
+        // v4.3.78: وضعیت چهارگانهٔ قرارداد — فعال / غیرفعال / پیش‌نویس / اتمام قرارداد
+        // (expired و terminated و completed در نمایش همه «اتمام قرارداد» هستند)
+        $status = (string)($body['status'] ?? 'inactive');
+        if (!in_array($status, ['draft', 'active', 'inactive', 'expired', 'terminated', 'completed'], true)) {
+            Response::error(400, 'وضعیت قرارداد نامعتبر است');
+        }
+        // فرم قدیمی ممکن است مقدار نمایشی بفرستد — به مقدار دیتابیسی ترجمه می‌شود
+        if ($status === 'finished') $status = 'completed';
         $stmt = $pdo->prepare("INSERT INTO contracts (contract_code, title, contractor_id, organization_id, contract_type, start_date, end_date, amount, currency, status, notes, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'IRR', ?, ?, NOW())");
         try {
             $stmt->execute([$code, $title, $contractorId, $body['organization_id'] ?? null, $type, $start, $end, (float)($body['amount'] ?? 0), $status, $body['notes'] ?? null]);
@@ -472,6 +543,15 @@ function registerModuleRoutes(Router $router): void
             $v = $body[$f];
             if ($f === 'contract_code' && trim((string)$v) === '') Response::error(400, 'کد قرارداد الزامی است و باید توسط کاربر وارد شود.');
             if ($f === 'contract_code') $v = trim((string)$v);
+            // v4.3.78: اعتبارسنجی وضعیت چهارگانه در ویرایش
+            if ($f === 'status') {
+                $sv = (string)$v;
+                if ($sv === 'finished') $sv = 'completed';
+                if (!in_array($sv, ['draft', 'active', 'inactive', 'expired', 'terminated', 'completed'], true)) {
+                    Response::error(400, 'وضعیت قرارداد نامعتبر است');
+                }
+                $v = $sv;
+            }
             $updates[] = "`$f` = ?"; $params[] = $v;
         }
         if (empty($updates)) Response::error(400, 'هیچ فیلدی ارسال نشده');
@@ -512,8 +592,12 @@ function registerModuleRoutes(Router $router): void
         if ($contractId === 0) { $where .= ' AND i.contract_id IS NULL'; } elseif ($contractId !== null) { $where .= ' AND i.contract_id = ?'; $params[] = $contractId; }
         if (!empty($search)) { $where .= ' AND (i.invoice_code LIKE ? OR c.title LIKE ?)'; $sp = "%$search%"; $params[] = $sp; $params[] = $sp; }
         if ($status) { $where .= ' AND i.status = ?'; $params[] = $status; }
+        // v4.3.78: کاربر اموردار فقط صورت‌وضعیت‌های امور خودش را می‌بیند
+        $where .= Helpers::districtWhere('i', 'invoices', $params);
+        $disJoin = Helpers::districtJoin('i', 'invoices');
+        $disSel = Helpers::districtSelect();
         $countStmt = $pdo->prepare("SELECT COUNT(*) FROM invoices i LEFT JOIN contracts c ON c.id = i.contract_id WHERE $where"); $countStmt->execute($params); $total = (int)$countStmt->fetchColumn();
-        $stmt = $pdo->prepare("SELECT i.*, c.title AS contract_title, ct.contractor_name AS contractor_name FROM invoices i LEFT JOIN contracts c ON c.id = i.contract_id LEFT JOIN contractors ct ON ct.id = i.contractor_id WHERE $where ORDER BY i.id DESC LIMIT $pageSize OFFSET $offset");
+        $stmt = $pdo->prepare("SELECT i.*, c.title AS contract_title, ct.contractor_name AS contractor_name$disSel FROM invoices i LEFT JOIN contracts c ON c.id = i.contract_id LEFT JOIN contractors ct ON ct.id = i.contractor_id$disJoin WHERE $where ORDER BY i.id DESC LIMIT $pageSize OFFSET $offset");
         $stmt->execute($params);
         Response::paginated($stmt->fetchAll(), $page, $pageSize, $total);
     });
@@ -525,8 +609,15 @@ function registerModuleRoutes(Router $router): void
         $pdo = Database::getInstance()->getConnection();
         $code = 'INV-' . date('Y') . '-' . str_pad((string)random_int(0, 9999), 4, '0', STR_PAD_LEFT);
         $total = $body['total_amount'] ?? 0; $tax = $total * 0.1; $final = $total + $tax;
-        $stmt = $pdo->prepare("INSERT INTO invoices (invoice_code, contract_id, contractor_id, period_start, period_end, total_amount, tax_amount, final_amount, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'draft', NOW())");
-        $stmt->execute([$code, (int)$body['contract_id'], $body['contractor_id'] ?? null, $body['period_start'] ?? date('Y-m-d'), $body['period_end'] ?? date('Y-m-d'), $total, $tax, $final]);
+        // v4.3.78: امور بهره‌برداری + وضعیت پیش‌فرض «غیرفعال» (activity_status)
+        $districtId = Helpers::districtFromBody($body, 'invoices');
+        $cols = ['invoice_code', 'contract_id', 'contractor_id', 'period_start', 'period_end', 'total_amount', 'tax_amount', 'final_amount', 'status', 'created_at'];
+        $vals = ['?', '?', '?', '?', '?', '?', '?', '?', "'draft'", 'NOW()'];
+        $params = [$code, (int)$body['contract_id'], $body['contractor_id'] ?? null, $body['period_start'] ?? date('Y-m-d'), $body['period_end'] ?? date('Y-m-d'), $total, $tax, $final];
+        if (Helpers::columnExists('invoices', 'activity_status')) { $cols[] = 'activity_status'; $vals[] = "'inactive'"; }
+        if (Helpers::columnExists('invoices', 'district_id')) { $cols[] = 'district_id'; $vals[] = '?'; $params[] = $districtId; }
+        $stmt = $pdo->prepare("INSERT INTO invoices (" . implode(', ', $cols) . ") VALUES (" . implode(', ', $vals) . ")");
+        $stmt->execute($params);
         Response::success(['id' => (int)$pdo->lastInsertId(), 'invoice_code' => $code], 'صورت‌وضعیت ایجاد شد', 201);
     });
 
@@ -540,8 +631,11 @@ function registerModuleRoutes(Router $router): void
         if (!$existing->fetch()) Response::error(404, 'صورت‌وضعیت پیدا نشد');
 
         $fields = ['contract_id', 'contractor_id', 'period_start', 'period_end', 'total_amount', 'status'];
+        // v4.3.78: ویرایش امور بهره‌برداری و وضعیت فعال/غیرفعال
+        if (Helpers::columnExists('invoices', 'district_id')) $fields[] = 'district_id';
+        if (Helpers::columnExists('invoices', 'activity_status')) $fields[] = 'activity_status';
         $updates = []; $params = [];
-        foreach ($fields as $f) { if (array_key_exists($f, $body)) { $updates[] = "`$f` = ?"; $params[] = $body[$f]; } }
+        foreach ($fields as $f) { if (array_key_exists($f, $body)) { $updates[] = "`$f` = ?"; $params[] = ($body[$f] === '' ? null : $body[$f]); } }
         if (!$updates) Response::error(400, 'هیچ فیلدی ارسال نشده');
 
         // اگر مبلغ کل تغییر کرد، مالیات و مبلغ نهایی از نو محاسبه می‌شوند
@@ -570,6 +664,12 @@ function registerModuleRoutes(Router $router): void
         Response::success(null, 'پرداخت ثبت شد');
     });
 
+    // v4.3.78: حذف صورت‌وضعیت — فقط رکوردِ غیرفعال (امنیت داده)
+    $router->delete('invoices/{id}', function ($id) use ($guardedDelete) {
+        Auth::authenticate(); Auth::requirePermission('financial.delete');
+        $guardedDelete('invoices', 'صورت‌وضعیت', (int)$id);
+    });
+
     // ============================================================
     //  ایمنی (Safety) — CRUD کامل
     // ============================================================
@@ -584,8 +684,12 @@ function registerModuleRoutes(Router $router): void
         if ($contractId === 0) { $where .= ' AND s.contract_id IS NULL'; } elseif ($contractId !== null) { $where .= ' AND s.contract_id = ?'; $params[] = $contractId; }
         if (!empty($search)) { $where .= ' AND (s.incident_code LIKE ? OR s.title LIKE ?)'; $sp = "%$search%"; $params[] = $sp; $params[] = $sp; }
         if ($type) { $where .= ' AND s.incident_type = ?'; $params[] = $type; }
+        // v4.3.78: کاربر اموردار فقط حوادث امور خودش را می‌بیند
+        $where .= Helpers::districtWhere('s', 'safety_incidents', $params);
+        $disJoin = Helpers::districtJoin('s', 'safety_incidents');
+        $disSel = Helpers::districtSelect();
         $countStmt = $pdo->prepare("SELECT COUNT(*) FROM safety_incidents s WHERE $where"); $countStmt->execute($params); $total = (int)$countStmt->fetchColumn();
-        $stmt = $pdo->prepare("SELECT s.*, l.line_code, t.tower_code, c.title AS contract_title FROM safety_incidents s LEFT JOIN `lines` l ON l.id = s.line_id LEFT JOIN towers t ON t.id = s.tower_id LEFT JOIN contracts c ON c.id = s.contract_id WHERE $where ORDER BY s.id DESC LIMIT $pageSize OFFSET $offset");
+        $stmt = $pdo->prepare("SELECT s.*, l.line_code, t.tower_code, c.title AS contract_title$disSel FROM safety_incidents s LEFT JOIN `lines` l ON l.id = s.line_id LEFT JOIN towers t ON t.id = s.tower_id LEFT JOIN contracts c ON c.id = s.contract_id$disJoin WHERE $where ORDER BY s.id DESC LIMIT $pageSize OFFSET $offset");
         $stmt->execute($params);
         Response::paginated($stmt->fetchAll(), $page, $pageSize, $total);
     });
@@ -596,8 +700,15 @@ function registerModuleRoutes(Router $router): void
         if (empty($body['title'])) Response::error(400, 'عنوان الزامی است');
         $pdo = Database::getInstance()->getConnection();
         $code = 'SI-' . date('Y') . '-' . str_pad((string)random_int(0, 9999), 4, '0', STR_PAD_LEFT);
-        $stmt = $pdo->prepare("INSERT INTO safety_incidents (incident_code, incident_type, severity, title, description, occurred_at, location_desc, line_id, tower_id, contract_id, work_order_id, reporter_id, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'reported', NOW())");
-        $stmt->execute([$code, $body['incident_type'] ?? 'near_miss', $body['severity'] ?? 'none', $body['title'], $body['description'] ?? null, $body['occurred_at'] ?? date('Y-m-d H:i:s'), $body['location_desc'] ?? null, $body['line_id'] ?? null, $body['tower_id'] ?? null, $body['contract_id'] ?? null, $body['work_order_id'] ?? null, $user['id']]);
+        // v4.3.78: امور بهره‌برداری + وضعیت پیش‌فرض «غیرفعال» (activity_status)
+        $districtId = Helpers::districtFromBody($body, 'safety_incidents');
+        $cols = ['incident_code', 'incident_type', 'severity', 'title', 'description', 'occurred_at', 'location_desc', 'line_id', 'tower_id', 'contract_id', 'work_order_id', 'reporter_id', 'status', 'created_at'];
+        $vals = ['?', '?', '?', '?', '?', '?', '?', '?', '?', '?', '?', '?', "'reported'", 'NOW()'];
+        $params = [$code, $body['incident_type'] ?? 'near_miss', $body['severity'] ?? 'none', $body['title'], $body['description'] ?? null, $body['occurred_at'] ?? date('Y-m-d H:i:s'), $body['location_desc'] ?? null, $body['line_id'] ?? null, $body['tower_id'] ?? null, $body['contract_id'] ?? null, $body['work_order_id'] ?? null, $user['id']];
+        if (Helpers::columnExists('safety_incidents', 'activity_status')) { $cols[] = 'activity_status'; $vals[] = "'inactive'"; }
+        if (Helpers::columnExists('safety_incidents', 'district_id')) { $cols[] = 'district_id'; $vals[] = '?'; $params[] = $districtId; }
+        $stmt = $pdo->prepare("INSERT INTO safety_incidents (" . implode(', ', $cols) . ") VALUES (" . implode(', ', $vals) . ")");
+        $stmt->execute($params);
         Response::success(['id' => (int)$pdo->lastInsertId(), 'incident_code' => $code], 'حادثه ثبت شد', 201);
     });
 
@@ -605,19 +716,22 @@ function registerModuleRoutes(Router $router): void
         Auth::authenticate();
         Auth::requirePermissionSoft('safety.update');
         $body = Helpers::getJsonBody(); $pdo = Database::getInstance()->getConnection();
-        $fields = ['title', 'description', 'severity', 'status', 'root_cause', 'corrective_actions', 'preventive_actions', 'contract_id'];
+        $fields = ['title', 'description', 'severity', 'status', 'root_cause', 'corrective_actions', 'preventive_actions', 'contract_id', 'line_id', 'tower_id', 'occurred_at', 'location_desc', 'incident_type'];
+        // v4.3.78: ویرایش امور بهره‌برداری و وضعیت فعال/غیرفعال
+        if (Helpers::columnExists('safety_incidents', 'district_id')) $fields[] = 'district_id';
+        if (Helpers::columnExists('safety_incidents', 'activity_status')) $fields[] = 'activity_status';
         $updates = []; $params = [];
-        foreach ($fields as $f) { if (array_key_exists($f, $body)) { $updates[] = "`$f` = ?"; $params[] = $body[$f]; } }
+        foreach ($fields as $f) { if (array_key_exists($f, $body)) { $updates[] = "`$f` = ?"; $params[] = ($body[$f] === '' ? null : $body[$f]); } }
         if (empty($updates)) Response::error(400, 'هیچ فیلدی ارسال نشده');
         $params[] = (int)$id;
         $pdo->prepare("UPDATE safety_incidents SET " . implode(', ', $updates) . " WHERE id = ?")->execute($params);
         Response::success(null, 'حادثه ویرایش شد');
     });
 
-    $router->delete('safety-incidents/{id}', function ($id) {
+    $router->delete('safety-incidents/{id}', function ($id) use ($guardedDelete) {
         Auth::authenticate(); Auth::requirePermission('safety.delete');
-        Database::getInstance()->execute("DELETE FROM safety_incidents WHERE id = ?", [(int)$id]);
-        Response::success(null, 'حادثه حذف شد');
+        // v4.3.78: حادثهٔ فعال قابل حذف نیست — ابتدا باید غیرفعال شود (امنیت داده)
+        $guardedDelete('safety_incidents', 'حادثه', (int)$id);
     });
 
     // ============================================================
@@ -641,10 +755,14 @@ function registerModuleRoutes(Router $router): void
             foreach ($searchCols as $sc) { $parts[] = "p.`$sc` LIKE ?"; $params[] = "%$search%"; }
             $where .= ' AND (' . implode(' OR ', $parts) . ')';
         }
+        // v4.3.78: کاربر اموردار فقط پرسنل امور خودش را می‌بیند
+        $where .= Helpers::districtWhere('p', 'personnel', $params);
+        $disJoin = Helpers::districtJoin('p', 'personnel');
+        $disSel = Helpers::districtSelect();
         $countStmt = $pdo->prepare("SELECT COUNT(*) FROM personnel p WHERE $where"); $countStmt->execute($params); $total = (int)$countStmt->fetchColumn();
         $posCol = $personnelPositionCol($pdo);
         $posSel = $posCol ? "p.`$posCol` AS position" : 'NULL AS position';
-        $stmt = $pdo->prepare("SELECT p.*, u.username, c.title AS contract_title, $posSel FROM personnel p LEFT JOIN users u ON u.id = p.user_id LEFT JOIN contracts c ON c.id = p.contract_id WHERE $where ORDER BY p.id DESC LIMIT $pageSize OFFSET $offset");
+        $stmt = $pdo->prepare("SELECT p.*, u.username, c.title AS contract_title$disSel, $posSel FROM personnel p LEFT JOIN users u ON u.id = p.user_id LEFT JOIN contracts c ON c.id = p.contract_id$disJoin WHERE $where ORDER BY p.id DESC LIMIT $pageSize OFFSET $offset");
         $stmt->execute($params);
         Response::paginated($stmt->fetchAll(), $page, $pageSize, $total);
     });
@@ -669,9 +787,13 @@ function registerModuleRoutes(Router $router): void
         foreach (['father_name', 'supervisor_name', 'phone', 'mobile', 'email', 'hire_date', 'collaboration_start', 'contract_id'] as $opt) {
             if (isset($cols[$opt])) $insCols[$opt] = $body[$opt] ?? null;
         }
+        // v4.3.78: امور بهره‌برداری پرسنل (اگر migration اجرا شده باشد)
+        if (isset($cols['district_id'])) $insCols['district_id'] = Helpers::districtFromBody($body, 'personnel');
         $posCol = $personnelPositionCol($pdo);
         if ($posCol !== null) $insCols[$posCol] = $body['position'] ?? null;
-        if (isset($cols['status'])) $insCols['status'] = 'active';
+        // v4.3.78: طبق سیاست امنیت داده، ثبت جدید پیش‌فرض «غیرفعال» است —
+        // فعال‌سازی از طریق ویرایش گروهی انجام می‌شود
+        if (isset($cols['status'])) $insCols['status'] = 'inactive';
         $colNames = implode(', ', array_map(fn($k) => "`$k`", array_keys($insCols)));
         $ph = implode(', ', array_fill(0, count($insCols), '?'));
         $stmt = $pdo->prepare("INSERT INTO personnel ($colNames, created_at) VALUES ($ph, NOW())");
@@ -695,6 +817,8 @@ function registerModuleRoutes(Router $router): void
         if ($posCol !== null && $posCol !== 'position' && array_key_exists('position', $body)) { $body[$posCol] = $body['position']; unset($body['position']); }
         $fields = ['first_name', 'last_name', 'national_id', 'phone', 'mobile', 'email', 'hire_date', 'contract_id', 'status', 'father_name', 'supervisor_name', 'collaboration_start', 'personnel_code'];
         if ($posCol !== null) $fields[] = $posCol;
+        // v4.3.78: ویرایش امور بهره‌برداری پرسنل
+        if (isset($cols['district_id'])) $fields[] = 'district_id';
         $fields = array_values(array_filter($fields, fn($f) => isset($cols[$f])));
         $updates = []; $params = [];
         foreach ($fields as $f) { if (array_key_exists($f, $body)) { $updates[] = "`$f` = ?"; $params[] = $body[$f]; } }
@@ -829,6 +953,8 @@ function registerModuleRoutes(Router $router): void
         // فقط فیلدهای مجاز که در این دیتابیس واقعاً وجود دارند
         $cols = $personnelCols($pdo = Database::getInstance()->getConnection());
         $allowed = ['status', 'supervisor_name', 'contract_id'];
+        // v4.3.78: ویرایش گروهی امور بهره‌برداری پرسنل
+        if (isset($cols['district_id'])) $allowed[] = 'district_id';
         $posCol = $personnelPositionCol($pdo);
         if ($posCol !== null) $allowed[] = $posCol;
 
@@ -1137,7 +1263,13 @@ function registerModuleRoutes(Router $router): void
         if ($contractId === 0) { $where .= ' AND c.contract_id IS NULL'; } elseif ($contractId !== null) { $where .= ' AND c.contract_id = ?'; $params[] = $contractId; }
         if (!empty($search)) { $where .= ' AND (c.dispatch_code LIKE ? OR c.name LIKE ?)'; $sp = "%$search%"; $params[] = $sp; $params[] = $sp; }
         if (!empty($voltage)) { $where .= ' AND c.voltage = ?'; $params[] = $voltage; }
-        $stmt = $pdo->prepare("SELECT c.*, l.line_code, l.name AS line_name, ct.title AS contract_title FROM circuits c LEFT JOIN `lines` l ON l.id = c.line_id LEFT JOIN contracts ct ON ct.id = c.contract_id WHERE $where ORDER BY c.voltage DESC, c.dispatch_code LIMIT 1000");
+        // v4.3.78: کاربر اموردار فقط مدارهای امور خودش را می‌بیند
+        $where .= Helpers::districtWhere('c', 'circuits', $params);
+        $disJoin = Helpers::districtJoin('c', 'circuits');
+        $disSel = Helpers::districtSelect();
+        // v4.3.78: ستون وضعیت (فعال/غیرفعال) — قبل از migration مقدار خالی برمی‌گردد
+        $statusSel = Helpers::columnExists('circuits', 'status') ? 'c.status' : "NULL AS status";
+        $stmt = $pdo->prepare("SELECT c.*, $statusSel, l.line_code, l.name AS line_name, ct.title AS contract_title$disSel FROM circuits c LEFT JOIN `lines` l ON l.id = c.line_id LEFT JOIN contracts ct ON ct.id = c.contract_id$disJoin WHERE $where ORDER BY c.voltage DESC, c.dispatch_code LIMIT 1000");
         $stmt->execute($params);
         $rows = $stmt->fetchAll();
         $data = array_map(function ($r) {
@@ -1151,6 +1283,10 @@ function registerModuleRoutes(Router $router): void
                 'line_name' => $r['line_name'] ?? null,
                 'contract_id' => $r['contract_id'] ? (int)$r['contract_id'] : null,
                 'contract_title' => $r['contract_title'] ?? null,
+                // v4.3.78: وضعیت فعال/غیرفعال + امور بهره‌برداری
+                'status' => $r['status'] ?? null,
+                'district_id' => !empty($r['district_id']) ? (int)$r['district_id'] : null,
+                'district_name' => $r['district_name'] ?? null,
                 'created_at' => $r['created_at'] ?? null,
             ];
         }, $rows);
@@ -1167,14 +1303,23 @@ function registerModuleRoutes(Router $router): void
         $stmt = $pdo->prepare("SELECT id FROM circuits WHERE dispatch_code = ? LIMIT 1");
         $stmt->execute([trim($body['dispatch_code'])]);
         if ($stmt->fetch()) Response::error(409, 'این کد دیسپاچینگ قبلاً ثبت شده است');
-        $stmt = $pdo->prepare("INSERT INTO circuits (line_id, dispatch_code, name, voltage, contract_id, created_at) VALUES (?, ?, ?, ?, ?, NOW())");
-        $stmt->execute([
+        // v4.3.78: وضعیت پیش‌فرض «غیرفعال» + امور بهره‌برداری (اگر migration اجرا شده باشد)
+        $districtId = Helpers::districtFromBody($body, 'circuits');
+        $hasStatusCol = Helpers::columnExists('circuits', 'status');
+        $hasDistrictCol = Helpers::columnExists('circuits', 'district_id');
+        $cols = ['line_id', 'dispatch_code', 'name', 'voltage', 'contract_id', 'created_at'];
+        $vals = ['?', '?', '?', '?', '?', 'NOW()'];
+        $params = [
             !empty($body['line_id']) ? (int) $body['line_id'] : null,
             trim($body['dispatch_code']),
             $body['name'] ?? null,
             (int) $body['voltage'],
             $body['contract_id'] ?? null,
-        ]);
+        ];
+        if ($hasStatusCol) { $cols[] = 'status'; $vals[] = "'inactive'"; }
+        if ($hasDistrictCol) { $cols[] = 'district_id'; $vals[] = '?'; $params[] = $districtId; }
+        $stmt = $pdo->prepare("INSERT INTO circuits (" . implode(', ', $cols) . ") VALUES (" . implode(', ', $vals) . ")");
+        $stmt->execute($params);
         Response::success(['id' => (int)$pdo->lastInsertId()], 'مدار ایجاد شد', 201);
     });
 
@@ -1183,19 +1328,22 @@ function registerModuleRoutes(Router $router): void
         Auth::requirePermissionSoft('circuits.update');
         $body = Helpers::getJsonBody(); $pdo = Database::getInstance()->getConnection();
         $fields = ['dispatch_code', 'name', 'voltage', 'line_id', 'contract_id'];
+        // v4.3.78: ویرایش وضعیت (فعال/غیرفعال) و امور بهره‌برداری
+        if (Helpers::columnExists('circuits', 'status')) $fields[] = 'status';
+        if (Helpers::columnExists('circuits', 'district_id')) $fields[] = 'district_id';
         $updates = []; $params = [];
-        foreach ($fields as $f) { if (array_key_exists($f, $body)) { $updates[] = "`$f` = ?"; $params[] = $body[$f]; } }
+        foreach ($fields as $f) { if (array_key_exists($f, $body)) { $updates[] = "`$f` = ?"; $params[] = ($body[$f] === '' ? null : $body[$f]); } }
         if (empty($updates)) Response::error(400, 'هیچ فیلدی ارسال نشده');
         $params[] = (int)$id;
         $pdo->prepare("UPDATE circuits SET " . implode(', ', $updates) . " WHERE id = ?")->execute($params);
         Response::success(null, 'مدار ویرایش شد');
     });
 
-    $router->delete('circuits/{id}', function ($id) {
+    $router->delete('circuits/{id}', function ($id) use ($guardedDelete) {
         Auth::authenticate();
         Auth::requirePermissionSoft('circuits.delete');
-        Database::getInstance()->execute("DELETE FROM circuits WHERE id = ?", [(int)$id]);
-        Response::success(null, 'مدار حذف شد');
+        // v4.3.78: مدارِ فعال قابل حذف نیست — ابتدا باید غیرفعال شود (امنیت داده)
+        $guardedDelete('circuits', 'مدار', (int)$id);
     });
 
     // حذف انبوه مدارها — v3.2.0: همان روش دکل‌ها/خطوط (یک تراکنش، حداکثر ۵۰۰۰ ردیف)
@@ -1210,6 +1358,15 @@ function registerModuleRoutes(Router $router): void
 
         $pdo = Database::getInstance()->getConnection();
         $idPlaceholders = implode(',', array_fill(0, count($ids), '?'));
+        // v4.3.78: مدارهای «فعال» قابل حذف نیستند — ابتدا باید غیرفعال شوند
+        if (Helpers::columnExists('circuits', 'status')) {
+            $activeStmt = $pdo->prepare("SELECT COUNT(*) FROM circuits WHERE id IN ($idPlaceholders) AND LOWER(TRIM(COALESCE(status, ''))) IN ('active', '1', 'true')");
+            $activeStmt->execute($ids);
+            $activeCount = (int) $activeStmt->fetchColumn();
+            if ($activeCount > 0) {
+                Response::error(409, "حذف انجام نشد.\n\n$activeCount مدار انتخاب‌شده وضعیت «فعال» دارد — برای امنیت داده، ابتدا وضعیت را «غیرفعال» کنید؛ رکوردهای غیرفعال قابل حذف هستند.");
+            }
+        }
         try {
             $pdo->beginTransaction();
             $stmt = $pdo->prepare("DELETE FROM circuits WHERE id IN ($idPlaceholders)");
@@ -1327,7 +1484,9 @@ function registerModuleRoutes(Router $router): void
         $pdo = Database::getInstance()->getConnection();
         $code = trim((string)($body['contractor_code'] ?? ''));
         if ($code === '') $code = 'PC-' . str_pad((string)random_int(0, 999), 3, '0', STR_PAD_LEFT);
-        $status = ($body['status'] ?? 'active') === 'inactive' ? 'inactive' : 'active';
+        // v4.3.78: طبق سیاست امنیت داده، ثبت جدید پیش‌فرض «غیرفعال» است —
+        // فعال‌سازی از طریق ویرایش گروهی انجام می‌شود
+        $status = (($body['status'] ?? 'inactive') === 'active') ? 'active' : 'inactive';
         $stmt = $pdo->prepare("INSERT INTO contractors
             (contractor_code, contractor_name, ceo_name, contractor_phone, mobile, address, status, created_at)
             VALUES (?, ?, ?, ?, ?, ?, ?, NOW())");
@@ -1407,7 +1566,11 @@ function registerModuleRoutes(Router $router): void
         if ($contractId === 0) { $where .= ' AND e.contract_id IS NULL'; } elseif ($contractId !== null) { $where .= ' AND e.contract_id = ?'; $params[] = $contractId; }
         if (!empty($search)) { $where .= ' AND (e.serial_number LIKE ? OR e.manufacturer LIKE ?)'; $sp = "%$search%"; $params[] = $sp; $params[] = $sp; }
         $countStmt = $pdo->prepare("SELECT COUNT(*) FROM equipment e WHERE $where"); $countStmt->execute($params); $total = (int)$countStmt->fetchColumn();
-        $stmt = $pdo->prepare("SELECT e.*, ec.name AS class_name, t.tower_code, c.title AS contract_title FROM equipment e LEFT JOIN equipment_classes ec ON ec.id = e.equipment_class_id LEFT JOIN towers t ON t.id = e.tower_id LEFT JOIN contracts c ON c.id = e.contract_id WHERE $where ORDER BY e.id DESC LIMIT $pageSize OFFSET $offset");
+        // v4.3.78: کاربر اموردار فقط تجهیزات امور خودش را می‌بیند + نام امور
+        $where .= Helpers::districtWhere('e', 'equipment', $params);
+        $disJoin = Helpers::districtJoin('e', 'equipment');
+        $disSel = Helpers::districtSelect();
+        $stmt = $pdo->prepare("SELECT e.*, ec.name AS class_name, t.tower_code, c.title AS contract_title$disSel FROM equipment e LEFT JOIN equipment_classes ec ON ec.id = e.equipment_class_id LEFT JOIN towers t ON t.id = e.tower_id LEFT JOIN contracts c ON c.id = e.contract_id$disJoin WHERE $where ORDER BY e.id DESC LIMIT $pageSize OFFSET $offset");
         $stmt->execute($params);
         Response::paginated($stmt->fetchAll(), $page, $pageSize, $total);
     });
@@ -1416,10 +1579,24 @@ function registerModuleRoutes(Router $router): void
         Auth::authenticate();
         Auth::requirePermissionSoft('equipment.create');
         $body = Helpers::getJsonBody();
-        if (empty($body['equipment_class_id'])) Response::error(400, 'گروه تجهیز الزامی است');
         $pdo = Database::getInstance()->getConnection();
-        $stmt = $pdo->prepare("INSERT INTO equipment (equipment_class_id, tower_id, line_id, contract_id, serial_number, manufacturer, model, install_date, warranty_expiry, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', NOW())");
-        $stmt->execute([$body['equipment_class_id'], $body['tower_id'] ?? null, $body['line_id'] ?? null, $body['contract_id'] ?? null, $body['serial_number'] ?? null, $body['manufacturer'] ?? null, $body['model'] ?? null, $body['install_date'] ?? null, $body['warranty_expiry'] ?? null]);
+        // v4.3.78: وضعیت پیش‌فرض «غیرفعال» + امور بهره‌برداری؛ ستون status جدید در
+        // دیتابیس‌هایی که هنوز migration نگرفته‌اند وجود ندارد و INSERT بدون آن ساخته می‌شود
+        $districtId = Helpers::districtFromBody($body, 'equipment');
+        // گروه تجهیز در فرم عمومی نیست — اگر ارسال نشد اولین گروه موجود استفاده می‌شود
+        // تا ثبت تجهیز از فرم برنامه بدون خطا انجام شود (ستون NOT NULL است)
+        $classId = $body['equipment_class_id'] ?? null;
+        if (empty($classId)) {
+            try { $classId = $pdo->query("SELECT id FROM equipment_classes ORDER BY id LIMIT 1")->fetchColumn() ?: 1; }
+            catch (Throwable $e) { $classId = 1; }
+        }
+        $cols = ['equipment_class_id', 'tower_id', 'line_id', 'contract_id', 'serial_number', 'manufacturer', 'model', 'install_date', 'warranty_expiry', 'created_at'];
+        $vals = ['?', '?', '?', '?', '?', '?', '?', '?', '?', 'NOW()'];
+        $params = [$classId, $body['tower_id'] ?? null, $body['line_id'] ?? null, $body['contract_id'] ?? null, $body['serial_number'] ?? null, $body['manufacturer'] ?? null, $body['model'] ?? null, $body['install_date'] ?? null, $body['warranty_expiry'] ?? null];
+        if (Helpers::columnExists('equipment', 'status')) { $cols[] = 'status'; $vals[] = "'inactive'"; }
+        if (Helpers::columnExists('equipment', 'district_id')) { $cols[] = 'district_id'; $vals[] = '?'; $params[] = $districtId; }
+        $stmt = $pdo->prepare("INSERT INTO equipment (" . implode(', ', $cols) . ") VALUES (" . implode(', ', $vals) . ")");
+        $stmt->execute($params);
         Response::success(['id' => (int)$pdo->lastInsertId()], 'تجهیز ایجاد شد', 201);
     });
 
@@ -1428,8 +1605,10 @@ function registerModuleRoutes(Router $router): void
         Auth::requirePermissionSoft('equipment.update');
         $body = Helpers::getJsonBody(); $pdo = Database::getInstance()->getConnection();
         $fields = ['serial_number', 'manufacturer', 'model', 'install_date', 'warranty_expiry', 'contract_id', 'status'];
+        // v4.3.78: ویرایش امور بهره‌برداری تجهیز
+        if (Helpers::columnExists('equipment', 'district_id')) $fields[] = 'district_id';
         $updates = []; $params = [];
-        foreach ($fields as $f) { if (array_key_exists($f, $body)) { $updates[] = "`$f` = ?"; $params[] = $body[$f]; } }
+        foreach ($fields as $f) { if (array_key_exists($f, $body)) { $updates[] = "`$f` = ?"; $params[] = ($body[$f] === '' ? null : $body[$f]); } }
         if (empty($updates)) Response::error(400, 'هیچ فیلدی ارسال نشده');
         $params[] = (int)$id;
         $pdo->prepare("UPDATE equipment SET " . implode(', ', $updates) . " WHERE id = ?")->execute($params);

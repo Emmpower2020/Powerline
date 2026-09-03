@@ -283,10 +283,13 @@ export function DefectsPage() {
       badgeColors: Object.fromEntries(Object.entries(priorityLabels).map(([k, v]) => [k, v.color])),
     },
     {
-      key: "status", header: "وضعیت", sortable: true, filterable: true, type: "badge", align: "right",
+      key: "status", header: "مرحله عیب", sortable: true, filterable: true, type: "badge", align: "right",
       badgeLabels: Object.fromEntries(Object.entries(statusLabels).map(([k, v]) => [k, v.label])),
       badgeColors: Object.fromEntries(Object.entries(statusLabels).map(([k, v]) => [k, v.color])),
     },
+    // v4.3.78: وضعیت استاندارد فعال/غیرفعال + امور بهره‌برداری عیب
+    { key: "activity_status", header: "وضعیت", type: "status", filterable: true, align: "right" },
+    { key: "district_name", header: "امور بهره‌برداری", sortable: true, filterable: true, align: "right" },
     {
       key: "line_name", header: "خط", sortable: true, filterable: true, wrap: true, align: "right",
       render: (row) => row.line_name
@@ -417,6 +420,8 @@ export function DefectsPage() {
             endpoint={API_ENDPOINTS.defects}
             entityName="عیب"
             onApplied={() => setRefreshKey(k => k + 1)}
+            canToggleStatus
+            statusField="activity_status"
             canChangeContract
             additionalActions={<>
               <ItemRow icon={<Flame className="w-4 h-4 text-orange-500" />} label="شدت" onClick={() => startBulk("severity")} />

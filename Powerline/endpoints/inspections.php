@@ -52,13 +52,18 @@ function registerInspectionRoutes(Router $router): void
         $stmt->execute($params);
         $total = (int) $stmt->fetchColumn();
 
-        $sql = "SELECT i.*, c.title AS contract_title, l.line_code, l.name AS line_name, t.tower_code,
+        // v4.3.78: کاربر اموردار فقط بازدیدهای امور خودش را می‌بیند + نام امور
+        $where .= Helpers::districtWhere('i', 'inspections', $params);
+        $disJoin = Helpers::districtJoin('i', 'inspections');
+        $disSel = Helpers::districtSelect();
+        $sql = "SELECT i.*, c.title AS contract_title, l.line_code, l.name AS line_name, t.tower_code$disSel,
                        p.first_name AS inspector_first, p.last_name AS inspector_last
                 FROM inspections i
                 LEFT JOIN `lines` l ON l.id = i.line_id
                 LEFT JOIN towers t ON t.id = i.tower_id
                 LEFT JOIN contracts c ON c.id = i.contract_id
                 LEFT JOIN personnel p ON p.id = i.inspector_id
+                $disJoin
                 WHERE $where
                 ORDER BY i.id DESC
                 LIMIT $pageSize OFFSET $offset";
@@ -108,14 +113,13 @@ function registerInspectionRoutes(Router $router): void
 
         $inspectionCode = Helpers::generateCode('INS', 6);
 
-        $sql = "INSERT INTO inspections
-                (inspection_code, line_id, tower_id, contract_id, template_id, inspector_id, crew_id,
-                 inspection_date, start_time, end_time, gps_lat, gps_lng,
-                 status, priority, weather, notes, created_at)
-                VALUES
-                (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'draft', ?, ?, ?, NOW())";
-
-        $db->execute($sql, [
+        // v4.3.78: امور بهره‌برداری + وضعیت پیش‌فرض «غیرفعال» (activity_status)
+        $districtId = Helpers::districtFromBody($body, 'inspections');
+        $insCols = ['inspection_code', 'line_id', 'tower_id', 'contract_id', 'template_id', 'inspector_id', 'crew_id',
+                    'inspection_date', 'start_time', 'end_time', 'gps_lat', 'gps_lng',
+                    'status', 'priority', 'weather', 'notes', 'created_at'];
+        $insVals = ['?', '?', '?', '?', '?', '?', '?', '?', '?', '?', '?', '?', "'draft'", '?', '?', '?', 'NOW()'];
+        $insParams = [
             $inspectionCode,
             $body['line_id'] ?? null,
             $body['tower_id'] ?? null,
@@ -131,7 +135,12 @@ function registerInspectionRoutes(Router $router): void
             $body['priority'] ?? 'routine',
             $body['weather'] ?? null,
             $body['notes'] ?? null,
-        ]);
+        ];
+        if (Helpers::columnExists('inspections', 'activity_status')) { $insCols[] = 'activity_status'; $insVals[] = "'inactive'"; }
+        if (Helpers::columnExists('inspections', 'district_id')) { $insCols[] = 'district_id'; $insVals[] = '?'; $insParams[] = $districtId; }
+        $sql = "INSERT INTO inspections (" . implode(', ', $insCols) . ") VALUES (" . implode(', ', $insVals) . ")";
+
+        $db->execute($sql, $insParams);
 
         $newId = (int) $db->lastInsertId();
 
@@ -145,8 +154,11 @@ function registerInspectionRoutes(Router $router): void
         Auth::requirePermissionSoft('inspections.update');
         $body = Helpers::getJsonBody();
         $fields = ['inspection_date','priority','weather','notes','line_id','tower_id','contract_id','inspector_id','crew_id','status'];
+        // v4.3.78: ویرایش امور بهره‌برداری و وضعیت فعال/غیرفعال بازدید
+        if (Helpers::columnExists('inspections', 'district_id')) $fields[] = 'district_id';
+        if (Helpers::columnExists('inspections', 'activity_status')) $fields[] = 'activity_status';
         $updates = []; $params = [];
-        foreach ($fields as $f) { if (array_key_exists($f, $body)) { $updates[] = "`$f` = ?"; $params[] = $body[$f]; } }
+        foreach ($fields as $f) { if (array_key_exists($f, $body)) { $updates[] = "`$f` = ?"; $params[] = ($body[$f] === '' ? null : $body[$f]); } }
         if (!$updates) Response::error(400, 'هیچ فیلدی ارسال نشده');
         $params[] = (int)$id;
         Database::getInstance()->getConnection()->prepare("UPDATE inspections SET " . implode(', ', $updates) . " WHERE id = ?")->execute($params);
@@ -154,9 +166,16 @@ function registerInspectionRoutes(Router $router): void
     });
 
     // حذف بازدید — برای عملیات گروهی جدول
+    // v4.3.78: بازدیدِ فعال قابل حذف نیست — ابتدا باید غیرفعال شود (امنیت داده)
     $router->delete('inspections/{id}', function ($id) {
         Auth::authenticate();
         Auth::requirePermissionSoft('inspections.delete');
+        $row = Database::getInstance()->fetchOne("SELECT * FROM inspections WHERE id = ?", [(int)$id]);
+        if (!$row) Response::error(404, 'بازدید پیدا نشد');
+        $rawStatus = array_key_exists('activity_status', $row) ? ($row['activity_status'] ?? '') : ($row['status'] ?? '');
+        if (in_array(strtolower(trim((string)$rawStatus)), ['active', '1', 'true'], true)) {
+            Response::error(409, "حذف بازدید انجام نشد.\n\nاین بازدید فعال است — برای امنیت داده، ابتدا وضعیت آن را به «غیرفعال» تغییر دهید؛ رکوردهای غیرفعال قابل حذف هستند.");
+        }
         Database::getInstance()->execute("DELETE FROM inspections WHERE id = ?", [(int)$id]);
         Response::success(null, 'بازدید حذف شد');
     });
@@ -214,6 +233,10 @@ function formatInspectionRow(array $row): array
         'priority'          => $row['priority'],
         'weather'           => $row['weather'],
         'notes'             => $row['notes'],
+        // v4.3.78: وضعیت فعال/غیرفعال + امور بهره‌برداری (بعد از migration)
+        'activity_status'   => $row['activity_status'] ?? null,
+        'district_id'       => !empty($row['district_id']) ? (int) $row['district_id'] : null,
+        'district_name'     => $row['district_name'] ?? null,
         'created_at'        => $row['created_at'],
     ];
 }

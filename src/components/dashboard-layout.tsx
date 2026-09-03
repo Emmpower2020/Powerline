@@ -17,7 +17,7 @@ import {
   Users as UsersIcon, Settings as SettingsIcon, Bell,
   FileText, Receipt, ShieldAlert, HardHat, Briefcase,
   Package, DollarSign, Waypoints, AlertTriangle, Map as MapIcon,
-  AlertOctagon, Cable as CableIcon,
+  AlertOctagon, Cable as CableIcon, MapPin,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useBootstrap } from "@/hooks/use-bootstrap";
@@ -31,6 +31,7 @@ type Page =
   | "circuits" | "lines" | "towers"
   | "inspections" | "defects" | "work-orders"
   | "contractors" | "contracts" | "equipment" | "personnel" | "price-lists" | "invoices"
+  | "districts"
   | "conductors" | "tower-structures" | "tower-type-codes"
   | "safety" | "line-incidents"
   | "reports" | "users" | "error-log" | "settings";
@@ -65,6 +66,8 @@ const navItems: NavItem[] = [
   { id: "conductors", label: "انواع سیم‌ها", icon: CableIcon, group: "داده‌های پایه" },
   { id: "tower-structures", label: "انواع ساختار دکل", icon: Radio, group: "داده‌های پایه" },
   { id: "tower-type-codes", label: "انواع کد دکل", icon: Waypoints, group: "داده‌های پایه" },
+  // v4.3.78: امور بهره‌برداری — تعریف امورهای مختلف (کردستان، ایلام، ...)
+  { id: "districts", label: "امور بهره‌برداری", icon: MapPin, group: "داده‌های پایه" },
   // ─── سیستمی ───
   { id: "reports", label: "گزارش‌گیری", icon: BarChart3, group: "سیستمی" },
   { id: "users", label: "کاربران", icon: UsersIcon, group: "سیستمی" },

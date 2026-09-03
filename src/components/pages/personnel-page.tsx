@@ -11,6 +11,7 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
 import { ContractSelect } from "@/components/contract-select";
+import { DistrictSelect } from "@/components/district-select";
 import { DataTable, type DataTableColumn, type DataTableHandle } from "@/components/data-table";
 import { ImportExcelDialog } from "@/components/import-excel-dialog";
 import { BulkDeleteDialog } from "@/components/bulk-delete-dialog";
@@ -101,6 +102,8 @@ export function PersonnelPage() {
   const columns: DataTableColumn<Person>[] = [
     { key: "personnel_code", header: "کد پرسنلی", sortable: true, filterable: true, align: "right" },
     { key: "contract_title", header: "قرارداد", sortable: true, filterable: true, wrap: true, align: "right" },
+    // v4.3.78: امور بهره‌برداری پرسنل
+    { key: "district_name", header: "امور بهره‌برداری", sortable: true, filterable: true, align: "right" },
     { key: "first_name", header: "نام", sortable: true, filterable: true, align: "right" },
     { key: "last_name", header: "نام خانوادگی", sortable: true, filterable: true, align: "right" },
     { key: "national_id", header: "کد ملی", align: "right" },
@@ -337,7 +340,7 @@ function PersonnelDialog({ open, editRow, duplicateFrom, onClose, onSaved }: {
   const [form, setForm] = useState({
     personnel_code: "", first_name: "", last_name: "", national_id: "", father_name: "",
     position: "", mobile: "", phone: "",
-    supervisor_name: "", collaboration_start: "", contract_id: "",
+    supervisor_name: "", collaboration_start: "", contract_id: "", district_id: "",
   });
 
   // v3.1.0: حالت کپی — از ردیف مبدأ پیش‌پر می‌شود ولی کد ملی خالی است (رکورد جدید)
@@ -358,6 +361,8 @@ function PersonnelDialog({ open, editRow, duplicateFrom, onClose, onSaved }: {
         supervisor_name: sourceRow?.supervisor_name || "",
         collaboration_start: sourceRow?.collaboration_start || "",
         contract_id: sourceRow?.contract_id != null ? String(sourceRow.contract_id) : "",
+        // v4.3.78: امور بهره‌برداری پرسنل
+        district_id: (sourceRow as any)?.district_id != null ? String((sourceRow as any).district_id) : "",
       });
     }
   }, [open, sourceRow, duplicateFrom]);
@@ -379,6 +384,8 @@ function PersonnelDialog({ open, editRow, duplicateFrom, onClose, onSaved }: {
         supervisor_name: form.supervisor_name.trim() || null,
         collaboration_start: form.collaboration_start.trim() || null,
         contract_id: form.contract_id ? Number(form.contract_id) : null,
+        // v4.3.78: امور بهره‌برداری پرسنل
+        district_id: form.district_id ? Number(form.district_id) : null,
       };
       if (editRow) {
         await apiClient.put(`${API_ENDPOINTS.personnel}/${editRow.id}`, payload);
@@ -448,6 +455,11 @@ function PersonnelDialog({ open, editRow, duplicateFrom, onClose, onSaved }: {
             <div className="space-y-2">
               <Label className="text-right block">قرارداد</Label>
               <ContractSelect value={form.contract_id} onChange={v => setForm({ ...form, contract_id: v })} />
+            </div>
+            {/* v4.3.78: امور بهره‌برداری پرسنل */}
+            <div className="space-y-2">
+              <Label className="text-right block">امور بهره‌برداری</Label>
+              <DistrictSelect value={form.district_id} onChange={v => setForm({ ...form, district_id: v })} />
             </div>
             <div className="space-y-2">
               <Label className="text-right block">سمت</Label>

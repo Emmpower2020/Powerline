@@ -15,6 +15,8 @@ import { usePersonnelOptions } from "@/hooks/use-personnel-options";
 import { Loader2, LockKeyhole } from "lucide-react";
 import { useTowerReferences } from "@/hooks/use-tower-references";
 import { ContractSelect } from "@/components/contract-select";
+import { DistrictSelect } from "@/components/district-select";
+import { currentUserDistrictId } from "@/hooks/use-district-options";
 
 interface FormData {
   line_code: string; dispatch_code: string; name: string; group_name: string;
@@ -23,7 +25,7 @@ interface FormData {
   total_towers: string; tension_towers: string; suspension_towers: string;
   plain_terrain: string; semi_mountainous: string; mountainous: string;
   commission_year: string;
-  line_supervisor: string; line_expert: string; notes: string; contract_id: string;
+  line_supervisor: string; line_expert: string; notes: string; contract_id: string; district_id: string;
 }
 
 const empty: FormData = {
@@ -32,7 +34,7 @@ const empty: FormData = {
   conductor_type: "", tower_structure: "", length_km: "", circuit_length_km: "",
   total_towers: "", tension_towers: "", suspension_towers: "",
   plain_terrain: "", semi_mountainous: "", mountainous: "",
-  commission_year: "", line_supervisor: "", line_expert: "", notes: "", contract_id: "",
+  commission_year: "", line_supervisor: "", line_expert: "", notes: "", contract_id: "", district_id: "",
 };
 
 
@@ -129,10 +131,12 @@ export function CreateLineDialog({ open, onClose, onCreated, editRow, duplicateF
           // v3.5.1: قبلاً همیشه "" بود و ویرایش خط توضیحات ذخیره‌شده را بی‌صدا پاک می‌کرد
           notes: sourceRow.notes || "",
           contract_id: sourceRow.contract_id != null ? String(sourceRow.contract_id) : "",
+          // v4.3.78: امور بهره‌برداری خط
+          district_id: sourceRow.district_id != null ? String(sourceRow.district_id) : "",
         });
         setDispatchCodes(parseDispatch(sourceRow.dispatch_code));
       } else {
-        setForm(empty);
+        setForm({ ...empty, district_id: currentUserDistrictId() !== null ? String(currentUserDistrictId()) : "" });
         setDispatchCodes([]);
       }
     }
@@ -177,6 +181,8 @@ export function CreateLineDialog({ open, onClose, onCreated, editRow, duplicateF
         line_expert: form.line_expert || null,
         notes: form.notes || null,
         contract_id: form.contract_id ? Number(form.contract_id) : null,
+        // v4.3.78: امور بهره‌برداری خط
+        district_id: form.district_id ? Number(form.district_id) : null,
       };
 
       if (isEdit && editRow?.id) {
@@ -254,6 +260,8 @@ export function CreateLineDialog({ open, onClose, onCreated, editRow, duplicateF
             <Field label="نام مجموعه خط"><Input value={form.group_name} onChange={e => set("group_name", e.target.value)} className="text-right" /></Field>
             <Field label="نام خط (اجباری)"><Input value={form.name} onChange={e => set("name", e.target.value)} className="text-right" /></Field>
             <Field label="قرارداد"><ContractSelect value={form.contract_id} onChange={v => set("contract_id", v)} /></Field>
+            {/* v4.3.78: امور بهره‌برداری خط */}
+            <Field label="امور بهره‌برداری"><DistrictSelect value={form.district_id} onChange={v => set("district_id", v)} /></Field>
           </div>
 
           {/* سکشن ۲: مشخصات فنی — v3.4.0: گرید منظم ۳ ستونه و ردیف‌های هم‌عرض */}

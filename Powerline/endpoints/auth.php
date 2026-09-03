@@ -69,6 +69,18 @@ function registerAuthRoutes(Router $router): void
         $roles = Auth::getCurrentUserRoles();
         $permissions = Auth::getCurrentUserPermissions();
 
+        // v4.3.78: امور بهره‌برداری کاربر + نام امور (اگر migration اجرا شده باشد)
+        $districtId = !empty($user['district_id']) ? (int) $user['district_id'] : null;
+        $districtName = null;
+        if ($districtId !== null) {
+            try {
+                $row = Database::getInstance()->fetchOne("SELECT name FROM districts WHERE id = ?", [$districtId]);
+                $districtName = $row['name'] ?? null;
+            } catch (Throwable $e) {
+                $districtName = null;
+            }
+        }
+
         Response::success([
             'user' => [
                 'id'              => (int) $user['id'],
@@ -76,6 +88,9 @@ function registerAuthRoutes(Router $router): void
                 'full_name'       => $user['full_name'],
                 'email'           => $user['email'],
                 'organization_id' => $user['organization_id'] ? (int) $user['organization_id'] : null,
+                // null = مدیر برنامه (دیدن همهٔ امور) | شماره = امور اختصاص‌یافته
+                'district_id'     => $districtId,
+                'district_name'   => $districtName,
             ],
             'roles'       => $roles,
             'permissions' => $permissions,

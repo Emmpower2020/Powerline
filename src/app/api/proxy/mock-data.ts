@@ -20,12 +20,15 @@ const FAKE_REFRESH_TOKEN = "dev-mock-refresh-token-admin";
 const nextId = (arr: any[]): number => arr.reduce((m: number, x: any) => Math.max(m, x?.id ?? 0), 0) + 1;
 
 // ─── کاربر نمونه ───
+// v4.3.78: district_id = null یعنی مدیر برنامه — همهٔ امور را می‌بیند
 const MOCK_USER = {
   id: 1,
   username: "admin",
   full_name: "مدیر سیستم",
   email: "admin@jibimarket.com",
   status: "active",
+  district_id: null,
+  district_name: null,
   roles: ["super_admin"],
   permissions: ["*"],
 };

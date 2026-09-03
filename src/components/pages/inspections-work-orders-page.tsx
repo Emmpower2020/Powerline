@@ -32,18 +32,22 @@ export function InspectionsPage() {
     setRefreshKey(k => k + 1);
   };
   const handleDuplicate = async (row: Inspection) => {
-    try { await apiClient.post(API_ENDPOINTS.inspections, { inspection_date: row.inspection_date, priority: row.priority, weather: row.weather || null, notes: row.notes || null, line_id: row.line_id || null, tower_id: row.tower_id || null, contract_id: row.contract_id || null }); setRefreshKey(k => k + 1); } catch (e) { console.error(e); }
+    try { await apiClient.post(API_ENDPOINTS.inspections, { inspection_date: row.inspection_date, priority: row.priority, weather: row.weather || null, notes: row.notes || null, line_id: row.line_id || null, tower_id: row.tower_id || null, contract_id: row.contract_id || null, district_id: (row as any).district_id ?? null }); setRefreshKey(k => k + 1); } catch (e) { console.error(e); }
   };
 
   const columns: DataTableColumn<Inspection>[] = [
     { key: "contract_title", header: "قرارداد", sortable: true, filterable: true, wrap: true },
     { key: "inspection_code", header: "کد", sortable: true, filterable: true, align: "left" },
+    // v4.3.78: امور بهره‌برداری بازدید
+    { key: "district_name", header: "امور بهره‌برداری", sortable: true, filterable: true },
     { key: "line_code", header: "خط", sortable: true, filterable: true },
     { key: "tower_code", header: "دکل" },
     { key: "inspector_name", header: "بازرس", sortable: true, filterable: true },
     { key: "inspection_date", header: "تاریخ", sortable: true, type: "date" },
     { key: "priority", header: "نوع", type: "badge", badgeLabels: priorityLabels, badgeColors: { routine: "bg-slate-100 text-slate-700", emergency: "bg-red-100 text-red-700", follow_up: "bg-amber-100 text-amber-700", commissioning: "bg-blue-100 text-blue-700" } },
-    { key: "status", header: "وضعیت", type: "badge", badgeLabels: statusLabels, badgeColors: { draft: "bg-slate-100 text-slate-700", submitted: "bg-amber-100 text-amber-700", approved: "bg-green-100 text-green-700", rejected: "bg-red-100 text-red-700", cancelled: "bg-slate-100 text-slate-500" } },
+    // v4.3.78: ستون وضعیت استاندارد فعال/غیرفعال — ستون مرحله با نام «مرحله بازدید» جدا شد
+    { key: "status", header: "مرحله بازدید", type: "badge", badgeLabels: statusLabels, badgeColors: { draft: "bg-slate-100 text-slate-700", submitted: "bg-amber-100 text-amber-700", approved: "bg-green-100 text-green-700", rejected: "bg-red-100 text-red-700", cancelled: "bg-slate-100 text-slate-500" } },
+    { key: "activity_status", header: "وضعیت", type: "status", filterable: true, align: "right" },
   ];
 
   return (
@@ -52,7 +56,7 @@ export function InspectionsPage() {
         searchKeys={columns.map(c => c.key)}
         title="بازدیدها" onAdd={() => setShowCreate(true)} onRefresh={() => setRefreshKey(k => k + 1)}
         onCopy={() => {}} onDelete={handleDelete} onDuplicate={handleDuplicate} onImport={() => alert("برای وارد کردن اطلاعات بازدید از قالب اکسل پروژه استفاده کنید.")} onLoadAllRows={async () => data}
-        toolbarExtra={(rows) => <GenericBulkActions rows={rows} endpoint={API_ENDPOINTS.inspections} entityName="بازدید" onApplied={() => setRefreshKey(k => k + 1)} canChangeContract />} />
+        toolbarExtra={(rows) => <GenericBulkActions rows={rows} endpoint={API_ENDPOINTS.inspections} entityName="بازدید" onApplied={() => setRefreshKey(k => k + 1)} canToggleStatus statusField="activity_status" canChangeContract />} />
       <CreateInspectionDialog open={showCreate} onClose={() => setShowCreate(false)} onCreated={() => { setShowCreate(false); setRefreshKey(k => k + 1); }} />
     </div>
   );
@@ -81,17 +85,21 @@ export function WorkOrdersPage() {
     setRefreshKey(k => k + 1);
   };
   const handleDuplicate = async (row: WorkOrder) => {
-    try { await apiClient.post(API_ENDPOINTS.workOrders, { title: row.title, description: row.description || null, priority: row.priority, planned_start: row.planned_start || null, planned_end: row.planned_end || null, crew_id: row.crew_id || null, outage_required: !!row.outage_required, contract_id: row.contract_id || null }); setRefreshKey(k => k + 1); } catch (e) { console.error(e); }
+    try { await apiClient.post(API_ENDPOINTS.workOrders, { title: row.title, description: row.description || null, priority: row.priority, planned_start: row.planned_start || null, planned_end: row.planned_end || null, crew_id: row.crew_id || null, outage_required: !!row.outage_required, contract_id: row.contract_id || null, district_id: (row as any).district_id ?? null }); setRefreshKey(k => k + 1); } catch (e) { console.error(e); }
   };
 
   const columns: DataTableColumn<WorkOrder>[] = [
     { key: "contract_title", header: "قرارداد", sortable: true, filterable: true, wrap: true },
     { key: "wo_code", header: "کد", sortable: true, filterable: true, align: "left" },
+    // v4.3.78: امور بهره‌برداری دستورکار
+    { key: "district_name", header: "امور بهره‌برداری", sortable: true, filterable: true },
     { key: "title", header: "عنوان", sortable: true, filterable: true },
     { key: "priority", header: "اولویت", type: "badge", badgeLabels: priorityLabels, badgeColors: { critical: "bg-red-100 text-red-700", high: "bg-orange-100 text-orange-700", medium: "bg-amber-100 text-amber-700", low: "bg-slate-100 text-slate-700" } },
     { key: "crew_name", header: "اکیپ", sortable: true, filterable: true },
     { key: "planned_start", header: "شروع پلن", type: "date" },
-    { key: "status", header: "وضعیت", type: "badge", badgeLabels: statusLabels, badgeColors: { draft: "bg-slate-100 text-slate-700", assigned: "bg-blue-100 text-blue-700", in_progress: "bg-amber-100 text-amber-700", completed: "bg-green-100 text-green-700", cancelled: "bg-red-100 text-red-700", verified: "bg-indigo-100 text-indigo-700" } },
+    // v4.3.78: ستون وضعیت استاندارد فعال/غیرفعال — ستون مرحله با نام «مرحله دستورکار» جدا شد
+    { key: "status", header: "مرحله دستورکار", type: "badge", badgeLabels: statusLabels, badgeColors: { draft: "bg-slate-100 text-slate-700", assigned: "bg-blue-100 text-blue-700", in_progress: "bg-amber-100 text-amber-700", completed: "bg-green-100 text-green-700", cancelled: "bg-red-100 text-red-700", verified: "bg-indigo-100 text-indigo-700" } },
+    { key: "activity_status", header: "وضعیت", type: "status", filterable: true, align: "right" },
   ];
 
   return (
@@ -100,7 +108,7 @@ export function WorkOrdersPage() {
         searchKeys={columns.map(c => c.key)}
         title="دستورکارها" onAdd={() => setShowCreate(true)} onRefresh={() => setRefreshKey(k => k + 1)}
         onCopy={() => {}} onDelete={handleDelete} onDuplicate={handleDuplicate} onImport={() => alert("برای وارد کردن اطلاعات دستورکار از قالب اکسل پروژه استفاده کنید.")} onLoadAllRows={async () => data}
-        toolbarExtra={(rows) => <GenericBulkActions rows={rows} endpoint={API_ENDPOINTS.workOrders} entityName="دستورکار" onApplied={() => setRefreshKey(k => k + 1)} canChangeContract />} />
+        toolbarExtra={(rows) => <GenericBulkActions rows={rows} endpoint={API_ENDPOINTS.workOrders} entityName="دستورکار" onApplied={() => setRefreshKey(k => k + 1)} canToggleStatus statusField="activity_status" canChangeContract />} />
       <CreateWorkOrderDialog open={showCreate} onClose={() => setShowCreate(false)} onCreated={() => { setShowCreate(false); setRefreshKey(k => k + 1); }} />
     </div>
   );

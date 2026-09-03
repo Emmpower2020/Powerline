@@ -36,13 +36,18 @@ function registerDefectRoutes(Router $router): void
         if ($priority) { $where .= ' AND d.priority = ?'; $params[] = $priority; }
         if ($lineId) { $where .= ' AND d.line_id = ?'; $params[] = $lineId; }
         if ($towerId) { $where .= ' AND d.tower_id = ?'; $params[] = $towerId; }
+        // v4.3.78: کاربر اموردار فقط عیوب امور خودش را می‌بیند
+        $where .= Helpers::districtWhere('d', 'defects', $params);
 
         $countSql = "SELECT COUNT(*) FROM defects d WHERE $where";
         $stmt = $pdo->prepare($countSql);
         $stmt->execute($params);
         $total = (int) $stmt->fetchColumn();
 
-        $sql = "SELECT d.*, c.title AS contract_title, l.line_code, l.name AS line_name, t.tower_code, t.tower_type,
+        // v4.3.78: نام امور بهره‌برداری عیب
+        $disJoin = Helpers::districtJoin('d', 'defects');
+        $disSel = Helpers::districtSelect();
+        $sql = "SELECT d.*, c.title AS contract_title, l.line_code, l.name AS line_name, t.tower_code, t.tower_type$disSel,
                        p.first_name AS discoverer_first, p.last_name AS discoverer_last,
                        dd.title AS definition_title, dc.name AS category_name
                 FROM defects d
@@ -52,6 +57,7 @@ function registerDefectRoutes(Router $router): void
                 LEFT JOIN personnel p ON p.id = d.discovered_by
                 LEFT JOIN defect_definitions dd ON dd.id = d.defect_definition_id
                 LEFT JOIN defect_categories dc ON dc.id = dd.category_id
+                $disJoin
                 WHERE $where
                 ORDER BY d.id DESC
                 LIMIT $pageSize OFFSET $offset";
@@ -130,7 +136,8 @@ function registerDefectRoutes(Router $router): void
             $personnelRow = $stmt->fetch();
 
             if (!$personnelRow) {
-                $stmt = $pdo->prepare("INSERT INTO personnel (organization_id, user_id, personnel_code, first_name, last_name, position, status, hire_date, created_at) VALUES (?, ?, ?, ?, '', 'کاربر', 'active', CURDATE(), NOW())");
+                // v4.3.78: پرسنل خودکارِ ساخته‌شده نیز طبق سیاست برنامه پیش‌فرض «غیرفعال» است
+                $stmt = $pdo->prepare("INSERT INTO personnel (organization_id, user_id, personnel_code, first_name, last_name, position, status, hire_date, created_at) VALUES (?, ?, ?, ?, '', 'کاربر', 'inactive', CURDATE(), NOW())");
                 $stmt->execute([
                     $user['organization_id'] ?? 1,
                     $user['id'],
@@ -143,15 +150,13 @@ function registerDefectRoutes(Router $router): void
             }
 
             // درج عیب با PDO مستقیم
-            $sql = "INSERT INTO defects
-                    (defect_code, defect_definition_id, line_id, tower_id, contract_id, equipment_id,
-                     title, description, defect_type, severity, priority, safety_risk,
-                     status, discovered_by, gps_lat, gps_lng, location_desc, notes, created_at)
-                    VALUES
-                    (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'new', ?, ?, ?, ?, ?, NOW())";
-
-            $stmt = $pdo->prepare($sql);
-            $stmt->execute([
+            // v4.3.78: امور بهره‌برداری + وضعیت پیش‌فرض «غیرفعال» (activity_status) —
+            // ستون‌ها فقط در صورت وجود در دیتابیس (بعد از migration) اضافه می‌شوند
+            $insCols = ['defect_code', 'defect_definition_id', 'line_id', 'tower_id', 'contract_id', 'equipment_id',
+                        'title', 'description', 'defect_type', 'severity', 'priority', 'safety_risk',
+                        'status', 'discovered_by', 'gps_lat', 'gps_lng', 'location_desc', 'notes', 'created_at'];
+            $insVals = ['?', '?', '?', '?', '?', '?', '?', '?', '?', '?', '?', '?', "'new'", '?', '?', '?', '?', '?', 'NOW()'];
+            $insParams = [
                 $defectCode,
                 $body['defect_definition_id'] ?? null,
                 $lineId,
@@ -169,7 +174,13 @@ function registerDefectRoutes(Router $router): void
                 $body['gps_lng'] ?? null,
                 $body['location_desc'] ?? null,
                 $body['notes'] ?? null,
-            ]);
+            ];
+            if (Helpers::columnExists('defects', 'activity_status')) { $insCols[] = 'activity_status'; $insVals[] = "'inactive'"; }
+            if (Helpers::columnExists('defects', 'district_id')) { $insCols[] = 'district_id'; $insVals[] = '?'; $insParams[] = Helpers::districtFromBody($body, 'defects'); }
+            $sql = "INSERT INTO defects (" . implode(', ', $insCols) . ") VALUES (" . implode(', ', $insVals) . ")";
+
+            $stmt = $pdo->prepare($sql);
+            $stmt->execute($insParams);
 
             $newId = (int) $pdo->lastInsertId();
 
@@ -205,9 +216,12 @@ function registerDefectRoutes(Router $router): void
         if (!$existing) Response::error(404, 'عیب پیدا نشد');
 
         $allowedFields = ['title', 'description', 'defect_type', 'severity', 'priority', 'safety_risk', 'contract_id', 'gps_lat', 'gps_lng', 'location_desc', 'notes'];
+        // v4.3.78: ویرایش امور بهره‌برداری و وضعیت فعال/غیرفعال عیب
+        if (Helpers::columnExists('defects', 'district_id')) $allowedFields[] = 'district_id';
+        if (Helpers::columnExists('defects', 'activity_status')) $allowedFields[] = 'activity_status';
         $updates = []; $params = [];
         foreach ($allowedFields as $field) {
-            if (array_key_exists($field, $body)) { $updates[] = "`$field` = ?"; $params[] = $body[$field]; }
+            if (array_key_exists($field, $body)) { $updates[] = "`$field` = ?"; $params[] = ($body[$field] === '' ? null : $body[$field]); }
         }
         if (empty($updates)) Response::error(400, 'هیچ فیلدی برای ویرایش ارسال نشده');
         $updates[] = 'updated_at = NOW()'; $params[] = (int) $id;
@@ -244,6 +258,13 @@ function registerDefectRoutes(Router $router): void
         $user = Auth::authenticate();
         Auth::requirePermission('defects.delete');
         $db = Database::getInstance();
+        // v4.3.78: عیبِ فعال قابل حذف نیست — ابتدا باید غیرفعال شود (امنیت داده)
+        $row = $db->fetchOne("SELECT * FROM defects WHERE id = ?", [(int) $id]);
+        if (!$row) Response::error(404, 'عیب پیدا نشد');
+        $rawStatus = array_key_exists('activity_status', $row) ? ($row['activity_status'] ?? '') : ($row['status'] ?? '');
+        if (in_array(strtolower(trim((string)$rawStatus)), ['active', '1', 'true'], true)) {
+            Response::error(409, "حذف عیب انجام نشد.\n\nاین عیب فعال است — برای امنیت داده، ابتدا وضعیت آن را به «غیرفعال» تغییر دهید؛ رکوردهای غیرفعال قابل حذف هستند.");
+        }
         $count = $db->execute("DELETE FROM defects WHERE id = ?", [(int) $id]);
         if ($count === 0) Response::error(404, 'عیب پیدا نشد');
         Response::success(null, 'عیب حذف شد');
@@ -262,6 +283,15 @@ function registerDefectRoutes(Router $router): void
 
         $pdo = Database::getInstance()->getConnection();
         $idPlaceholders = implode(',', array_fill(0, count($ids), '?'));
+        // v4.3.78: عیوب «فعال» قابل حذف نیستند — ابتدا باید غیرفعال شوند (امنیت داده)
+        if (Helpers::columnExists('defects', 'activity_status')) {
+            $activeStmt = $pdo->prepare("SELECT COUNT(*) FROM defects WHERE id IN ($idPlaceholders) AND LOWER(TRIM(COALESCE(activity_status, ''))) IN ('active', '1', 'true')");
+            $activeStmt->execute($ids);
+            $activeCount = (int) $activeStmt->fetchColumn();
+            if ($activeCount > 0) {
+                Response::error(409, "حذف انجام نشد.\n\n$activeCount عیب انتخاب‌شده وضعیت «فعال» دارد — برای امنیت داده، ابتدا وضعیت را «غیرفعال» کنید؛ رکوردهای غیرفعال قابل حذف هستند.");
+            }
+        }
         try {
             $pdo->beginTransaction();
             $stmt = $pdo->prepare("DELETE FROM defects WHERE id IN ($idPlaceholders)");
@@ -429,7 +459,9 @@ function registerDefectRoutes(Router $router): void
         $countStmt->execute($params);
         $total = (int) $countStmt->fetchColumn();
 
-        $sql = "SELECT u.id, u.username, u.full_name, u.email, u.status, u.organization_id,
+        // v4.3.78: امور بهره‌برداری کاربر — فقط اگر migration اجرا شده باشد
+        $districtColSel = (Helpers::districtsReady() && Helpers::columnExists('users', 'district_id')) ? ', u.district_id' : '';
+        $sql = "SELECT u.id, u.username, u.full_name, u.email, u.status, u.organization_id$districtColSel,
                        u.created_at, u.last_login_at,
                        GROUP_CONCAT(r.display_name SEPARATOR '، ') AS roles
                 FROM users u
@@ -441,14 +473,70 @@ function registerDefectRoutes(Router $router): void
                 LIMIT $pageSize OFFSET $offset";
         $stmt = $pdo->prepare($sql);
         $stmt->execute($params);
+        $rows = $stmt->fetchAll();
+
+        // v4.3.78: امور بهره‌برداری هر کاربر — با یک کوئری سبک برای همهٔ کاربران صفحه
+        $districtNames = [];
+        if (Helpers::districtsReady() && Helpers::columnExists('users', 'district_id') && $rows) {
+            try {
+                $disMap = [];
+                foreach ($pdo->query('SELECT id, name FROM districts')->fetchAll() as $d) {
+                    $disMap[(int) $d['id']] = (string) $d['name'];
+                }
+                foreach ($rows as $r) {
+                    $districtNames[(int) $r['id']] = !empty($r['district_id']) ? ($disMap[(int) $r['district_id']] ?? null) : null;
+                }
+            } catch (Throwable $e) { /* جدول امور هنوز ساخته نشده — نامش بدون نام امور */ }
+        }
+
         $data = array_map(fn($r) => [
             'id' => (int) $r['id'], 'username' => $r['username'], 'full_name' => $r['full_name'],
             'email' => $r['email'], 'status' => (string) $r['status'],
             'organization_id' => $r['organization_id'] ? (int) $r['organization_id'] : null,
+            'district_id' => !empty($r['district_id']) ? (int) $r['district_id'] : null,
+            'district_name' => $districtNames[(int) $r['id']] ?? null,
             'roles' => $r['roles'], 'created_at' => $r['created_at'], 'last_login_at' => $r['last_login_at'],
-        ], $stmt->fetchAll());
+        ], $rows);
 
         Response::paginated($data, $page, $pageSize, $total);
+    });
+
+    // v4.3.78: ویرایش کاربر — امور بهره‌برداری و وضعیت فعال/غیرفعال
+    // کاربرِ بدون امور (NULL) همهٔ داده‌ها را می‌بیند؛ برای محدود کردن، امور اختصاص دهید
+    $router->put('users/{id}', function ($id) {
+        Auth::authenticate();
+        Auth::requireRole('super_admin');
+        $body = Helpers::getJsonBody();
+        $pdo = Database::getInstance()->getConnection();
+
+        $existing = $pdo->prepare('SELECT id, status FROM users WHERE id = ?');
+        $existing->execute([(int) $id]);
+        if (!$existing->fetch()) Response::error(404, 'کاربر پیدا نشد');
+
+        $updates = []; $params = [];
+        if (array_key_exists('district_id', $body) && Helpers::columnExists('users', 'district_id')) {
+            $v = $body['district_id'];
+            $updates[] = '`district_id` = ?';
+            $params[] = ($v === null || $v === '' || (int) $v <= 0) ? null : (int) $v;
+        }
+        if (array_key_exists('status', $body)) {
+            $sv = (string) $body['status'];
+            $updates[] = '`status` = ?';
+            $params[] = ($sv === 'inactive' || $sv === '0') ? 'inactive' : 'active';
+        }
+        if (array_key_exists('full_name', $body) && trim((string) $body['full_name']) !== '') {
+            $updates[] = '`full_name` = ?';
+            $params[] = trim((string) $body['full_name']);
+        }
+        if (array_key_exists('email', $body)) {
+            $updates[] = '`email` = ?';
+            $params[] = trim((string) $body['email']) === '' ? null : trim((string) $body['email']);
+        }
+        if (!$updates) Response::error(400, 'هیچ فیلدی برای ویرایش ارسال نشده');
+        $updates[] = 'updated_at = NOW()';
+        $params[] = (int) $id;
+        $pdo->prepare('UPDATE users SET ' . implode(', ', $updates) . ' WHERE id = ?')->execute($params);
+        Response::success(null, 'کاربر ویرایش شد');
     });
 }
 
@@ -459,6 +547,10 @@ function formatDefectRow(array $row): array
         'description' => $row['description'], 'defect_type' => $row['defect_type'],
         'severity' => $row['severity'], 'priority' => $row['priority'], 'safety_risk' => $row['safety_risk'],
         'status' => $row['status'],
+        // v4.3.78: وضعیت فعال/غیرفعال + امور بهره‌برداری (بعد از migration)
+        'activity_status' => $row['activity_status'] ?? null,
+        'district_id' => !empty($row['district_id']) ? (int) $row['district_id'] : null,
+        'district_name' => $row['district_name'] ?? null,
         // v3.1.0: عنوان عیب استاندارد و نام دسته از JOIN با defect_definitions/defect_categories
         'category_name' => $row['category_name'] ?? null,
         'definition_title' => $row['definition_title'] ?? null,

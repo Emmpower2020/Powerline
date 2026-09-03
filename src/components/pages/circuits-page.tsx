@@ -20,6 +20,8 @@ import { useToast } from "@/hooks/use-toast";
 import { useStatsVisible } from "@/hooks/use-stats-visible";
 import { GenericBulkActions } from "@/components/generic-bulk-actions";
 import { ContractSelect } from "@/components/contract-select";
+import { DistrictSelect } from "@/components/district-select";
+import { currentUserDistrictId } from "@/hooks/use-district-options";
 import { logError } from "@/lib/error-log";
 import { Loader2, Zap } from "lucide-react";
 
@@ -43,6 +45,10 @@ interface Circuit {
   line_name?: string | null;
   contract_id?: number | null;
   contract_title?: string | null;
+  // v4.3.78: وضعیت فعال/غیرفعال + امور بهره‌برداری
+  status?: string | null;
+  district_id?: number | null;
+  district_name?: string | null;
   created_at?: string | null;
 }
 
@@ -117,6 +123,8 @@ export function CircuitsPage() {
       render: (row) => <span className="font-mono font-bold text-indigo-700">{row.dispatch_code}</span>,
     },
     { key: "contract_title", header: "قرارداد", sortable: true, filterable: true, wrap: true, align: "right" },
+    // v4.3.78: امور بهره‌برداری + وضعیت فعال/غیرفعال
+    { key: "district_name", header: "امور بهره‌برداری", sortable: true, filterable: true, align: "right" },
     { key: "name", header: "نام مدار", sortable: true, filterable: true, wrap: true, align: "right" },
     {
       key: "voltage", header: "ولتاژ", sortable: true, filterable: true, type: "badge", align: "right",
@@ -128,6 +136,8 @@ export function CircuitsPage() {
         "63": voltageBadge["63"].color,
       },
     },
+    // v4.3.78: ستون وضعیت استاندارد (فعال/غیرفعال) — قابل فیلتر
+    { key: "status", header: "وضعیت", type: "status", filterable: true, align: "right" },
     // v3.2.0: ستون «خط مرتبط» حذف شد (درخواست کاربر)
   ];
 
@@ -211,7 +221,7 @@ export function CircuitsPage() {
         onCopy={handleCopy}
         onDelete={bulkDelete.requestDelete}
         onImport={() => setShowImport(true)}
-        toolbarExtra={(rows) => <GenericBulkActions rows={rows} endpoint={API_ENDPOINTS.circuits} entityName="مدار" onApplied={() => setRefreshKey(k => k + 1)} canChangeContract />}
+        toolbarExtra={(rows) => <GenericBulkActions rows={rows} endpoint={API_ENDPOINTS.circuits} entityName="مدار" onApplied={() => setRefreshKey(k => k + 1)} canToggleStatus canChangeContract />}
       />
 
       {/* دیالوگ ایجاد/ویرایش/کپی مدار */}
@@ -313,7 +323,7 @@ function CircuitDialog({ open, editRow, duplicateFrom, existingCodes, onClose, o
 }) {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [form, setForm] = useState({ dispatch_code: "", name: "", voltage: "", contract_id: "" });
+  const [form, setForm] = useState({ dispatch_code: "", name: "", voltage: "", contract_id: "", district_id: "" });
 
   const sourceRow = editRow || duplicateFrom;
   const isDuplicate = !editRow && !!duplicateFrom;
@@ -327,6 +337,10 @@ function CircuitDialog({ open, editRow, duplicateFrom, existingCodes, onClose, o
         name: sourceRow?.name || "",
         voltage: sourceRow?.voltage != null ? String(sourceRow.voltage) : "",
         contract_id: sourceRow?.contract_id != null ? String(sourceRow.contract_id) : "",
+        // v4.3.78: امور بهره‌برداری — در ثبت جدید امور کاربر جاری پیش‌فرض است
+        district_id: !isDuplicate && !editRow
+          ? (currentUserDistrictId() !== null ? String(currentUserDistrictId()) : (sourceRow?.district_id != null ? String(sourceRow.district_id) : ""))
+          : (sourceRow?.district_id != null ? String(sourceRow.district_id) : ""),
       });
     }
   }, [open, sourceRow, isDuplicate]);
@@ -347,6 +361,8 @@ function CircuitDialog({ open, editRow, duplicateFrom, existingCodes, onClose, o
         name: form.name.trim() || null,
         voltage: Number(form.voltage),
         contract_id: form.contract_id ? Number(form.contract_id) : null,
+        // v4.3.78: امور بهره‌برداری
+        district_id: form.district_id ? Number(form.district_id) : null,
       };
       if (editRow) {
         await apiClient.put(`${API_ENDPOINTS.circuits}/${editRow.id}`, payload);
@@ -399,6 +415,11 @@ function CircuitDialog({ open, editRow, duplicateFrom, existingCodes, onClose, o
           <div className="space-y-2">
             <Label className="text-right block">قرارداد</Label>
             <ContractSelect value={form.contract_id} onChange={v => setForm({ ...form, contract_id: v })} />
+          </div>
+          {/* v4.3.78: امور بهره‌برداری مدار */}
+          <div className="space-y-2">
+            <Label className="text-right block">امور بهره‌برداری</Label>
+            <DistrictSelect value={form.district_id} onChange={v => setForm({ ...form, district_id: v })} />
           </div>
           <div className="space-y-2">
             <Label className="text-right block">نام مدار</Label>

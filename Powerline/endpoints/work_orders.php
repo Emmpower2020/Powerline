@@ -59,13 +59,17 @@ function registerWorkOrderRoutes(Router $router): void
         $stmt->execute($params);
         $total = (int) $stmt->fetchColumn();
 
+        // v4.3.78: کاربر اموردار فقط دستورکارهای امور خودش را می‌بیند + نام امور
+        $where .= Helpers::districtWhere('wo', 'work_orders', $params);
+        $disJoin = Helpers::districtJoin('wo', 'work_orders');
+        $disSel = Helpers::districtSelect();
         $sql = "SELECT wo.*,
                        l.line_code, l.name AS line_name,
                        t.tower_code,
                        d.defect_code AS related_defect_code,
                        cr.name AS crew_name,
                        ct.contractor_name AS contractor_name,
-                       c.title AS contract_title
+                       c.title AS contract_title$disSel
                 FROM work_orders wo
                 LEFT JOIN `lines` l ON l.id = wo.line_id
                 LEFT JOIN towers t ON t.id = wo.tower_id
@@ -73,6 +77,7 @@ function registerWorkOrderRoutes(Router $router): void
                 LEFT JOIN crews cr ON cr.id = wo.crew_id
                 LEFT JOIN contractors ct ON ct.id = wo.contractor_id
                 LEFT JOIN contracts c ON c.id = wo.contract_id
+                $disJoin
                 WHERE $where
                 ORDER BY wo.id DESC
                 LIMIT $pageSize OFFSET $offset";
@@ -129,14 +134,13 @@ function registerWorkOrderRoutes(Router $router): void
 
         $woCode = Helpers::generateCode('WO', 6);
 
-        $sql = "INSERT INTO work_orders
-                (wo_code, defect_id, line_id, tower_id, crew_id, contractor_id, contract_id,
-                 title, description, priority, status, planned_start, planned_end,
-                 outage_required, created_by, created_at)
-                VALUES
-                (?, ?, ?, ?, ?, ?, ?, ?, ?, 'draft', ?, ?, ?, ?, NOW())";
-
-        $db->execute($sql, [
+        // v4.3.78: امور بهره‌برداری + وضعیت پیش‌فرض «غیرفعال» (activity_status)
+        $districtId = Helpers::districtFromBody($body, 'work_orders');
+        $woCols = ['wo_code', 'defect_id', 'line_id', 'tower_id', 'crew_id', 'contractor_id', 'contract_id',
+                   'title', 'description', 'priority', 'status', 'planned_start', 'planned_end',
+                   'outage_required', 'created_by', 'created_at'];
+        $woVals = ['?', '?', '?', '?', '?', '?', '?', '?', '?', '?', "'draft'", '?', '?', '?', '?', 'NOW()'];
+        $woParams = [
             $woCode,
             $body['defect_id'] ?? null,
             $body['line_id'] ?? null,
@@ -151,7 +155,12 @@ function registerWorkOrderRoutes(Router $router): void
             $body['planned_end'] ?? null,
             !empty($body['outage_required']) ? 1 : 0,
             $user['id'],
-        ]);
+        ];
+        if (Helpers::columnExists('work_orders', 'activity_status')) { $woCols[] = 'activity_status'; $woVals[] = "'inactive'"; }
+        if (Helpers::columnExists('work_orders', 'district_id')) { $woCols[] = 'district_id'; $woVals[] = '?'; $woParams[] = $districtId; }
+        $sql = "INSERT INTO work_orders (" . implode(', ', $woCols) . ") VALUES (" . implode(', ', $woVals) . ")";
+
+        $db->execute($sql, $woParams);
 
         $newId = (int) $db->lastInsertId();
 
@@ -165,8 +174,11 @@ function registerWorkOrderRoutes(Router $router): void
         Auth::requirePermissionSoft('maintenance.update');
         $body = Helpers::getJsonBody();
         $fields = ['title','description','priority','planned_start','planned_end','crew_id','contractor_id','contract_id','outage_required','status'];
+        // v4.3.78: ویرایش امور بهره‌برداری و وضعیت فعال/غیرفعال دستورکار
+        if (Helpers::columnExists('work_orders', 'district_id')) $fields[] = 'district_id';
+        if (Helpers::columnExists('work_orders', 'activity_status')) $fields[] = 'activity_status';
         $updates = []; $params = [];
-        foreach ($fields as $f) { if (array_key_exists($f, $body)) { $updates[] = "`$f` = ?"; $params[] = $body[$f]; } }
+        foreach ($fields as $f) { if (array_key_exists($f, $body)) { $updates[] = "`$f` = ?"; $params[] = ($body[$f] === '' ? null : $body[$f]); } }
         if (!$updates) Response::error(400, 'هیچ فیلدی ارسال نشده');
         $params[] = (int)$id;
         Database::getInstance()->getConnection()->prepare("UPDATE work_orders SET " . implode(', ', $updates) . " WHERE id = ?")->execute($params);
@@ -174,9 +186,16 @@ function registerWorkOrderRoutes(Router $router): void
     });
 
     // حذف دستورکار — برای عملیات گروهی جدول
+    // v4.3.78: دستورکارِ فعال قابل حذف نیست — ابتدا باید غیرفعال شود (امنیت داده)
     $router->delete('work-orders/{id}', function ($id) {
         Auth::authenticate();
         Auth::requirePermissionSoft('maintenance.delete');
+        $row = Database::getInstance()->fetchOne("SELECT * FROM work_orders WHERE id = ?", [(int)$id]);
+        if (!$row) Response::error(404, 'دستورکار پیدا نشد');
+        $rawStatus = array_key_exists('activity_status', $row) ? ($row['activity_status'] ?? '') : ($row['status'] ?? '');
+        if (in_array(strtolower(trim((string)$rawStatus)), ['active', '1', 'true'], true)) {
+            Response::error(409, "حذف دستورکار انجام نشد.\n\nاین دستورکار فعال است — برای امنیت داده، ابتدا وضعیت آن را به «غیرفعال» تغییر دهید؛ رکوردهای غیرفعال قابل حذف هستند.");
+        }
         Database::getInstance()->execute("DELETE FROM work_orders WHERE id = ?", [(int)$id]);
         Response::success(null, 'دستورکار حذف شد');
     });
@@ -294,6 +313,10 @@ function formatWorkOrderRow(array $row): array
         'description'       => $row['description'],
         'priority'          => $row['priority'],
         'status'            => $row['status'],
+        // v4.3.78: وضعیت فعال/غیرفعال + امور بهره‌برداری (بعد از migration)
+        'activity_status'   => $row['activity_status'] ?? null,
+        'district_id'       => !empty($row['district_id']) ? (int) $row['district_id'] : null,
+        'district_name'     => $row['district_name'] ?? null,
         'defect_id'         => $row['defect_id'] ? (int) $row['defect_id'] : null,
         'related_defect_code'=> $row['related_defect_code'] ?? null,
         'line_id'           => $row['line_id'] ? (int) $row['line_id'] : null,

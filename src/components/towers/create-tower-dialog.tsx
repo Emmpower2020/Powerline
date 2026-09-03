@@ -7,6 +7,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { DistrictSelect } from "@/components/district-select";
+import { currentUserDistrictId } from "@/hooks/use-district-options";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { SearchableSelect } from "@/components/searchable-select";
 import { usePersonnelOptions } from "@/hooks/use-personnel-options";
@@ -28,6 +30,7 @@ interface FormData {
   insulator_count_r1: string; insulator_count_s1: string; insulator_count_t1: string;
   insulator_count_r2: string; insulator_count_s2: string; insulator_count_t2: string;
   gps_lat: string; gps_lng: string;
+  district_id: string;
 }
 
 const empty: FormData = {
@@ -38,7 +41,7 @@ const empty: FormData = {
   insulator_r2: "", insulator_s2: "", insulator_t2: "",
   insulator_count_r1: "", insulator_count_s1: "", insulator_count_t1: "",
   insulator_count_r2: "", insulator_count_s2: "", insulator_count_t2: "",
-  gps_lat: "", gps_lng: "",
+  gps_lat: "", gps_lng: "", district_id: "",
 };
 
 interface Props {
@@ -155,9 +158,12 @@ export function CreateTowerDialog({ open, onClose, onCreated, editRow, duplicate
           insulator_count_t2: s(sourceRow.insulator_count_t2),
           gps_lat: s(sourceRow.gps_lat),
           gps_lng: s(sourceRow.gps_lng),
+          // v4.3.78: امور بهره‌برداری دکل
+          district_id: (sourceRow as any)?.district_id != null ? String((sourceRow as any).district_id) : "",
         });
       } else {
-        setForm(empty);
+        // v4.3.78: در ثبت جدید، امور کاربر جاری پیش‌فرض است
+        setForm({ ...empty, district_id: currentUserDistrictId() !== null ? String(currentUserDistrictId()) : "" });
       }
     }
   }, [open, sourceRow, isEdit]);
@@ -177,6 +183,8 @@ export function CreateTowerDialog({ open, onClose, onCreated, editRow, duplicate
       const payload: Record<string, unknown> = {
         line_id: form.line_id ? Number(form.line_id) : null,
         contract_id: form.contract_id ? Number(form.contract_id) : null,
+        // v4.3.78: امور بهره‌برداری دکل
+        district_id: form.district_id ? Number(form.district_id) : null,
         tower_code: autoCode,
         tower_number: num(form.tower_number),
         tower_structure: form.tower_structure,
@@ -271,6 +279,11 @@ export function CreateTowerDialog({ open, onClose, onCreated, editRow, duplicate
                 <Field label="شماره دکل">
                   <Input type="number" min={1} value={form.tower_number} onChange={e => set("tower_number", e.target.value)} dir="ltr" className="text-left bg-white" placeholder="مثلاً 1" />
                 </Field>
+                {/* v4.3.78: امور بهره‌برداری دکل */}
+                <Field label="امور بهره‌برداری">
+                  <DistrictSelect value={form.district_id} onChange={v => set("district_id", v)} />
+                </Field>
+              </div>
               {/* v2.8.0: فیلد «کد دکل خودکار» حذف شد — کد دکل به‌طور خودکار در سرور از کد خط + شماره دکل تولید می‌شود */}
               {/* v3.0.0: سرپرست خط از جدول پرسنل با کمبوباکس قابل جستجو (سرپرست‌های اکیپ) */}
               <Field label="سرپرست خط">
@@ -283,7 +296,6 @@ export function CreateTowerDialog({ open, onClose, onCreated, editRow, duplicate
                   allowClear
                 />
               </Field>
-              </div>
             </div>
           </div>
 

@@ -389,6 +389,8 @@ export function TowersPage() {
       key: "line_name", header: "نام خط", sortable: true, filterable: true, wrap: true, width: "260px", align: "right",
       render: (row: any) => lineNameBadge(row),
     },
+    // v4.3.78: امور بهره‌برداری دکل
+    { key: "district_name", header: "امور بهره‌برداری", sortable: true, filterable: true, align: "right" },
     {
       key: "tower_structure", header: "ساختار دکل", sortable: true, filterable: true, align: "right",
       render: (row: any) => structureBadge(row.tower_structure),

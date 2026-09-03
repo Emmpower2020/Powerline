@@ -5,6 +5,113 @@
 
 class Helpers
 {
+    // ─────────────────────────────────────────────────────────────
+    // v4.3.78 — ابزارهای «امور بهره‌برداری» (districts)
+    // همهٔ کوئری‌ها فقط وقتی ستون/جدول واقعاً موجود باشد ساخته می‌شوند تا
+    // تا زمان اجرای migration روی دیتابیس، هیچ خطایی رخ ندهد.
+    // ─────────────────────────────────────────────────────────────
+
+    /** کش وجود ستون‌ها — هر جدول/ستون فقط یک‌بار از information_schema پرسیده می‌شود */
+    private static array $colCache = [];
+
+    /** آیا ستون در جدول وجود دارد؟ (بدون خطا — در نبود جدول false) */
+    public static function columnExists(string $table, string $column): bool
+    {
+        $key = "$table.$column";
+        if (!array_key_exists($key, self::$colCache)) {
+            try {
+                $pdo = Database::getInstance()->getConnection();
+                $st = $pdo->prepare(
+                    "SELECT COUNT(*) FROM information_schema.COLUMNS
+                     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?"
+                );
+                $st->execute([$table, $column]);
+                self::$colCache[$key] = ((int) $st->fetchColumn()) > 0;
+            } catch (Throwable $e) {
+                self::$colCache[$key] = false;
+            }
+        }
+        return self::$colCache[$key];
+    }
+
+    /** آیا جدول «امور بهره‌برداری» ساخته شده است؟ */
+    public static function districtsReady(): bool
+    {
+        static $ready = null;
+        if ($ready === null) {
+            try {
+                $pdo = Database::getInstance()->getConnection();
+                $st = $pdo->prepare(
+                    "SELECT COUNT(*) FROM information_schema.TABLES
+                     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'districts'"
+                );
+                $st->execute();
+                $ready = ((int) $st->fetchColumn()) > 0;
+            } catch (Throwable $e) {
+                $ready = false;
+            }
+        }
+        return $ready;
+    }
+
+    /**
+     * امور کاربر جاری — null یعنی مدیر برنامه (دیدن همهٔ امور).
+     * کاربر عادی فقط داده‌های امور خودش را می‌بیند.
+     */
+    public static function userDistrictId(): ?int
+    {
+        $user = Auth::getCurrentUser();
+        $d = $user['district_id'] ?? null;
+        return ($d === null || $d === '' || (int) $d <= 0) ? null : (int) $d;
+    }
+
+    /**
+     * شرط SQL محدودسازی به امور کاربر — اگر کاربر مدیر بود یا ستون/جدول
+     * هنوز ساخته نشده بود رشتهٔ خالی برمی‌گردد (بدون تغییر رفتار).
+     * $params به‌صورت مرجع پر می‌شود.
+     */
+    public static function districtWhere(string $alias, string $table, array &$params): string
+    {
+        if (!self::districtsReady()) return '';
+        $d = self::userDistrictId();
+        if ($d === null) return '';
+        if (!self::columnExists($table, 'district_id')) return '';
+        $params[] = $d;
+        return " AND `$alias`.`district_id` = ?";
+    }
+
+    /**
+     * عبارت JOIN و SELECT نام امور برای endpoint های لیست —
+     * 'دخل JOIN ...' فقط وقتی districts و district_id جدول موجود باشند.
+     */
+    public static function districtJoin(string $alias, string $table, string $joinAlias = 'dis'): string
+    {
+        if (!self::districtsReady()) return '';
+        if (!self::columnExists($table, 'district_id')) return '';
+        return " LEFT JOIN districts `$joinAlias` ON `$joinAlias`.id = `$alias`.`district_id`";
+    }
+
+    /** ستون SELECT نام امور: "، dis.name AS district_name" یا خالی */
+    public static function districtSelect(string $joinAlias = 'dis'): string
+    {
+        if (!self::districtsReady()) return '';
+        return ", `$joinAlias`.`name` AS `district_name`";
+    }
+
+    /**
+     * دریافت district_id امن از بدنه درخواست — اگر migration اجرا نشده باشد
+     * مقدار نادیده گرفته می‌شود (و اگر کاربر اموردار باشد، پیش‌فرض امور خودش).
+     */
+    public static function districtFromBody(array $body, string $table): ?int
+    {
+        if (!self::districtsReady() || !self::columnExists($table, 'district_id')) return null;
+        if (array_key_exists('district_id', $body)) {
+            $v = $body['district_id'];
+            return ($v === null || $v === '' || (int) $v <= 0) ? null : (int) $v;
+        }
+        return null;
+    }
+
     /**
      * دریافت بدنه JSON از درخواست
      */

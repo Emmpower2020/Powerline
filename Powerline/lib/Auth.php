@@ -35,9 +35,11 @@ class Auth
         }
 
         // بارگذاری کاربر از دیتابیس
+        // v4.3.78: امور بهره‌برداری کاربر — اگر migration اجرا شده باشد همراه کاربر برمی‌گردد
         $db = Database::getInstance();
+        $districtCol = self::userHasDistrictColumn() ? ', u.district_id' : '';
         $user = $db->fetchOne(
-            "SELECT u.id, u.username, u.full_name, u.email, u.status, u.organization_id
+            "SELECT u.id, u.username, u.full_name, u.email, u.status, u.organization_id$districtCol
              FROM users u
              WHERE u.id = ? AND u.status = 'active'",
             [$payload['sub']]
@@ -63,8 +65,9 @@ class Auth
         if (!$payload) return null;
 
         $db = Database::getInstance();
+        $districtColOpt = self::userHasDistrictColumn() ? ', u.district_id' : '';
         $user = $db->fetchOne(
-            "SELECT u.id, u.username, u.full_name, u.email, u.status, u.organization_id
+            "SELECT u.id, u.username, u.full_name, u.email, u.status, u.organization_id$districtColOpt
              FROM users u
              WHERE u.id = ? AND u.status = 'active'",
             [$payload['sub']]
@@ -90,6 +93,29 @@ class Auth
     public static function getCurrentUserId(): ?int
     {
         return self::$currentUser['id'] ?? null;
+    }
+
+    /**
+     * v4.3.78: آیا جدول users ستون district_id را دارد؟ (یک‌بار بررسی و کش می‌شود)
+     * تا قبل از اجرای migration، لاگین/توکن‌ها بدون خطا همان خروجی قبلی را می‌دهند.
+     */
+    private static ?bool $userDistrictCol = null;
+    public static function userHasDistrictColumn(): bool
+    {
+        if (self::$userDistrictCol === null) {
+            try {
+                $pdo = Database::getInstance()->getConnection();
+                $st = $pdo->prepare(
+                    "SELECT COUNT(*) FROM information_schema.COLUMNS
+                     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users' AND COLUMN_NAME = 'district_id'"
+                );
+                $st->execute();
+                self::$userDistrictCol = ((int) $st->fetchColumn()) > 0;
+            } catch (Throwable $e) {
+                self::$userDistrictCol = false;
+            }
+        }
+        return self::$userDistrictCol;
     }
 
     /**
@@ -270,8 +296,9 @@ class Auth
         $db = Database::getInstance();
 
         // پیدا کردن کاربر
+        $districtColLogin = self::userHasDistrictColumn() ? ', district_id' : '';
         $user = $db->fetchOne(
-            "SELECT id, username, password_hash, full_name, email, status, failed_attempts, locked_until
+            "SELECT id, username, password_hash, full_name, email, status, failed_attempts, locked_until$districtColLogin
              FROM users
              WHERE username = ?",
             [$username]
@@ -336,6 +363,8 @@ class Auth
                 'username' => $user['username'],
                 'full_name'=> $user['full_name'],
                 'email'    => $user['email'],
+                // v4.3.78: امور بهره‌برداری کاربر (null = مدیر، دیدن همه)
+                'district_id' => isset($user['district_id']) && $user['district_id'] ? (int) $user['district_id'] : null,
             ],
             'tokens' => [
                 'access_token'  => $accessToken,

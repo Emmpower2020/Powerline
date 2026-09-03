@@ -16,6 +16,7 @@ export function GenericBulkActions({
   onApplied,
   canToggleStatus = false,
   canChangeContract = false,
+  statusField = "status",
   additionalActions,
 }: {
   rows: any[];
@@ -24,6 +25,8 @@ export function GenericBulkActions({
   onApplied: () => void;
   canToggleStatus?: boolean;
   canChangeContract?: boolean;
+  /** v4.3.78: نام فیلد وضعیت فعال/غیرفعال — جداول گردش‌کاری activity_status دارند */
+  statusField?: string;
   additionalActions?: ReactNode;
 }) {
   const [busy, setBusy] = useState(false);
@@ -112,8 +115,8 @@ export function GenericBulkActions({
         {canChangeContract && (canToggleStatus || true) && <DropdownMenuSeparator />}
         {additionalActions}{additionalActions && (canToggleStatus || canChangeContract) && <DropdownMenuSeparator />}
         {canToggleStatus && <>
-          <DropdownMenuItem className="gap-2 cursor-pointer" onClick={() => requestRun({status: "active"}, "فعال کردن") }><Power className="w-4 h-4 text-emerald-600"/>فعال کردن</DropdownMenuItem>
-          <DropdownMenuItem className="gap-2 cursor-pointer" onClick={() => requestRun({status: "inactive"}, "غیرفعال کردن") }><PowerOff className="w-4 h-4 text-slate-500"/>غیرفعال کردن</DropdownMenuItem>
+          <DropdownMenuItem className="gap-2 cursor-pointer" onClick={() => requestRun({[statusField]: "active"}, "فعال کردن") }><Power className="w-4 h-4 text-emerald-600"/>فعال کردن</DropdownMenuItem>
+          <DropdownMenuItem className="gap-2 cursor-pointer" onClick={() => requestRun({[statusField]: "inactive"}, "غیرفعال کردن") }><PowerOff className="w-4 h-4 text-slate-500"/>غیرفعال کردن</DropdownMenuItem>
         </>}
       </DropdownMenuContent>
     </DropdownMenu>

@@ -333,6 +333,8 @@ export function LinesPage() {
       ),
     },
     { key: "voltage_kv", header: "ولتاژ (kV)", sortable: true, filterable: true, type: "number", align: "right" },
+    // v4.3.78: امور بهره‌برداری خط
+    { key: "district_name", header: "امور بهره‌برداری", sortable: true, filterable: true, align: "right" },
     { key: "circuit_count", header: "مدار", sortable: true, filterable: true, type: "number", align: "right" },
     { key: "bundle_count", header: "باندل", sortable: true, filterable: true, type: "number", align: "right" },
     { key: "conductor_type", header: "نوع سیم", sortable: true, filterable: true, align: "right" },

@@ -46,6 +46,9 @@ function registerLineRoutes(Router $router): void
             $params[] = $searchParam;
         }
 
+        // v4.3.78: کاربر اموردار فقط خطوط امور خودش را می‌بیند
+        $where .= Helpers::districtWhere('l', 'lines', $params);
+
         // شمارش کل
         $total = $db->count('lines l', $where, $params);
 
@@ -53,13 +56,17 @@ function registerLineRoutes(Router $router): void
         $lineColumns = [];
         foreach ($db->fetchAll("SHOW COLUMNS FROM `lines`") as $cr) if (isset($cr['Field'])) $lineColumns[(string)$cr['Field']] = true;
         $resolvedStructure = isset($lineColumns['tower_structure']) ? 'l.tower_structure' : 'NULL';
-        $sql = "SELECT l.*, o.name AS owner_org_name, c.contractor_name AS contractor_name, ct.title AS contract_title,
+        // v4.3.78: نام امور بهره‌برداری خط
+        $disJoin = Helpers::districtJoin('l', 'lines');
+        $disSel = Helpers::districtSelect();
+        $sql = "SELECT l.*, o.name AS owner_org_name, c.contractor_name AS contractor_name, ct.title AS contract_title$disSel,
                        (SELECT COUNT(*) FROM towers tt WHERE tt.line_id = l.id AND tt.status = 'active') AS tower_count,
                        $resolvedStructure AS resolved_tower_structure
                 FROM `lines` l
                 LEFT JOIN organization o ON o.id = l.owner_org_id
                 LEFT JOIN contractors c ON c.id = l.contractor_id
                 LEFT JOIN contracts ct ON ct.id = l.contract_id
+                $disJoin
                 WHERE $where
                 ORDER BY l.id DESC
                 LIMIT $pageSize OFFSET $offset";
@@ -156,6 +163,8 @@ function registerLineRoutes(Router $router): void
             'commission_year','line_supervisor','line_expert','owner_org_id','contractor_id','contract_id',
             'geom','status'
         ];
+        // v4.3.78: امور بهره‌برداری خط
+        $lineColumns[] = 'district_id';
 
         // در برابر نسخه‌های قدیمی دیتابیس/کد هم مقاوم باشد: فقط ستون‌هایی که واقعاً در جدول وجود دارند وارد INSERT شوند.
         $schemaRows = $db->fetchAll("SHOW COLUMNS FROM `lines`");
@@ -176,7 +185,12 @@ function registerLineRoutes(Router $router): void
                 $insertValues[] = 'ST_GeomFromText(?)';
                 $params[] = $geomWkt;
             } elseif ($column === 'status') {
-                $insertValues[] = '1';
+                // v4.3.78: طبق سیاست امنیت داده، ثبت جدید پیش‌فرض «غیرفعال» است —
+                // فعال‌سازی از طریق ویرایش گروهی انجام می‌شود
+                $insertValues[] = "'inactive'";
+            } elseif ($column === 'district_id') {
+                $insertValues[] = '?';
+                $params[] = Helpers::districtFromBody($body, 'lines');
             } else {
                 $insertValues[] = '?';
                 $params[] = $body[$column] ?? null;
@@ -238,6 +252,8 @@ function registerLineRoutes(Router $router): void
         $structureLocked = (int)($towerCountRow['cnt'] ?? 0) > 0;
         $lineColumns = [];
         foreach ($db->fetchAll("SHOW COLUMNS FROM `lines`") as $cr) if (isset($cr['Field'])) $lineColumns[(string)$cr['Field']] = true;
+        // v4.3.78: ویرایش امور بهره‌برداری خط — فقط اگر migration اجرا شده باشد
+        if (isset($lineColumns['district_id'])) $allowedFields[] = 'district_id';
         if ($structureLocked) {
             // ساختار خط بعد از ثبت حداقل یک دکل فقط از روی دکل‌ها محاسبه می‌شود.
             unset($body['tower_structure']);
@@ -314,6 +330,8 @@ function registerLineRoutes(Router $router): void
             'owner_org_id', 'contractor_id', 'contract_id', 'status',
             'tower_structure',
         ];
+        // v4.3.78: ویرایش گروهی امور بهره‌برداری خطوط (اگر migration اجرا شده باشد)
+        if (Helpers::columnExists('lines', 'district_id')) $allowedFields[] = 'district_id';
 
         $updates = [];
         $params = [];

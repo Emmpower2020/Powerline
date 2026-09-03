@@ -27,7 +27,7 @@ type Page =
   | "circuits" | "lines" | "towers"
   | "inspections" | "defects" | "work-orders"
   | "contractors" | "contracts" | "equipment" | "personnel" | "price-lists" | "invoices"
-  | "conductors" | "tower-structures" | "tower-type-codes"
+  | "conductors" | "tower-structures" | "tower-type-codes" | "districts"
   | "safety" | "line-incidents"
   | "reports" | "users" | "error-log" | "settings";
 
@@ -38,6 +38,8 @@ const pageInfo: Record<Page, { title: string; subtitle?: string }> = {
   conductors: { title: "انواع سیم‌ها", subtitle: "سیم‌های استاندارد ACSR" },
   "tower-structures": { title: "انواع ساختار دکل", subtitle: "مقادیر مرجع سازه دکل" },
   "tower-type-codes": { title: "انواع کد دکل", subtitle: "کدهای مرجع دکل" },
+  // v4.3.78: امور بهره‌برداری — داده‌های پایه
+  districts: { title: "امور بهره‌برداری", subtitle: "تعریف امورهای مختلف" },
   lines: { title: "خطوط انتقال", subtitle: "مدیریت خطوط" },
   towers: { title: "دکل‌ها", subtitle: "مدیریت دکل‌ها" },
   inspections: { title: "بازدیدها", subtitle: "بازدیدهای فنی" },
@@ -88,6 +90,8 @@ export default function Home() {
       case "conductors": return <ConductorsPage />;
       case "tower-structures": return <TowerReferencePage kind="structures" />;
       case "tower-type-codes": return <TowerReferencePage kind="type-codes" />;
+      // v4.3.78: امور بهره‌برداری — CRUD کامل از طریق ماژول عمومی
+      case "districts": return <GenericModulePage moduleKey="districts" endpoint="/districts" />;
       case "maps": return <MapPage />;
       case "defects": return <DefectsPage />;
       case "inspections": return <InspectionsPage />;

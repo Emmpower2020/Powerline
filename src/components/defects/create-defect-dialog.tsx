@@ -12,6 +12,8 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { SearchableSelect } from "@/components/searchable-select";
 import { ContractSelect } from "@/components/contract-select";
+import { DistrictSelect } from "@/components/district-select";
+import { currentUserDistrictId } from "@/hooks/use-district-options";
 import { FormSection } from "@/components/form-section";
 import { Loader2, Sparkles } from "lucide-react";
 
@@ -46,6 +48,7 @@ export function CreateDefectDialog({ open, onClose, onCreated, editRow, duplicat
     location_desc: "",
     defect_type: "",
     contract_id: "",
+    district_id: "",
   });
 
   const isEdit = !!editRow;
@@ -83,6 +86,8 @@ export function CreateDefectDialog({ open, onClose, onCreated, editRow, duplicat
           location_desc: sourceRow.location_desc || "",
           defect_type: sourceRow.defect_type || (sourceRow as any).category_name || "",
           contract_id: sourceRow.contract_id != null ? String(sourceRow.contract_id) : "",
+          // v4.3.78: امور بهره‌برداری عیب
+          district_id: (sourceRow as any)?.district_id != null ? String((sourceRow as any).district_id) : "",
         });
         setStandardId(sourceRow.defect_definition_id != null ? String(sourceRow.defect_definition_id) : "");
         // v3.3.0: دسته از ردیف مبدأ پر می‌شود (ویرایش/کپی)
@@ -91,7 +96,7 @@ export function CreateDefectDialog({ open, onClose, onCreated, editRow, duplicat
           : null;
         setStandardCategory((sourceRow as any).category_name || srcDef?.category_name || "");
       } else {
-        setForm({ title: "", description: "", severity: "minor", priority: "medium", safety_risk: "none", line_id: "", location_desc: "", defect_type: "" });
+        setForm({ title: "", description: "", severity: "minor", priority: "medium", safety_risk: "none", line_id: "", location_desc: "", defect_type: "", contract_id: "", district_id: currentUserDistrictId() !== null ? String(currentUserDistrictId()) : "" });
         setStandardId("");
         setStandardCategory("");
       }
@@ -158,6 +163,8 @@ export function CreateDefectDialog({ open, onClose, onCreated, editRow, duplicat
         line_id: form.line_id ? Number(form.line_id) : null,
         location_desc: form.location_desc.trim() || null,
         contract_id: form.contract_id ? Number(form.contract_id) : null,
+        // v4.3.78: امور بهره‌برداری عیب
+        district_id: form.district_id ? Number(form.district_id) : null,
       };
       // v3.1.0: شناسه عیب استاندارد در صورت انتخاب
       if (standardId) payload.defect_definition_id = Number(standardId);
@@ -231,6 +238,12 @@ export function CreateDefectDialog({ open, onClose, onCreated, editRow, duplicat
           <div className="space-y-2">
             <Label className="text-right block">قرارداد</Label>
             <ContractSelect value={form.contract_id} onChange={v => setForm({ ...form, contract_id: v })} />
+          </div>
+
+          {/* v4.3.78: امور بهره‌برداری عیب */}
+          <div className="space-y-2">
+            <Label className="text-right block">امور بهره‌برداری</Label>
+            <DistrictSelect value={form.district_id} onChange={v => setForm({ ...form, district_id: v })} />
           </div>
 
           <div className="space-y-2">

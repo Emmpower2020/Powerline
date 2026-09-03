@@ -26,6 +26,8 @@ export const API_ENDPOINTS = {
   circuits: "/circuits",
   // v3.5.0: انواع سیم‌ها
   conductors: "/conductors",
+  // v4.3.78: امور بهره‌برداری — داده‌های پایه
+  districts: "/districts",
   equipment: "/equipment", equipmentClasses: "/equipment-classes",
   priceLists: "/price-lists", priceListItems: "/price-list-items",
   checklistTemplates: "/checklist-templates",

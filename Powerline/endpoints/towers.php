@@ -145,10 +145,15 @@ function registerTowerRoutes(Router $router): void
 
         $total = $db->count('towers t', $where, $params);
 
-        $sql = "SELECT t.*, l.line_code, l.name AS line_name, l.voltage_kv, ct.title AS contract_title
+        // v4.3.78: کاربر اموردار فقط دکل‌های امور خودش را می‌بیند + نام امور
+        $where .= Helpers::districtWhere('t', 'towers', $params);
+        $disJoin = Helpers::districtJoin('t', 'towers');
+        $disSel = Helpers::districtSelect();
+        $sql = "SELECT t.*, l.line_code, l.name AS line_name, l.voltage_kv, ct.title AS contract_title$disSel
                 FROM towers t
                 LEFT JOIN `lines` l ON l.id = t.line_id
                 LEFT JOIN contracts ct ON ct.id = t.contract_id
+                $disJoin
                 WHERE $where
                 ORDER BY t.id DESC
                 LIMIT $pageSize OFFSET $offset";
@@ -254,7 +259,10 @@ function registerTowerRoutes(Router $router): void
         $columns[]='gps_lng'; $values[]='?'; $params[]=$gpsLng;
         $columns[]='geom'; $values[]='ST_GeomFromText(?)'; $params[]=$geomWkt;
         $columns[]='line_supervisor'; $values[]='?'; $params[]=$supervisor;
-        if (isset($dbColumns['status'])) { $columns[]='status'; $values[]='1'; }
+        // v4.3.78: امور بهره‌برداری دکل (اگر migration اجرا شده باشد) —
+        // و وضعیت: طبق سیاست امنیت داده، ثبت جدید پیش‌فرض «غیرفعال» است
+        if (isset($dbColumns['district_id'])) { $columns[]='district_id'; $values[]='?'; $params[]=Helpers::districtFromBody($body, 'towers'); }
+        if (isset($dbColumns['status'])) { $columns[]='status'; $values[]="'inactive'"; }
         if (isset($dbColumns['created_at'])) { $columns[]='created_at'; $values[]='NOW()'; }
         $quotedCols = implode(', ', array_map(fn($c) => "`$c`", $columns));
         $sql = "INSERT INTO towers (" . $quotedCols . ") VALUES (" . implode(', ', $values) . ")";
@@ -301,6 +309,8 @@ function registerTowerRoutes(Router $router): void
             'insulator_count_r2', 'insulator_count_s2', 'insulator_count_t2',
             'line_supervisor', 'contract_id', 'status',
         ];
+        // v4.3.78: ویرایش امور بهره‌برداری دکل (اگر migration اجرا شده باشد)
+        if (Helpers::columnExists('towers', 'district_id')) $allowedFields[] = 'district_id';
 
         $updates = [];
         $params = [];
@@ -387,6 +397,8 @@ function registerTowerRoutes(Router $router): void
             'insulator_r2', 'insulator_s2', 'insulator_t2',
             'line_supervisor', 'contract_id', 'status', 'line_id',
         ];
+        // v4.3.78: ویرایش گروهی امور بهره‌برداری دکل‌ها (اگر migration اجرا شده باشد)
+        if (Helpers::columnExists('towers', 'district_id')) $allowedFields[] = 'district_id';
 
         // line_id باید به خط واقعی اشاره کند (اتصال گروهی دکل‌ها به خط)
         if (array_key_exists('line_id', $patch)) {
