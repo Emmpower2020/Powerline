@@ -65,7 +65,7 @@ export function CreateContractDialog({ open, onClose, onCreated }: { open: boole
   };
 
   return (
-    <Shell open={open} onClose={onClose} boxTitle="اطلاعات قرارداد" title="قرارداد جدید" submitting={submitting} error={error} onSubmit={submit}>
+    <Shell open={open} onClose={onClose} boxTitle="اطلاعات قرارداد" title="ثبت قرارداد جدید" submitting={submitting} error={error} onSubmit={submit}>
       <Field label="کد قرارداد (اجباری)"><Input value={form.contract_code} onChange={e => setForm({ ...form, contract_code: e.target.value })} dir="ltr" className="text-left" /></Field>
       <Field label="عنوان (اجباری)"><Input value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} className="text-right" /></Field>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -104,7 +104,7 @@ export function CreateSafetyDialog({ open, onClose, onCreated }: { open: boolean
   };
 
   return (
-    <Shell open={open} onClose={onClose} boxTitle="اطلاعات حادثه" title="ثبت حادثه ایمنی" submitting={submitting} error={error} onSubmit={submit}>
+    <Shell open={open} onClose={onClose} boxTitle="اطلاعات حادثه" title="ثبت حادثه ایمنی جدید" submitting={submitting} error={error} onSubmit={submit}>
       <Field label="عنوان (اجباری)"><Input value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} className="text-right" /></Field>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <Field label="نوع حادثه"><Select value={form.incident_type} onValueChange={v => setForm({ ...form, incident_type: v })}><SelectTrigger className="w-full"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="accident">حادثه</SelectItem><SelectItem value="near_miss">Near Miss</SelectItem><SelectItem value="unsafe_act">عمل ناایمن</SelectItem></SelectContent></Select></Field>
@@ -272,7 +272,7 @@ export function CreateWorkOrderDialog({ open, onClose, onCreated }: { open: bool
   };
 
   return (
-    <Shell open={open} onClose={onClose} boxTitle="اطلاعات دستورکار" title="دستورکار جدید" submitting={submitting} error={error} onSubmit={submit}>
+    <Shell open={open} onClose={onClose} boxTitle="اطلاعات دستورکار" title="ثبت دستورکار جدید" submitting={submitting} error={error} onSubmit={submit}>
       <Field label="عنوان (اجباری)"><Input value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} className="text-right" /></Field>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <Field label="اولویت"><Select value={form.priority} onValueChange={v => setForm({ ...form, priority: v })}><SelectTrigger className="w-full"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="critical">بحرانی</SelectItem><SelectItem value="high">بالا</SelectItem><SelectItem value="medium">متوسط</SelectItem><SelectItem value="low">پایین</SelectItem></SelectContent></Select></Field>

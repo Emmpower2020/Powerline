@@ -225,8 +225,8 @@ export function CreateTowerDialog({ open, onClose, onCreated, editRow, duplicate
             {isEdit
               ? `ویرایش دکل: ${editRow?.tower_code || ""}`
               : isDuplicate
-                ? `افزودن دکل جدید (کپی از: ${duplicateFrom?.tower_code || ""})`
-                : "افزودن دکل جدید"}
+                ? `کپی دکل جدید (از: ${duplicateFrom?.tower_code || ""})`
+                : "ثبت دکل جدید"}
           </DialogTitle>
         </DialogHeader>
         <form onSubmit={submit} className="space-y-5">
@@ -396,11 +396,11 @@ export function CreateTowerDialog({ open, onClose, onCreated, editRow, duplicate
   );
 }
 
-/** لیبل در ردیف بالا، ورودی در ردیف پایین — همیشه تک‌خطی و مرتب */
+/** v4.3.76: لیبل دقیقاً به سبک فرم «ثبت خط جدید» خطوط */
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div className="space-y-1.5 min-w-0">
-      <Label className="text-right block text-xs text-slate-600 dark:text-slate-300 whitespace-nowrap">{label}</Label>
+    <div className="space-y-2 min-w-0">
+      <Label className="text-right block">{label}</Label>
       {children}
     </div>
   );

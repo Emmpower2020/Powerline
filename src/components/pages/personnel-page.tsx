@@ -401,7 +401,7 @@ function PersonnelDialog({ open, editRow, duplicateFrom, onClose, onSaved }: {
             {editRow
               ? `ویرایش پرسنل: ${editRow.first_name} ${editRow.last_name}`
               : duplicateFrom
-                ? `ثبت پرسنل جدید (کپی از: ${duplicateFrom.first_name} ${duplicateFrom.last_name})`
+                ? `کپی پرسنل جدید (از: ${duplicateFrom.first_name} ${duplicateFrom.last_name})`
                 : "ثبت پرسنل جدید"}
           </DialogTitle>
         </DialogHeader>

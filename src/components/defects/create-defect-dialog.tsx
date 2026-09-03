@@ -188,7 +188,7 @@ export function CreateDefectDialog({ open, onClose, onCreated, editRow, duplicat
             {isEdit
               ? `ویرایش عیب: ${editRow?.defect_code || ""}`
               : isDuplicate
-                ? `ثبت عیب جدید (کپی از: ${duplicateFrom?.defect_code || ""})`
+                ? `کپی عیب جدید (از: ${duplicateFrom?.defect_code || ""})`
                 : "ثبت عیب جدید"}
           </DialogTitle>
         </DialogHeader>

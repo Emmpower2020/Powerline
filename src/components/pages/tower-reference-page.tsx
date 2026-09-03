@@ -39,10 +39,10 @@ export function TowerReferencePage({ kind }: { kind: "structures" | "type-codes"
   return <div className="space-y-3">
     <div className="flex items-center justify-between gap-2"><div><h2 className="text-base font-bold text-slate-800 dark:text-slate-100">{singular}</h2><p className="text-xs text-slate-500">مدیریت مقادیر مرجع مورد استفاده در فرم‌ها</p></div><Button onClick={()=>start()} className="gap-2"><Plus className="w-4 h-4"/>افزودن</Button></div>
     <DataTable data={data} columns={columns} loading={loading} title={singular} searchKeys={kind==="structures"?["name"]:["code","title"]} onAdd={()=>start()} onRefresh={()=>setRefreshKey(k=>k+1)} onEdit={start} onDelete={remove} tableRef={tableRef} layoutKey={`tower-${kind}`} toolbarExtra={(rows)=><GenericBulkActions rows={rows} endpoint={endpoint} entityName={singular} onApplied={()=>setRefreshKey(k=>k+1)} canToggleStatus/>}/>
-    <Dialog open={open} onOpenChange={setOpen}><DialogContent><DialogHeader><DialogTitle className="text-right">{edit?`ویرایش ${singular}`:`افزودن ${singular}`}</DialogTitle></DialogHeader><div className="space-y-4 text-right">
-      <div className="space-y-2"><Label>{kind==="structures"?"نام ساختار":"کد"}</Label><Input value={value} onChange={e=>setValue(e.target.value)} dir="rtl" /></div>
-      {kind==="type-codes"&&<div className="space-y-2"><Label>عنوان</Label><Input value={title} onChange={e=>setTitle(e.target.value)} /></div>}
-      <div className="space-y-2"><Label>ترتیب نمایش</Label><Input type="number" value={sort} onChange={e=>setSort(e.target.value)} dir="ltr" /></div>
+    <Dialog open={open} onOpenChange={setOpen}><DialogContent><DialogHeader><DialogTitle className="text-right">{edit?`ویرایش ${singular}`:`ثبت ${singular} جدید`}</DialogTitle></DialogHeader><div className="space-y-4 text-right">
+      <div className="space-y-2"><Label className="text-right block">{kind==="structures"?"نام ساختار":"کد"}</Label><Input value={value} onChange={e=>setValue(e.target.value)} dir="rtl" /></div>
+      {kind==="type-codes"&&<div className="space-y-2"><Label className="text-right block">عنوان</Label><Input value={title} onChange={e=>setTitle(e.target.value)} /></div>}
+      <div className="space-y-2"><Label className="text-right block">ترتیب نمایش</Label><Input type="number" value={sort} onChange={e=>setSort(e.target.value)} dir="ltr" /></div>
       <div className="flex items-center justify-between border rounded-lg px-3 py-2"><Label>فعال</Label><Switch checked={active} onCheckedChange={setActive}/></div>
     </div><DialogFooter><Button variant="outline" onClick={()=>setOpen(false)}>انصراف</Button><Button onClick={save} disabled={saving}>{saving?<Loader2 className="w-4 h-4 animate-spin"/>:"ذخیره"}</Button></DialogFooter></DialogContent></Dialog>
   </div>

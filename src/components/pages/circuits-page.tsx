@@ -366,7 +366,7 @@ function CircuitDialog({ open, editRow, duplicateFrom, existingCodes, onClose, o
       <DialogContent className="max-w-lg">
         <DialogHeader>
           <DialogTitle className="text-right">
-            {editRow ? `ویرایش مدار: ${editRow.dispatch_code}` : isDuplicate ? `مدار جدید (کپی از: ${duplicateFrom?.dispatch_code})` : "مدار جدید"}
+            {editRow ? `ویرایش مدار: ${editRow.dispatch_code}` : isDuplicate ? `کپی مدار جدید (از: ${duplicateFrom?.dispatch_code})` : "ثبت مدار جدید"}
           </DialogTitle>
         </DialogHeader>
         <form onSubmit={submit} className="space-y-4">

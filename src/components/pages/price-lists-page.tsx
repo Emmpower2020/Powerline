@@ -345,7 +345,7 @@ function CreatePriceListDialog({ open, onClose, onCreated }: { open: boolean; on
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
-          <DialogTitle className="text-right">فهرست بها جدید</DialogTitle>
+          <DialogTitle className="text-right">ثبت فهرست بها جدید</DialogTitle>
         </DialogHeader>
         <form onSubmit={submit} className="space-y-4">
           {error && <div className="bg-red-50 dark:bg-red-950 text-red-600 text-sm p-3 rounded-lg text-right">{error}</div>}
@@ -413,7 +413,7 @@ function CreatePriceListItemDialog({ open, priceListId, onClose, onCreated }: {
       <DialogContent className="max-w-lg">
         <DialogHeader>
           <DialogTitle className="text-right">
-            <span className="flex items-center gap-2"><FileSpreadsheet className="w-5 h-5 text-indigo-600" />قلم جدید فهرست بها</span>
+            <span className="flex items-center gap-2"><FileSpreadsheet className="w-5 h-5 text-indigo-600" />ثبت قلم جدید فهرست بها</span>
           </DialogTitle>
         </DialogHeader>
         <form onSubmit={submit} className="space-y-4">

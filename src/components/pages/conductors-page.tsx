@@ -428,7 +428,7 @@ function ConductorDialog({ open, editRow, duplicateFrom, onClose, onSaved }: {
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-right">
-            {editRow ? `ویرایش سیم: ${conductorDisplayName(editRow.name)}` : isDup ? `سیم جدید (کپی از: ${conductorDisplayName(duplicateFrom?.name)})` : "ثبت سیم جدید"}
+            {editRow ? `ویرایش سیم: ${conductorDisplayName(editRow.name)}` : isDup ? `کپی سیم جدید (از: ${conductorDisplayName(duplicateFrom?.name)})` : "ثبت سیم جدید"}
           </DialogTitle>
         </DialogHeader>
         <form onSubmit={submit} className="space-y-4">

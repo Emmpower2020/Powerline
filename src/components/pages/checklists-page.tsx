@@ -150,7 +150,7 @@ function CreateChecklistDialog({ open, onClose, onCreated }: { open: boolean; on
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
-          <DialogTitle className="text-right">چک‌لیست جدید</DialogTitle>
+          <DialogTitle className="text-right">ثبت چک‌لیست جدید</DialogTitle>
         </DialogHeader>
         <form onSubmit={submit} className="space-y-4">
           {error && <div className="bg-red-50 dark:bg-red-950 text-red-600 text-sm p-3 rounded-lg text-right">{error}</div>}

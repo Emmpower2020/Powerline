@@ -202,8 +202,8 @@ export function CreateLineDialog({ open, onClose, onCreated, editRow, duplicateF
             {isEdit
               ? `ویرایش خط: ${editRow?.name || ""}`
               : isDuplicate
-                ? `افزودن خط جدید (کپی از: ${duplicateFrom?.name || ""})`
-                : "افزودن خط انتقال جدید"}
+                ? `کپی خط جدید (از: ${duplicateFrom?.name || ""})`
+                : "ثبت خط جدید"}
           </DialogTitle>
         </DialogHeader>
         <form onSubmit={submit} className="space-y-5">
