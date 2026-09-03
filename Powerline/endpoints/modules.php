@@ -106,10 +106,17 @@ function registerModuleRoutes(Router $router): void
         if (!$row) {
             Response::error(404, "$label پیدا نشد یا قبلاً حذف شده است");
         }
-        if (in_array($table, ['contracts', 'contractors'], true) && strtolower((string)($row['status'] ?? '')) === 'active') {
+        // v4.3.77: هیچ رکوردِ «فعالی» در هیچ جدولی حذف نمی‌شود (امنیت داده).
+        // مقدار وضعیت بسته به اسکیما varchar ('active'/'inactive' یا مقدار قدیمی 'deactive')
+        // یا tinyint (1/0) است — همه به‌صورت واحد نرمال‌سازی می‌شود.
+        // قرارداد و پیمانکار پیام اختصاصی خود را حفظ می‌کنند (از v4.3.59).
+        $statusActive = in_array(strtolower(trim((string)($row['status'] ?? ''))), ['active', '1', 'true'], true);
+        if ($statusActive) {
             $specific = $table === 'contracts'
                 ? 'قرارداد فعال است و برای جلوگیری از حذف ناخواسته تا زمانی که وضعیت آن را از «فعال» خارج نکنید، حذف نمی‌شود.'
-                : 'پیمانکار فعال است و برای جلوگیری از حذف ناخواسته تا زمانی که وضعیت آن را به «غیرفعال» تغییر ندهید، حذف نمی‌شود.';
+                : $table === 'contractors'
+                    ? 'پیمانکار فعال است و برای جلوگیری از حذف ناخواسته تا زمانی که وضعیت آن را به «غیرفعال» تغییر ندهید، حذف نمی‌شود.'
+                    : "$label فعال است — برای امنیت داده، ابتدا وضعیت آن را به «غیرفعال» تغییر دهید؛ رکوردهای غیرفعال قابل حذف هستند.";
             Response::error(409, "حذف $label انجام نشد.\n\n$specific");
         }
 
@@ -262,8 +269,19 @@ function registerModuleRoutes(Router $router): void
         try{Database::getInstance()->execute("UPDATE tower_structures SET ".implode(',',$fields).",updated_at=NOW() WHERE id=?",$params);}catch(PDOException $e){Response::error(409,'ویرایش ساختار انجام نشد: '.fa_db_error($e));}
         Response::success(null,'ساختار دکل ویرایش شد');
     });
-    $router->delete('tower-structures/{id}', function($id){
-        Auth::authenticate(); Auth::requirePermissionSoft('towers.delete'); Database::getInstance()->execute("DELETE FROM tower_structures WHERE id=?",[(int)$id]); Response::success(null,'ساختار دکل حذف شد');
+    // v4.3.77: مرجعِ «فعال» قابل حذف نیست — ابتدا باید غیرفعال شود (امنیت داده)
+    $towerRefIsActive = function (string $table, int $id) use ($towerRefStatusExpr): bool {
+        $pdo = Database::getInstance()->getConnection();
+        $statusExpr = $towerRefStatusExpr($pdo, $table);
+        $row = Database::getInstance()->fetchOne("SELECT $statusExpr AS st FROM `$table` WHERE id = ?", [$id]);
+        return $row && in_array(strtolower(trim((string)($row['st'] ?? ''))), ['active', '1', 'true'], true);
+    };
+    $router->delete('tower-structures/{id}', function($id) use ($towerRefIsActive){
+        Auth::authenticate(); Auth::requirePermissionSoft('towers.delete');
+        if ($towerRefIsActive('tower_structures', (int)$id)) {
+            Response::error(409, "حذف ساختار دکل انجام نشد.\n\nاین ساختار فعال است — برای امنیت داده، ابتدا کلید «فعال» را خاموش کنید؛ رکوردهای غیرفعال قابل حذف هستند.");
+        }
+        Database::getInstance()->execute("DELETE FROM tower_structures WHERE id=?",[(int)$id]); Response::success(null,'ساختار دکل حذف شد');
     });
 
     $router->get('tower-type-codes', function () use ($towerRefStatusExpr) {
@@ -286,7 +304,13 @@ function registerModuleRoutes(Router $router): void
         if(array_key_exists('status',$b)){list($statusCol,$statusVal)=$towerRefStatusValue($pdo,'tower_type_codes',$b['status']);$fields[]="`$statusCol`=?";$params[]=$statusVal;}
         if(!$fields) Response::error(400,'فیلدی برای ویرایش ارسال نشده'); $params[]=(int)$id; Database::getInstance()->execute("UPDATE tower_type_codes SET ".implode(',',$fields).",updated_at=NOW() WHERE id=?",$params); Response::success(null,'کد نوع دکل ویرایش شد');
     });
-    $router->delete('tower-type-codes/{id}', function($id){ Auth::authenticate(); Auth::requirePermissionSoft('towers.delete'); Database::getInstance()->execute("DELETE FROM tower_type_codes WHERE id=?",[(int)$id]); Response::success(null,'کد نوع دکل حذف شد'); });
+    $router->delete('tower-type-codes/{id}', function($id) use ($towerRefIsActive){
+        Auth::authenticate(); Auth::requirePermissionSoft('towers.delete');
+        // v4.3.77: کد نوعِ «فعال» قابل حذف نیست — ابتدا باید غیرفعال شود
+        if ($towerRefIsActive('tower_type_codes', (int)$id)) {
+            Response::error(409, "حذف کد نوع دکل انجام نشد.\n\nاین کد فعال است — برای امنیت داده، ابتدا کلید «فعال» را خاموش کنید؛ رکوردهای غیرفعال قابل حذف هستند.");
+        }
+        Database::getInstance()->execute("DELETE FROM tower_type_codes WHERE id=?",[(int)$id]); Response::success(null,'کد نوع دکل حذف شد'); });
 
     // ============================================================
     //  Endpoint تجمیعی داده‌های مرجع — v3.5.2
@@ -700,10 +724,20 @@ function registerModuleRoutes(Router $router): void
         if (!is_array($ids) || count($ids) === 0) Response::error(400, 'لیست شناسه‌ها ارسال نشده');
         if (count($ids) > 5000) Response::error(400, 'حداکثر ۵۰۰۰ ردیف در هر درخواست');
         $ids = array_values(array_filter(array_map('intval', $ids), fn($v) => $v > 0));
+        if (empty($ids)) Response::error(400, 'شناسه معتبری برای حذف ارسال نشده');
 
         $pdo = Database::getInstance()->getConnection();
         $idPlaceholders = implode(',', array_fill(0, count($ids), '?'));
         $skipped = 0;
+
+        // v4.3.77: پرسنلِ «فعال» قابل حذف نیست — ابتدا باید از طریق عملیات گروهی/ویرایش «غیرفعال» شود.
+        // مقدار وضعیت در اسکیماهای مختلف active یا 1 است؛ هر دو پوشش داده می‌شوند.
+        $activeStmt = $pdo->prepare("SELECT COUNT(*) FROM personnel WHERE id IN ($idPlaceholders) AND LOWER(TRIM(COALESCE(status, ''))) IN ('active', '1', 'true')");
+        $activeStmt->execute($ids);
+        $activeCount = (int) $activeStmt->fetchColumn();
+        if ($activeCount > 0) {
+            Response::error(409, "حذف انجام نشد.\n\n$activeCount پرسنل انتخاب‌شده وضعیت «فعال» دارد — برای امنیت داده، ابتدا وضعیت را «غیرفعال» کنید؛ رکوردهای غیرفعال قابل حذف هستند.");
+        }
 
         try {
             $pdo->beginTransaction();

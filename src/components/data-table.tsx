@@ -19,6 +19,7 @@ import {
   DropdownMenuTrigger, DropdownMenuSeparator, DropdownMenuLabel,
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
+import { isActiveStatus, statusLabel, STATUS_ACTIVE_LABEL, STATUS_INACTIVE_LABEL } from "@/lib/status";
 import { toJalali } from "@/lib/jalali";
 import { ExportDialog, type ExportOptions, type ExportScope } from "@/components/export-dialog";
 import { PrintDialog, type PrintScope as PrintScopeType } from "@/components/print-dialog";
@@ -303,9 +304,33 @@ function DataTableInner<T extends { id: number }>({
   }, [data]);
 
   const getUniqueValues = (key: string): string[] => {
+    const col = columns.find(c => c.key === key);
+    // v4.3.77: ستون وضعیت (فعال/غیرفعال) — فهرست فیلتر فقط همین دو مقدار فارسی است؛
+    // داده خام ممکن است active/inactive/deactive یا 1/0 باشد ولی نمایش همیشه واحد فارسی است
+    if (col?.type === "status") {
+      const present = new Set<string>();
+      data.forEach(row => { const val = row[key as keyof T]; if (val !== null && val !== undefined && val !== "") present.add(statusLabel(val)); });
+      return [STATUS_ACTIVE_LABEL, STATUS_INACTIVE_LABEL].filter(v => present.has(v));
+    }
+    // v4.3.77: ستون بج — مقدار خام از طریق badgeLabels به لیبل فارسی تبدیل می‌شود
+    if (col?.type === "badge" && col.badgeLabels) {
+      const present = new Set<string>();
+      data.forEach(row => { const val = row[key as keyof T]; if (val !== null && val !== undefined && val !== "") present.add(col.badgeLabels?.[String(val)] || String(val)); });
+      return Array.from(present).sort((a, b) => a.localeCompare(b, "fa"));
+    }
     const values = new Set<string>();
     data.forEach(row => { const val = row[key as keyof T]; if (val !== null && val !== undefined && val !== "") values.add(String(val)); });
     return Array.from(values).sort((a, b) => a.localeCompare(b, "fa"));
+  };
+
+  // v4.3.77: مقدار «نمایشی» سلول برای تطبیق فیلتر — ستون وضعیت با لیبل فارسی،
+  // ستون بج با لیبل بج؛ بقیه ستون‌ها همان مقدار خام
+  const filterDisplayValue = (row: T, key: string): string => {
+    const col = columns.find(c => c.key === key);
+    const val = row[key as keyof T];
+    if (col?.type === "status") return statusLabel(val);
+    if (col?.type === "badge" && col.badgeLabels) return col.badgeLabels?.[String(val ?? "")] || String(val ?? "");
+    return String(val ?? "");
   };
 
   // Get filtered unique values — apply pending search to live-filter the list of values
@@ -328,8 +353,9 @@ function DataTableInner<T extends { id: number }>({
     let result = [...data];
     if (search && searchKeys) { const l = search.toLowerCase(); result = result.filter(row => searchKeys.some(k => String(row[k as keyof T] ?? "").toLowerCase().includes(l))); }
     Object.entries(appliedFilters).forEach(([key, filter]) => {
-      if (filter.search) result = result.filter(row => String(row[key as keyof T] ?? "").toLowerCase().includes(filter.search.toLowerCase()));
-      if (filter.selectedValues.size > 0) result = result.filter(row => filter.selectedValues.has(String(row[key as keyof T] ?? "")));
+      // v4.3.77: تطبیق با مقدار «نمایشی» — وضعیت با لیبل فارسی فعال/غیرفعال، بج با لیبل بج
+      if (filter.search) result = result.filter(row => filterDisplayValue(row, key).toLowerCase().includes(filter.search.toLowerCase()));
+      if (filter.selectedValues.size > 0) result = result.filter(row => filter.selectedValues.has(filterDisplayValue(row, key)));
     });
     const compareBySort = (a: T, b: T, key: string, direction: "asc" | "desc", order?: Array<string | number>) => {
       const av = a[key as keyof T];
@@ -613,8 +639,24 @@ function DataTableInner<T extends { id: number }>({
     }
   };
 
+  // v4.3.77: قانون امنیتی حذف — تا زمانی که وضعیت ردیف «فعال» است حذف مجاز نیست.
+  // جداولی که ستون نوع status دارند (خطوط، دکل‌ها، پیمانکار، پرسنل، تجهیزات، چک‌لیست،
+  // فهرست بها، مراجع دکل و...) مشمول این قاعده‌اند؛ جداول بدون ستون فعال/غیرفعال عادی حذف می‌شوند.
+  const statusColumn = columns.find(c => c.type === "status");
+
   const handleDelete = () => {
     const sel = filtered.filter(r => selectedRows.has(r.id));
+    if (statusColumn && onDelete) {
+      const activeRows = sel.filter(r => isActiveStatus(r[statusColumn.key as keyof T]));
+      if (activeRows.length > 0) {
+        toast({
+          title: "حذف مجاز نیست",
+          description: `${activeRows.length.toLocaleString("fa-IR")} ردیف انتخاب‌شده وضعیت «فعال» دارد — برای امنیت داده، ابتدا وضعیت را «غیرفعال» کنید؛ ردیف‌های غیرفعال قابل حذف هستند.`,
+          variant: "destructive",
+        });
+        return;
+      }
+    }
     if (onDelete) onDelete(sel);
   };
 
@@ -624,7 +666,7 @@ function DataTableInner<T extends { id: number }>({
     if (value === null || value === undefined) return <span className="text-slate-300">—</span>;
     if (col.type === "badge") { const v = String(value); return <Badge className={col.badgeColors?.[v] || "bg-slate-100 text-slate-700"} variant="secondary">{col.badgeLabels?.[v] || v}</Badge>; }
     if (col.type === "boolean") return value ? <Badge className="bg-green-100 text-green-700">بله</Badge> : <Badge className="bg-slate-100 text-slate-500">خیر</Badge>;
-    if (col.type === "status") return String(value) === "active" ? <Badge className="bg-green-100 text-green-700">فعال</Badge> : <Badge className="bg-red-100 text-red-700">غیرفعال</Badge>;
+    if (col.type === "status") return isActiveStatus(value) ? <Badge className="bg-green-100 text-green-700">فعال</Badge> : <Badge className="bg-red-100 text-red-700">غیرفعال</Badge>;
     if (col.type === "date") {
       try { return toJalali(String(value)); } catch { return String(value); }
     }

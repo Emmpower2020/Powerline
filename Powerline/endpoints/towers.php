@@ -454,9 +454,14 @@ function registerTowerRoutes(Router $router): void
         $pdo = $db->getConnection();
         $towerId = (int) $id;
 
-        $existing = $db->fetchOne("SELECT id, line_id FROM towers WHERE id = ?", [$towerId]);
+        $existing = $db->fetchOne("SELECT id, line_id, status FROM towers WHERE id = ?", [$towerId]);
         if (!$existing) {
             Response::error(404, 'دکل پیدا نشد');
+        }
+
+        // v4.3.77: دکلِ «فعال» قابل حذف نیست — ابتدا باید «غیرفعال» شود (امنیت داده)
+        if (in_array(strtolower(trim((string)($existing['status'] ?? ''))), ['active', '1', 'true'], true)) {
+            Response::error(409, "حذف دکل انجام نشد.\n\nدکل فعال است — برای امنیت داده، ابتدا وضعیت آن را به «غیرفعال» تغییر دهید؛ رکوردهای غیرفعال قابل حذف هستند.");
         }
 
         try {
@@ -501,10 +506,20 @@ function registerTowerRoutes(Router $router): void
         }
 
         $ids = array_values(array_filter(array_map('intval', $ids), fn($v) => $v > 0));
+        if (empty($ids)) Response::error(400, 'شناسه معتبری برای حذف ارسال نشده');
 
         $db = Database::getInstance();
         $pdo = $db->getConnection();
         $idPlaceholders = implode(',', array_fill(0, count($ids), '?'));
+
+        // v4.3.77: دکلِ «فعال» قابل حذف نیست — برای امنیت داده، ابتدا باید «غیرفعال» شود.
+        // مقدار وضعیت دکل‌ها بسته به داده 'active' یا '1' است؛ هر دو پوشش داده می‌شوند.
+        $activeStmt = $pdo->prepare("SELECT COUNT(*) FROM towers WHERE id IN ($idPlaceholders) AND LOWER(TRIM(COALESCE(status, ''))) IN ('active', '1', 'true')");
+        $activeStmt->execute($ids);
+        $activeCount = (int) $activeStmt->fetchColumn();
+        if ($activeCount > 0) {
+            Response::error(409, "حذف انجام نشد.\n\n$activeCount دکل انتخاب‌شده وضعیت «فعال» دارد — برای امنیت داده، ابتدا وضعیت را «غیرفعال» کنید؛ رکوردهای غیرفعال قابل حذف هستند.");
+        }
 
         try {
             $pdo->beginTransaction();

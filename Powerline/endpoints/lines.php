@@ -489,16 +489,25 @@ function registerLineRoutes(Router $router): void
 
         // فقط اعداد صحیح معتبر
         $ids = array_values(array_filter(array_map('intval', $ids), fn($v) => $v > 0));
+        if (empty($ids)) Response::error(400, 'شناسه معتبری برای حذف ارسال نشده');
 
         $db = Database::getInstance();
         $pdo = $db->getConnection();
+
+        // v4.3.77: خطِ «فعال» قابل حذف نیست — برای امنیت داده، ابتدا باید «غیرفعال» شود.
+        // مقدار وضعیت در اسکیماهای مختلف 'active' یا '1' است؛ هر دو پوشش داده می‌شوند.
+        $idPlaceholders = implode(',', array_fill(0, count($ids), '?'));
+        $activeStmt = $pdo->prepare("SELECT COUNT(*) FROM `lines` WHERE id IN ($idPlaceholders) AND LOWER(TRIM(COALESCE(status, ''))) IN ('active', '1', 'true')");
+        $activeStmt->execute($ids);
+        $activeCount = (int) $activeStmt->fetchColumn();
+        if ($activeCount > 0) {
+            Response::error(409, "حذف انجام نشد.\n\n$activeCount خط انتخاب‌شده وضعیت «فعال» دارد — برای امنیت داده، ابتدا وضعیت را «غیرفعال» کنید؛ رکوردهای غیرفعال قابل حذف هستند.");
+        }
 
         try {
             $pdo->beginTransaction();
 
             // دکل‌های این خطوط حذف، ارجاع سایر جداول null می‌شود (مطابق حذف تکی)
-            $idPlaceholders = implode(',', array_fill(0, count($ids), '?'));
-
             $pdo->prepare("DELETE FROM towers WHERE line_id IN ($idPlaceholders)")->execute($ids);
 
             foreach (['defects', 'inspections', 'work_orders', 'safety_incidents', 'circuits', 'equipment'] as $tbl) {
