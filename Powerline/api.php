@@ -99,4 +99,13 @@ Logger::info('API request', [
     'uri'    => $_SERVER['REQUEST_URI'] ?? '',
 ]);
 
+// v4.3.82: گارد مرکزی دسترسی ابزارها — قبل از dispatch همهٔ نوشتن‌ها
+// (POST/PUT/DELETE) بر اساس ماتریس «کاربران ← دسترسی‌ها» کنترل می‌شوند.
+// مدیر سیستم همیشه مجاز است؛ نقشهٔ null یعنی فقط‌خواننده.
+Helpers::guardModuleWrite(
+    $_SERVER['REQUEST_METHOD'] ?? 'GET',
+    $_SERVER['REQUEST_URI'] ?? '/',
+    $_SERVER['SCRIPT_NAME'] ?? ''
+);
+
 $router->dispatch();

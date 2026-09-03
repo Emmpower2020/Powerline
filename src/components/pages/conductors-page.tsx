@@ -283,6 +283,7 @@ export function ConductorsPage() {
       </div>
 
       <DataTable
+        accessKey="conductors"
         data={data}
         columns={columns}
         loading={loading}

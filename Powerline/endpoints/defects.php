@@ -516,7 +516,7 @@ function registerDefectRoutes(Router $router): void
         Response::paginated($data, $page, $pageSize, $total);
     });
 
-    // v4.3.78: ویرایش کاربر — امور بهره‌برداری و وضعیت فعال/غیرفعال
+    // v4.3.78: ویرایش کاربر — امور بهره‌برداری، وضعیت، مشخصات، رمز و ماتریس دسترسی
     // کاربرِ بدون امور (NULL) همهٔ داده‌ها را می‌بیند؛ برای محدود کردن، امور اختصاص دهید
     $router->put('users/{id}', function ($id) {
         Auth::authenticate();
@@ -524,9 +524,24 @@ function registerDefectRoutes(Router $router): void
         $body = Helpers::getJsonBody();
         $pdo = Database::getInstance()->getConnection();
 
-        $existing = $pdo->prepare('SELECT id, status FROM users WHERE id = ?');
+        $existing = $pdo->prepare('SELECT id, username, status, district_id FROM users WHERE id = ?');
         $existing->execute([(int) $id]);
-        if (!$existing->fetch()) Response::error(404, 'کاربر پیدا نشد');
+        $current = $existing->fetch();
+        if (!$current) Response::error(404, 'کاربر پیدا نشد');
+        $selfId = (int) (Auth::getCurrentUserId() ?? 0);
+
+        // v4.3.82: محافظ حساب خود کاربر — مدیر نمی‌تواند ناخواسته دسترسی مدیر خود را ببندد
+        if ((int) $id === $selfId) {
+            if (array_key_exists('district_id', $body) && $body['district_id'] !== null && (int) $body['district_id'] > 0) {
+                Response::error(403, 'امور بهره‌برداری حساب خودتان قابل محدودکردن نیست — دسترسی مدیر سیستم از بین می‌رود');
+            }
+            if (array_key_exists('status', $body) && in_array((string) $body['status'], ['inactive', '0'], true)) {
+                Response::error(403, 'حساب کاربری خودتان را نمی‌توانید غیرفعال کنید');
+            }
+            if (array_key_exists('module_permissions', $body) && $body['module_permissions'] !== null) {
+                Response::error(403, 'ماتریس دسترسی حساب مدیر خودتان قابل تغییر نیست');
+            }
+        }
 
         $updates = []; $params = [];
         if (array_key_exists('district_id', $body) && Helpers::columnExists('users', 'district_id')) {
@@ -547,16 +562,36 @@ function registerDefectRoutes(Router $router): void
             $updates[] = '`email` = ?';
             $params[] = trim((string) $body['email']) === '' ? null : trim((string) $body['email']);
         }
-        // v4.3.81: ماتریس دسترسی ماژول‌ها — نقشهٔ {کلید ماژول: boolean} به JSON ذخیره می‌شود؛
-        // null یعنی همهٔ بخش‌ها مجاز (ریست دسترسی‌ها)
+        // v4.3.82: تغییر رمز عبور — با bcrypt، حداقل ۴ کاراکتر
+        if (array_key_exists('password', $body)) {
+            $pw = (string) $body['password'];
+            if ($pw !== '') {
+                if (strlen($pw) < 4) Response::error(400, 'رمز عبور باید حداقل ۴ کاراکتر باشد');
+                $updates[] = '`password_hash` = ?';
+                $params[] = password_hash($pw, PASSWORD_BCRYPT);
+            }
+        }
+        // v4.3.81/82: ماتریس دسترسی — مقدار هر ماژول true | false | {view,create,edit,delete,import,export}
         if (array_key_exists('module_permissions', $body) && Helpers::columnExists('users', 'module_permissions')) {
             $mp = $body['module_permissions'];
             if ($mp === null) {
                 $updates[] = '`module_permissions` = NULL';
             } elseif (is_array($mp)) {
                 $clean = [];
+                $allowedTools = ['view', 'create', 'edit', 'delete', 'import', 'export'];
                 foreach ($mp as $k => $v) {
-                    if (is_string($k) && $k !== '' && $k !== 'id') $clean[$k] = ($v === true);
+                    if (!is_string($k) || $k === '' || $k === 'id') continue;
+                    if ($v === true) { $clean[$k] = true; continue; }
+                    if (is_array($v)) {
+                        if (($v['view'] ?? true) === false) { $clean[$k] = false; continue; }
+                        $tools = ['view' => true];
+                        foreach ($allowedTools as $t) {
+                            if ($t !== 'view' && !empty($v[$t])) $tools[$t] = true;
+                        }
+                        $clean[$k] = $tools;
+                    } else {
+                        $clean[$k] = false;
+                    }
                 }
                 $updates[] = '`module_permissions` = ?';
                 $params[] = json_encode($clean, JSON_UNESCAPED_UNICODE);
@@ -567,6 +602,120 @@ function registerDefectRoutes(Router $router): void
         $params[] = (int) $id;
         $pdo->prepare('UPDATE users SET ' . implode(', ', $updates) . ' WHERE id = ?')->execute($params);
         Response::success(null, 'کاربر ویرایش شد');
+    });
+
+    // v4.3.82: ایجاد کاربر جدید — از تب «اطلاعات کاربران»
+    // رمز پیش‌فرض 123456، نقش بر اساس امور (کاربر امور / مدیر سیستم)
+    $router->post('users', function () {
+        Auth::authenticate();
+        Auth::requireRole('super_admin');
+        $b = Helpers::getJsonBody();
+        $pdo = Database::getInstance()->getConnection();
+
+        $username = trim((string) ($b['username'] ?? ''));
+        $fullName = trim((string) ($b['full_name'] ?? ''));
+        $password = (string) ($b['password'] ?? '');
+        if ($username === '') Response::error(400, 'نام کاربری الزامی است');
+        if ($fullName === '') Response::error(400, 'نام و نام خانوادگی الزامی است');
+        if (strlen($password) < 4) $password = '123456';
+
+        $dup = $pdo->prepare('SELECT id FROM users WHERE username = ?');
+        $dup->execute([$username]);
+        if ($dup->fetch()) Response::error(409, 'این نام کاربری قبلاً ثبت شده است');
+
+        $districtId = null;
+        if (array_key_exists('district_id', $b) && $b['district_id'] !== null && (int) $b['district_id'] > 0) {
+            if (Helpers::districtsReady() && Helpers::columnExists('users', 'district_id')) {
+                $districtId = (int) $b['district_id'];
+            }
+        }
+
+        $status = in_array((string) ($b['status'] ?? 'active'), ['inactive', '0'], true) ? 'inactive' : 'active';
+
+        // ماتریس دسترسی اولیه (اختیاری)
+        $mpJson = null;
+        if (isset($b['module_permissions']) && is_array($b['module_permissions']) && Helpers::columnExists('users', 'module_permissions')) {
+            $clean = [];
+            $allowedTools = ['view', 'create', 'edit', 'delete', 'import', 'export'];
+            foreach ($b['module_permissions'] as $k => $v) {
+                if (!is_string($k) || $k === '' || $k === 'id') continue;
+                if ($v === true) { $clean[$k] = true; continue; }
+                if (is_array($v)) {
+                    if (($v['view'] ?? true) === false) { $clean[$k] = false; continue; }
+                    $tools = ['view' => true];
+                    foreach ($allowedTools as $t) {
+                        if ($t !== 'view' && !empty($v[$t])) $tools[$t] = true;
+                    }
+                    $clean[$k] = $tools;
+                } else {
+                    $clean[$k] = false;
+                }
+            }
+            $mpJson = json_encode($clean, JSON_UNESCAPED_UNICODE);
+        }
+
+        $cols = ['username', 'full_name', 'password_hash', 'status'];
+        $vals = [$username, $fullName, password_hash($password, PASSWORD_BCRYPT), $status];
+        if (Helpers::columnExists('users', 'email')) {
+            $email = trim((string) ($b['email'] ?? ''));
+            $cols[] = 'email';
+            $vals[] = $email === '' ? null : $email;
+        }
+        if ($districtId !== null) { $cols[] = 'district_id'; $vals[] = $districtId; }
+        if ($mpJson !== null) { $cols[] = 'module_permissions'; $vals[] = $mpJson; }
+
+        $sql = 'INSERT INTO users (`' . implode('`, `', $cols) . '`, created_at) VALUES (' . implode(', ', array_fill(0, count($cols), '?')) . ', NOW())';
+        $pdo->prepare($sql)->execute($vals);
+        $newId = (int) $pdo->lastInsertId();
+
+        // تخصیص نقش — کاربر اموردار: district_user، بدون امور: super_admin
+        try {
+            $roleName = $districtId !== null ? 'district_user' : 'super_admin';
+            $role = $pdo->prepare('SELECT id FROM roles WHERE name = ? LIMIT 1');
+            $role->execute([$roleName]);
+            $roleId = $role->fetchColumn();
+            if ($roleId) {
+                $pdo->prepare('INSERT IGNORE INTO user_roles (user_id, role_id, assigned_at) VALUES (?, ?, NOW())')->execute([$newId, (int) $roleId]);
+            }
+        } catch (Throwable $e) { /* نقش تخصیص نشد — کاربر همچنان با محدودیت امور/ماتریس کار می‌کند */ }
+
+        Response::success(['id' => $newId], 'کاربر ایجاد شد' . ($password === '123456' ? ' — رمز پیش‌فرض 123456' : ''), 201);
+    });
+
+    // v4.3.82: حذف کاربر — با محافظ خود و آخرین مدیر سیستم
+    $router->delete('users/{id}', function ($id) {
+        Auth::authenticate();
+        Auth::requireRole('super_admin');
+        $pdo = Database::getInstance()->getConnection();
+
+        $selfId = (int) (Auth::getCurrentUserId() ?? 0);
+        if ((int) $id === $selfId) Response::error(403, 'حساب کاربری خودتان قابل حذف نیست');
+
+        $stmt = $pdo->prepare('SELECT id, username, district_id FROM users WHERE id = ?');
+        $stmt->execute([(int) $id]);
+        $user = $stmt->fetch();
+        if (!$user) Response::error(404, 'کاربر پیدا نشد');
+
+        // آخرین مدیر سیستم حذف نمی‌شود
+        if ($user['district_id'] === null) {
+            $superCount = $pdo->query(
+                "SELECT COUNT(DISTINCT u.id) FROM users u
+                 JOIN user_roles ur ON ur.user_id = u.id
+                 JOIN roles r ON r.id = ur.role_id
+                 WHERE r.name = 'super_admin'"
+            )->fetchColumn();
+            if ((int) $superCount <= 1) Response::error(403, 'آخرین مدیر سیستم حذف نمی‌شود — ابتدا مدیر دیگری بسازید');
+        }
+
+        // قطع اتصال پرسنل به این حساب (رکورد پرسنل باقی می‌ماند)
+        if (Helpers::columnExists('personnel', 'user_id')) {
+            try { $pdo->prepare('UPDATE personnel SET user_id = NULL WHERE user_id = ?')->execute([(int) $id]); } catch (Throwable $e) { /* بدون ستون user_id */ }
+        }
+        // پاک‌سازی نقش‌ها
+        try { $pdo->prepare('DELETE FROM user_roles WHERE user_id = ?')->execute([(int) $id]); } catch (Throwable $e) { /* بدون جدول */ }
+
+        $pdo->prepare('DELETE FROM users WHERE id = ?')->execute([(int) $id]);
+        Response::success(null, 'کاربر حذف شد');
     });
 }
 

@@ -115,6 +115,7 @@ export function ErrorLogPage() {
         </Card>
       ) : (
         <DataTable
+          accessKey="error-log"
           key={refreshKey}
           data={rows}
           columns={columns}

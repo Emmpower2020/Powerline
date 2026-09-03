@@ -344,8 +344,10 @@ function EditorDialog({
   </Dialog>;
 }
 
-export function GenericModulePage({ moduleKey, endpoint }: { moduleKey: string; endpoint: string }) {
+export function GenericModulePage({ moduleKey, endpoint, accessKey }: { moduleKey: string; endpoint: string; accessKey?: string }) {
   const config = configs[moduleKey];
+  // v4.3.82: کلید ماتریس دسترسی — ماژول حوادث ایمنی endpoint مشترک دارد و کلید دسترسی «safety» است
+  const permKey = accessKey ?? (moduleKey === "safety-incidents" ? "safety" : moduleKey);
   const [data, setData] = useState<GenericItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -460,7 +462,7 @@ export function GenericModulePage({ moduleKey, endpoint }: { moduleKey: string; 
   const openCreateEditor = () => setEditor({ open: true, mode: "create", row: null });
 
   return <div className="space-y-4">
-    <DataTable data={data} columns={config.columns} loading={loading}
+    <DataTable data={data} columns={config.columns} loading={loading} accessKey={permKey}
       searchKeys={config.columns.map(c => c.key)} title={config.title}
       layoutKey={moduleKey}
       onAdd={selectedKeys.length ? openCreateEditor : undefined}

@@ -30,7 +30,7 @@ function registerModuleRoutes(Router $router): void
     // v4.3.70: نمایش نسخه بک‌اند برای اطمینان از آپلود درست فایل‌ها
     // (بدون نیاز به لاگین — فقط شماره نسخه برمی‌گرداند)
     $router->get('backend-version', function () {
-        Response::success(['version' => 'v4.3.70', 'component' => 'Powerline PHP Backend'], 'نسخه بک‌اند');
+        Response::success(['version' => 'v4.3.82', 'component' => 'Powerline PHP Backend'], 'نسخه بک‌اند');
     });
 
 

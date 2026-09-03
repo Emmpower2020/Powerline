@@ -419,6 +419,7 @@ export function LinesPage() {
       )}
 
       <DataTable
+        accessKey="lines"
         data={filteredData}
         columns={columns}
         loading={loading}

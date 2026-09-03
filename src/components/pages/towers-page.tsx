@@ -447,6 +447,7 @@ export function TowersPage() {
       )}
 
       <DataTable
+        accessKey="towers"
         data={filteredData}
         columns={columns}
         loading={loading}

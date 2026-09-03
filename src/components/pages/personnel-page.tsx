@@ -217,6 +217,7 @@ export function PersonnelPage() {
       {showStats && <PersonnelStatsBar total={data.length} byType={byType} />}
 
       <DataTable
+        accessKey="personnel"
         data={data}
         columns={columns}
         loading={loading}

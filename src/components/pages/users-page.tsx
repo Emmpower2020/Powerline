@@ -1,293 +1,545 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { apiClient } from "@/lib/api-client";
 import { API_ENDPOINTS } from "@/lib/api-config";
-import { Card, CardContent } from "@/components/ui/card";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
+import { putUser, postUser, deleteUser } from "@/lib/users-api";
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { DistrictSelect } from "@/components/district-select";
-import { Loader2, Search, Pencil, ShieldCheck } from "lucide-react";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
+import {
+  Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle,
+} from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Checkbox } from "@/components/ui/checkbox";
-import { MODULE_ACCESS } from "@/lib/module-access";
+import { DistrictSelect } from "@/components/district-select";
+import { DataTable, type DataTableColumn, type DataTableHandle } from "@/components/data-table";
+import { ImportExcelDialog } from "@/components/import-excel-dialog";
+import { BulkDeleteDialog } from "@/components/bulk-delete-dialog";
+import { FormSection } from "@/components/form-section";
+import { useDistrictOptions } from "@/hooks/use-district-options";
+import { useAuth } from "@/lib/auth-context";
 import { useToast } from "@/hooks/use-toast";
-import type { PaginatedResponse } from "@/lib/types";
-
-interface UserList {
-  id: number;
-  username: string;
-  full_name: string;
-  email: string | null;
-  status: string;
-  roles: string | null;
-  district_id?: number | null;
-  district_name?: string | null;
-  // v4.3.81: نقشهٔ دسترسی ماژول‌ها — null یعنی همه مجاز
-  module_permissions?: Record<string, boolean> | null;
-  last_login_at: string | null;
-}
+import { toJalali } from "@/lib/jalali";
+import { compactPermissions, presetRows } from "@/lib/module-access";
+import { Loader2, Users as UsersIcon, ShieldCheck } from "lucide-react";
+import { PermissionsDialog, type UserRow } from "@/components/users/permissions-dialog";
+import { UsersStatusActions, PermissionsBulkActions, AccessSummaryCell } from "@/components/users/users-bulk-actions";
 
 /**
- * صفحه کاربران — v4.3.78: نمایش/ویرایش امور و وضعیت کاربران.
- * v4.3.81: تب جدید «دسترسی‌های بخش‌ها» — ماتریس کاربر × ماژول با تیک:
- *   • مدیر سیستم (بدون امور) همیشه دسترسی کامل دارد (ردیف قفل)
- *   • تیک خاموش = آن بخش از منوی کاربر حذف می‌شود
- *   • کاربران تازه (بدون نقشه) پیش‌فرض همهٔ بخش‌ها را می‌بینند
- * کاربران آزمایشی پرسنل پیمانکار با نام کاربری «کد ملی» از SQL نسخه ساخته می‌شوند.
+ * صفحه کاربران — v4.3.82: بازطراحی کامل با همان الگوی جدول‌های برنامه.
+ *
+ * تب «کاربران»: جدول هم‌شکل خطوط/پرسنل + نوار ابزار کامل (افزودن/ویرایش/کپی/حذف/
+ * ایمپورت اکسل/اکسپورت/چاپ/جستجو/فیلتر/چیدمان ستون) + عملیات گروهی وضعیت و ریست رمز.
+ *
+ * تب «دسترسی‌ها»: جدول انتخاب‌پذیر کاربران + منوی عملیات گروهی (ویرایش گروهی ماتریس،
+ * کپی دسترسی از کاربر، پیش‌تنظیم کامل/فقط‌مشاهده/هیچ) + ماتریس ریز ابزار هر بخش.
+ * مدیر سیستم (بدون امور) ردیف قفل با دسترسی کامل است.
  */
 export function UsersPage() {
   const { toast } = useToast();
-  const [users, setUsers] = useState<UserList[]>([]);
+  const { user: me } = useAuth();
+  const [users, setUsers] = useState<UserRow[]>([]);
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState("");
-  const [editing, setEditing] = useState<UserList | null>(null);
-  const [saving, setSaving] = useState(false);
-  const [editDistrict, setEditDistrict] = useState("");
-  const [editStatus, setEditStatus] = useState("active");
-  const [error, setError] = useState<string | null>(null);
-  // v4.3.81: ذخیرهٔ ماتریس — کاربری که در حال ذخیره است (تیک‌های همان ردیف قفل می‌شوند)
-  const [savingUserId, setSavingUserId] = useState<number | null>(null);
+  const [refreshKey, setRefreshKey] = useState(0);
 
-  const load = async () => {
+  // ─── تب کاربران: فرم/حذف/ایمپورت ───
+  const [showCreate, setShowCreate] = useState(false);
+  const [editRow, setEditRow] = useState<UserRow | null>(null);
+  const [duplicateFrom, setDuplicateFrom] = useState<UserRow | null>(null);
+  const [showImport, setShowImport] = useState(false);
+
+  // حذف انبوه — DELETE زنجیره‌ای با پروگرس
+  const [pendingDelete, setPendingDelete] = useState<UserRow[] | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteProgress, setDeleteProgress] = useState<{ done: number; total: number } | null>(null);
+
+  // ─── تب دسترسی‌ها ───
+  const [permTargets, setPermTargets] = useState<UserRow[] | null>(null);
+  const [permSource, setPermSource] = useState<UserRow | null>(null);
+
+  const tableRef = useRef<DataTableHandle | null>(null);
+  const accessTableRef = useRef<DataTableHandle | null>(null);
+
+  const { rows: districtRows } = useDistrictOptions();
+
+  const load = useCallback(async () => {
+    setLoading(true);
     try {
-      const result = await apiClient.get<PaginatedResponse<UserList>>(API_ENDPOINTS.users, { page: 1, page_size: 200, search: search || undefined });
-      setUsers(result?.data || []);
-    } catch (err) { console.error("خطا:", err); } finally { setLoading(false); }
-  };
+      const result = await apiClient.get<any>(API_ENDPOINTS.users, { page: 1, page_size: 500 });
+      setUsers(Array.isArray(result) ? result : (result?.data || []));
+    } catch (err: any) {
+      toast({
+        title: "خطا در دریافت کاربران",
+        description: err?.message || "خطای نامشخص",
+        variant: "destructive",
+      });
+    } finally { setLoading(false); }
+  }, [toast]);
 
   useEffect(() => {
     const d = setTimeout(load, 300);
     return () => clearTimeout(d);
-  }, [search]);
+  }, [load, refreshKey]);
 
-  // v4.3.78: باز کردن فرم ویرایش امور/وضعیت کاربر
-  const openEdit = (user: UserList) => {
-    setEditing(user);
-    setEditDistrict(user.district_id != null ? String(user.district_id) : "");
-    setEditStatus(user.status === "inactive" ? "inactive" : "active");
-    setError(null);
+  // ─── ستون‌های تب کاربران ───
+  const columns: DataTableColumn<UserRow>[] = [
+    {
+      key: "username", header: "نام کاربری", sortable: true, filterable: true, align: "right",
+      render: (u) => <span dir="ltr" className="font-medium text-slate-700 dark:text-slate-200">{u.username}</span>,
+    },
+    { key: "full_name", header: "نام و نام خانوادگی", sortable: true, filterable: true, align: "right" },
+    { key: "roles", header: "نقش", filterable: true, align: "right", render: (u) => u.roles ? <Badge variant="outline" className="text-[11px]">{u.roles}</Badge> : <span className="text-slate-300">—</span> },
+    {
+      key: "district_name", header: "امور بهره‌برداری", sortable: true, filterable: true, align: "right",
+      render: (u) => u.district_id != null
+        ? <Badge variant="outline" className="text-[11px] border-indigo-200 text-indigo-700 dark:text-indigo-300">{u.district_name || `امور ${u.district_id}`}</Badge>
+        : <Badge variant="outline" className="text-[11px] border-slate-200 text-slate-400">همهٔ امور (مدیر)</Badge>,
+    },
+    { key: "email", header: "ایمیل", align: "right", render: (u) => u.email ? <span dir="ltr" className="text-xs text-slate-500">{u.email}</span> : <span className="text-slate-300">—</span> },
+    { key: "status", header: "وضعیت", type: "status", align: "right" },
+    {
+      key: "last_login_at", header: "آخرین ورود", align: "right",
+      render: (u) => u.last_login_at
+        ? <span className="text-xs text-slate-500 nums-fa" title={u.last_login_at}>{toJalali(String(u.last_login_at))}</span>
+        : <span className="text-slate-300">—</span>,
+    },
+  ];
+
+  // ─── ستون‌های تب دسترسی‌ها ───
+  const accessColumns: DataTableColumn<UserRow>[] = [
+    {
+      key: "full_name", header: "کاربر", sortable: true, filterable: true, align: "right",
+      render: (u) => (
+        <div className="flex flex-col">
+          <span className="font-medium text-slate-700 dark:text-slate-100 text-right">{u.full_name}</span>
+          <span className="text-[10px] text-slate-400 text-right" dir="ltr">@{u.username}</span>
+        </div>
+      ),
+    },
+    {
+      key: "district_name", header: "امور بهره‌برداری", sortable: true, filterable: true, align: "right",
+      render: (u) => u.district_id != null
+        ? <Badge variant="outline" className="text-[11px] border-indigo-200 text-indigo-700 dark:text-indigo-300">{u.district_name || `امور ${u.district_id}`}</Badge>
+        : <Badge variant="outline" className="text-[11px] border-slate-200 text-slate-400">مدیر سیستم</Badge>,
+    },
+    {
+      key: "status", header: "وضعیت", type: "status", align: "right",
+    },
+    { key: "access", header: "دسترسی‌ها", align: "right", render: (u) => <AccessSummaryCell user={u} /> },
+  ];
+
+  // ─── حذف زنجیره‌ای ───
+  const confirmDelete = async () => {
+    if (!pendingDelete) return;
+    setDeleting(true);
+    const prog = { done: 0, total: pendingDelete.length };
+    setDeleteProgress({ ...prog });
+    let failed = 0;
+    let firstError: string | null = null;
+    for (const user of pendingDelete) {
+      try {
+        await deleteUser(user.id);
+      } catch (err) {
+        failed++;
+        firstError ??= err instanceof Error ? err.message : "خطای نامشخص";
+      }
+      prog.done++;
+      setDeleteProgress({ ...prog });
+    }
+    setDeleting(false);
+    setDeleteProgress(null);
+    setPendingDelete(null);
+    toast({
+      title: failed ? "حذف ناقص ماند" : "کاربران حذف شدند",
+      description: failed
+        ? `${failed.toLocaleString("fa-IR")} کاربر حذف نشد — ${firstError ?? ""}`
+        : `${prog.total.toLocaleString("fa-IR")} کاربر حذف شد`,
+      variant: failed ? "destructive" : undefined,
+    });
+    setRefreshKey(k => k + 1);
   };
 
-  // ذخیره ویرایش — PUT /users/{id} (فقط مدیر ارشد)
-  const saveEdit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!editing) return;
-    setSaving(true); setError(null);
-    try {
-      await apiClient.put(`${API_ENDPOINTS.users}/${editing.id}`, {
-        district_id: editDistrict ? Number(editDistrict) : null,
-        status: editStatus,
-      });
-      setEditing(null);
-      await load();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "خطا در ذخیره اطلاعات");
-    } finally {
-      setSaving(false);
+  // ─── ایمپورت کاربران از اکسل ───
+  const resolveDistrictIdByName = (name: unknown): number | null => {
+    const n = String(name ?? "").trim();
+    if (!n) return null;
+    const hit = districtRows.find(d => d.name === n || d.name.includes(n) || n.includes(d.name));
+    return hit ? hit.id : null;
+  };
+
+  const importUserPayload = (row: Record<string, unknown>, isCreate: boolean) => {
+    const districtId = resolveDistrictIdByName(row.district_name);
+    if (districtId == null) {
+      throw new Error(`امور بهره‌برداری «${String(row.district_name ?? "")}» پیدا نشود — نام امور در فایل الزامی است`);
+    }
+    const payload: Record<string, unknown> = {
+      full_name: String(row.full_name ?? "").trim(),
+      email: row.email ? String(row.email).trim() : null,
+      district_id: districtId,
+      status: "active",
+    };
+    if (isCreate) {
+      payload.username = String(row.username ?? "").trim();
+      payload.password = row.password ? String(row.password) : "123456";
+      payload.module_permissions = compactPermissions(presetRows("view-only"));
+    } else if (row.password) {
+      payload.password = String(row.password);
+    }
+    return payload;
+  };
+
+  const handleImportRow = async (row: Record<string, unknown>, mode: "insert" | "update", existingId?: number) => {
+    const payload = importUserPayload(row, mode !== "update" || !existingId);
+    if (mode === "update" && existingId) {
+      await putUser(existingId, payload);
+    } else {
+      await postUser(payload);
     }
   };
 
-  // ── v4.3.81: ماتریس دسترسی — تغییر تیک یک ماژول برای یک کاربر ──
-  const toggleModule = async (user: UserList, moduleKey: string, allowed: boolean) => {
-    if (user.district_id == null) return; // مدیر — قفل
-    // نقشهٔ فعلی را کامل بساز (کلیدهای غایب = true) تا ذخیرهٔ دقیق و قابل‌مقایسه باشد
-    const current: Record<string, boolean> = {};
-    for (const m of MODULE_ACCESS) {
-      current[m.key] = user.module_permissions ? user.module_permissions[m.key] !== false : true;
+  const handleImportBatch = async (
+    items: Array<{ row: Record<string, unknown>; mode: "insert" | "update"; existingId?: number }>
+  ): Promise<Array<{ status: "inserted" | "updated" | "skipped" | "failed"; error?: string }>> => {
+    // هاست اشتراکی — درخواست‌ها زنجیره‌ای (نه هم‌زمان) ارسال می‌شوند
+    const results: Array<{ status: "inserted" | "updated" | "skipped" | "failed"; error?: string }> = [];
+    for (const it of items) {
+      try {
+        await handleImportRow(it.row, it.mode, it.existingId);
+        results.push({ status: it.mode === "update" && it.existingId ? "updated" : "inserted" });
+      } catch (err) {
+        results.push({ status: "failed", error: err instanceof Error ? err.message : "خطای نامشخص" });
+      }
     }
-    current[moduleKey] = allowed;
-
-    // به‌روزرسانی خوش‌بینانه + بازگردانی در صورت خطا
-    const prev = user.module_permissions ?? null;
-    setUsers(list => list.map(u => u.id === user.id ? { ...u, module_permissions: current } : u));
-    setSavingUserId(user.id);
-    try {
-      await apiClient.put(`${API_ENDPOINTS.users}/${user.id}`, { module_permissions: current });
-      toast({
-        title: allowed ? "دسترسی فعال شد" : "دسترسی حذف شد",
-        description: `${user.full_name} — ${moduleLabel(moduleKey)}`,
-      });
-    } catch (err) {
-      setUsers(list => list.map(u => u.id === user.id ? { ...u, module_permissions: prev } : u));
-      toast({
-        title: "خطا در ذخیره دسترسی",
-        description: err instanceof Error ? err.message : "خطای نامشخص",
-        variant: "destructive",
-      });
-    } finally {
-      setSavingUserId(null);
-    }
+    return results;
   };
 
-  const moduleLabel = (key: string) => MODULE_ACCESS.find(m => m.key === key)?.label || key;
-
-  if (loading && !users.length) return <div className="flex justify-center h-64"><Loader2 className="w-8 h-8 text-indigo-600 animate-spin" /></div>;
-
-  const getInitials = (name: string) => name.split(" ").slice(0, 2).map(p => p[0]).join("");
+  const importHeaderMap: Record<string, string> = {
+    "نام کاربری": "username",
+    "کد ملی": "username",
+    "نام و نام خانوادگی": "full_name",
+    "نام کامل": "full_name",
+    "رمز عبور": "password",
+    "رمز": "password",
+    "ایمیل": "email",
+    "امور بهره‌برداری": "district_name",
+    "امور": "district_name",
+  };
+  const importTemplateColumns = [
+    { key: "username", header: "نام کاربری (کد ملی)" },
+    { key: "full_name", header: "نام و نام خانوادگی" },
+    { key: "district_name", header: "امور بهره‌برداری" },
+    { key: "email", header: "ایمیل (اختیاری)" },
+    { key: "password", header: "رمز عبور (خالی = 123456)" },
+  ];
 
   return (
     <div className="space-y-4">
       <Tabs defaultValue="info" dir="rtl" className="w-full">
-        <TabsList className="grid w-full max-w-md grid-cols-2">
-          <TabsTrigger value="info" className="text-xs">اطلاعات کاربران</TabsTrigger>
-          {/* v4.3.81: ماتریس دسترسی بخش‌ها */}
-          <TabsTrigger value="access" className="text-xs gap-1.5"><ShieldCheck className="w-3.5 h-3.5" />دسترسی‌های بخش‌ها</TabsTrigger>
+        <TabsList className="grid w-full max-w-lg grid-cols-2">
+          <TabsTrigger value="info" className="text-xs gap-1.5"><UsersIcon className="w-3.5 h-3.5" />اطلاعات کاربران</TabsTrigger>
+          <TabsTrigger value="access" className="text-xs gap-1.5"><ShieldCheck className="w-3.5 h-3.5" />دسترسی‌ها</TabsTrigger>
         </TabsList>
 
-        {/* ─── تب ۱: اطلاعات کاربران (کارت‌ها + ویرایش امور/وضعیت) ─── */}
-        <TabsContent value="info" className="space-y-4 mt-4">
-          <div className="relative flex-1 max-w-md">
-            <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-            <Input placeholder="جستجوی کاربر..." value={search} onChange={e => setSearch(e.target.value)} className="pr-9" />
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {users.map(user => (
-              <Card key={user.id} className="hover:shadow-md transition-shadow cursor-pointer">
-                <CardContent className="p-4">
-                  <div className="flex items-start gap-3">
-                    <Avatar className="w-12 h-12"><AvatarFallback className="bg-indigo-100 dark:bg-indigo-900 text-indigo-700 dark:text-indigo-300">{getInitials(user.full_name)}</AvatarFallback></Avatar>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
-                        <h3 className="font-semibold text-slate-800 dark:text-slate-100 truncate text-right">{user.full_name}</h3>
-                        {user.status === "active"
-                          ? <Badge className="bg-green-100 text-green-700" variant="secondary">فعال</Badge>
-                          : <Badge variant="secondary" className="bg-slate-100 text-slate-500">غیرفعال</Badge>}
-                      </div>
-                      <p className="text-xs text-slate-500 text-right" dir="ltr">@{user.username}</p>
-                      {user.email && <p className="text-xs text-slate-400 truncate text-right">{user.email}</p>}
-                      {/* v4.3.78: امور بهره‌برداری کاربر — نامشخص یعنی همهٔ امور (مدیر) */}
-                      <div className="mt-2 flex items-center gap-2 flex-wrap">
-                        {user.district_name
-                          ? <Badge variant="outline" className="text-xs border-indigo-200 text-indigo-700 dark:text-indigo-300">{user.district_name}</Badge>
-                          : <Badge variant="outline" className="text-xs border-slate-200 text-slate-400">همهٔ امور (مدیر)</Badge>}
-                      </div>
-                      {user.roles && <div className="mt-2"><Badge variant="outline" className="text-xs">{user.roles}</Badge></div>}
-                    </div>
-                    {/* v4.3.78: ویرایش امور/وضعیت کاربر */}
-                    <Button
-                      variant="outline" size="icon" onClick={() => openEdit(user)}
-                      className="h-8 w-8 shrink-0 text-indigo-600 hover:bg-indigo-50 border-indigo-200"
-                      title="ویرایش امور بهره‌برداری و وضعیت"
-                    >
-                      <Pencil className="w-4 h-4" />
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+        {/* ─── تب ۱: اطلاعات کاربران — جدول هم‌شکل بقیه بخش‌ها ─── */}
+        <TabsContent value="info" className="mt-4">
+          <DataTable
+            data={users}
+            columns={columns}
+            loading={loading}
+            searchKeys={["username", "full_name", "email", "roles", "district_name"]}
+            title="کاربران"
+            layoutKey="users"
+            accessKey="users"
+            tableRef={tableRef}
+            onAdd={() => { setEditRow(null); setDuplicateFrom(null); setShowCreate(true); }}
+            onRefresh={() => setRefreshKey(k => k + 1)}
+            onEdit={(row) => { setDuplicateFrom(null); setEditRow(row); }}
+            onDuplicate={(row) => { setEditRow(null); setDuplicateFrom(row); setShowCreate(true); }}
+            onCopy={(rows) => {
+              if (!rows.length) {
+                toast({ title: "هیچ ردیفی انتخاب نشده", description: "برای کپی، ابتدا ردیف(های) مورد نظر را انتخاب کنید" });
+                return;
+              }
+              toast({
+                title: "کپی شد",
+                description: `${rows.length.toLocaleString("fa-IR")} ردیف به‌صورت TSV در کلیپ‌بورد کپی شد — آماده پیست در اکسل`,
+              });
+            }}
+            onDelete={(rows) => setPendingDelete(rows)}
+            onImport={() => setShowImport(true)}
+            toolbarExtra={(selected) => (
+              <UsersStatusActions
+                selectedUsers={selected}
+                onApplied={() => setRefreshKey(k => k + 1)}
+                selfUserId={me?.id}
+              />
+            )}
+          />
         </TabsContent>
 
-        {/* ─── تب ۲: v4.3.81 ماتریس دسترسی‌ها — کاربر × بخش با تیک ─── */}
-        <TabsContent value="access" className="mt-4 space-y-3">
+        {/* ─── تب ۲: دسترسی‌ها — جدول + ماتریس + عملیات گروهی ─── */}
+        <TabsContent value="access" className="mt-4">
           <div className="bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-100 dark:border-indigo-900 rounded-lg p-3 text-xs text-slate-600 dark:text-slate-300 leading-6">
-            تیک = کاربر آن بخش را در منو می‌بیند. برداشتن تیک، بخش از منوی کاربر حذف می‌شود.
-            مدیر سیستم (بدون امور) دسترسی کامل و تغییرناپذیر دارد. کاربر جدید بدون محدودیت، همهٔ بخش‌ها را می‌بیند.
+            برای هر کاربر مشخص کنید <b>کدام بخش‌ها</b> را می‌بیند و در هر بخش به <b>کدام ابزارها</b> (ایجاد/ویرایش/حذف/ایمپورت/اکسپورت) دسترسی دارد.
+            یک یا چند کاربر را انتخاب کنید و از منوی «عملیات گروهی» همه را هم‌زمان تغییر دهید. مدیر سیستم همیشه دسترسی کامل دارد.
           </div>
-          <div className="overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
-            <table className="w-full text-xs border-collapse">
-              <thead>
-                <tr className="bg-slate-50 dark:bg-slate-800/70">
-                  <th className="sticky right-0 z-10 bg-slate-50 dark:bg-slate-800/70 border-l border-slate-200 dark:border-slate-700 px-3 py-2.5 text-right font-semibold text-slate-600 dark:text-slate-300 whitespace-nowrap min-w-[190px]">
-                    کاربر
-                  </th>
-                  {MODULE_ACCESS.map(m => (
-                    <th key={m.key} className="px-2 py-2.5 text-center font-semibold text-slate-600 dark:text-slate-300 whitespace-nowrap min-w-[70px] border-l border-slate-100 dark:border-slate-800 last:border-l-0">
-                      {m.label}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {users.map(user => {
-                  const isAdmin = user.district_id == null;
-                  const rowSaving = savingUserId === user.id;
-                  return (
-                    <tr key={user.id} className="border-t border-slate-100 dark:border-slate-800 hover:bg-slate-50/60 dark:hover:bg-slate-800/40">
-                      <td className="sticky right-0 z-10 bg-white dark:bg-slate-900 px-3 py-2 border-l border-slate-200 dark:border-slate-700 whitespace-nowrap">
-                        <div className="flex flex-col">
-                          <span className="font-medium text-slate-800 dark:text-slate-100 text-right">{user.full_name}</span>
-                          <span className="text-[10px] text-slate-400 text-right" dir="ltr">@{user.username}</span>
-                          {isAdmin
-                            ? <Badge variant="outline" className="text-[10px] mt-0.5 border-slate-200 text-slate-400 w-fit">مدیر — دسترسی کامل</Badge>
-                            : user.district_name
-                              ? <Badge variant="outline" className="text-[10px] mt-0.5 border-indigo-200 text-indigo-700 dark:text-indigo-300 w-fit">{user.district_name}</Badge>
-                              : null}
-                        </div>
-                      </td>
-                      {MODULE_ACCESS.map(m => {
-                        const allowed = isAdmin
-                          ? true
-                          : user.module_permissions
-                            ? user.module_permissions[m.key] !== false
-                            : true;
-                        return (
-                          <td key={m.key} className="px-2 py-2 text-center border-l border-slate-100 dark:border-slate-800 last:border-l-0">
-                            <div className="flex justify-center">
-                              <Checkbox
-                                checked={allowed}
-                                disabled={isAdmin || rowSaving || user.status === "inactive"}
-                                onCheckedChange={(v) => toggleModule(user, m.key, v === true)}
-                                className={isAdmin ? "opacity-50" : "data-[state=checked]:bg-indigo-600 data-[state=checked]:border-indigo-600"}
-                                aria-label={`${m.label} — ${user.full_name}`}
-                              />
-                            </div>
-                          </td>
-                        );
-                      })}
-                    </tr>
-                  );
-                })}
-                {!users.length && (
-                  <tr><td colSpan={MODULE_ACCESS.length + 1} className="px-3 py-8 text-center text-slate-400">کاربری یافت نشد</td></tr>
-                )}
-              </tbody>
-            </table>
-          </div>
+          <DataTable
+            data={users}
+            columns={accessColumns}
+            loading={loading}
+            searchKeys={["username", "full_name", "roles", "district_name"]}
+            title="دسترسی کاربران"
+            layoutKey="users-access"
+            accessKey="users"
+            tableRef={accessTableRef}
+            onRefresh={() => setRefreshKey(k => k + 1)}
+            onRowClick={(row) => {
+              if (row.district_id != null) { setPermSource(null); setPermTargets([row]); }
+            }}
+            onEdit={(row) => {
+              if (row.district_id == null) {
+                toast({ title: "مدیر سیستم", description: "دسترسی مدیر سیستم (بدون امور) همیشه کامل و تغییرناپذیر است" });
+                return;
+              }
+              setPermSource(null);
+              setPermTargets([row]);
+            }}
+            toolbarExtra={(selected) => (
+              <PermissionsBulkActions
+                selectedUsers={selected}
+                allUsers={users}
+                onOpenMatrix={(targets, source) => { setPermSource(source); setPermTargets(targets); }}
+                onApplied={() => setRefreshKey(k => k + 1)}
+              />
+            )}
+          />
         </TabsContent>
       </Tabs>
 
-      {/* v4.3.78: دیالوگ ویرایش کاربر — امور بهره‌برداری + وضعیت */}
-      <Dialog open={editing !== null} onOpenChange={(o) => { if (!o && !saving) setEditing(null); }}>
-        <DialogContent className="max-w-md" dir="rtl">
-          <DialogHeader>
-            <DialogTitle className="text-right">ویرایش کاربر: {editing?.full_name}</DialogTitle>
-          </DialogHeader>
-          <form onSubmit={saveEdit} className="space-y-4">
-            <div className="bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-700 rounded-lg p-3 text-xs text-slate-500 text-right leading-6">
-              کاربرِ بدون امور (نامشخص) همهٔ داده‌های همهٔ امور را می‌بیند — مناسب مدیر برنامه.
-              با انتخاب امور، کاربر فقط جدول‌های همان امور را خواهد دید.
-            </div>
-            <div className="space-y-2">
-              <Label className="text-right block">امور بهره‌برداری</Label>
-              <DistrictSelect value={editDistrict} onChange={setEditDistrict} placeholder="نامشخص — همهٔ امور (مدیر)" />
-            </div>
-            <div className="space-y-2">
-              <Label className="text-right block">وضعیت</Label>
-              <Select value={editStatus} onValueChange={setEditStatus}>
-                <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="active">فعال</SelectItem>
-                  <SelectItem value="inactive">غیرفعال</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            {error && <p className="text-sm text-red-600 whitespace-pre-line text-right">{error}</p>}
-            <DialogFooter className="gap-2">
-              <Button type="button" variant="outline" onClick={() => setEditing(null)} disabled={saving}>انصراف</Button>
-              <Button type="submit" disabled={saving} className="bg-indigo-600 hover:bg-indigo-700">
-                {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : "اعمال ویرایش"}
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
+      {/* فرم ایجاد/ویرایش/کپی کاربر */}
+      <UserDialog
+        open={showCreate || editRow !== null}
+        editRow={editRow}
+        duplicateFrom={duplicateFrom}
+        selfUserId={me?.id}
+        onClose={() => { setShowCreate(false); setEditRow(null); setDuplicateFrom(null); }}
+        onSaved={() => { setShowCreate(false); setEditRow(null); setDuplicateFrom(null); setRefreshKey(k => k + 1); }}
+      />
+
+      {/* ایمپورت کاربران از اکسل */}
+      <ImportExcelDialog
+        open={showImport}
+        onClose={() => { setShowImport(false); setRefreshKey(k => k + 1); }}
+        onImportRow={handleImportRow}
+        onImportBatch={handleImportBatch}
+        getExistingRows={async () => users as any}
+        defaultUniqueKey="username"
+        uniqueKeyOptions={[{ value: "username", label: "نام کاربری" }]}
+        entityName="کاربر"
+        headerMap={importHeaderMap}
+        templateColumns={importTemplateColumns}
+      />
+
+      {/* تأیید حذف با پروگرس — همان ظاهر بقیه جدول‌ها */}
+      <BulkDeleteDialog
+        open={pendingDelete !== null}
+        rowsCount={pendingDelete?.length ?? 0}
+        entityName="کاربر"
+        description={(pendingDelete?.length ?? 0) === 1
+          ? `حساب «${pendingDelete?.[0].full_name}» (@${pendingDelete?.[0].username}) حذف می‌شود. اتصال پرسنل به این حساب قطع می‌شود ولی رکورد پرسنل باقی می‌ماند.`
+          : `${(pendingDelete?.length ?? 0).toLocaleString("fa-IR")} کاربر انتخاب‌شده حذف می‌شوند. اتصال پرسنل به این حساب‌ها قطع می‌شود ولی رکوردهای پرسنل باقی می‌مانند. این عمل قابل بازگشت نیست.`}
+        isDeleting={deleting}
+        progress={deleteProgress}
+        onCancel={() => { if (!deleting) setPendingDelete(null); }}
+        onConfirm={confirmDelete}
+      />
+
+      {/* ماتریس دسترسی — تکی یا گروهی */}
+      <PermissionsDialog
+        open={permTargets !== null}
+        targets={permTargets ?? []}
+        sourceUser={permSource}
+        onClose={() => { setPermTargets(null); setPermSource(null); }}
+        onSaved={() => setRefreshKey(k => k + 1)}
+      />
     </div>
+  );
+}
+
+/** فرم کاربر — ایجاد / ویرایش / کپی (مثل فرم پرسنل) */
+function UserDialog({ open, editRow, duplicateFrom, selfUserId, onClose, onSaved }: {
+  open: boolean;
+  editRow: UserRow | null;
+  duplicateFrom: UserRow | null;
+  selfUserId?: number | null;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [form, setForm] = useState({
+    username: "", full_name: "", password: "", email: "",
+    district_id: "", status: "active", preset: "view-only",
+  });
+
+  const sourceRow = editRow || duplicateFrom;
+  const editingSelf = editRow != null && editRow.id === selfUserId;
+
+  useEffect(() => {
+    if (open) {
+      setError(null);
+      setForm({
+        // کپی: نام کاربری جدید لازم است (مثل کد ملی در پرسنل)
+        username: duplicateFrom ? "" : (sourceRow?.username || ""),
+        full_name: sourceRow?.full_name || "",
+        password: "",
+        email: sourceRow?.email || "",
+        district_id: sourceRow?.district_id != null ? String(sourceRow.district_id) : "",
+        status: sourceRow?.status === "inactive" ? "inactive" : "active",
+        preset: "view-only",
+      });
+    }
+  }, [open, sourceRow, duplicateFrom]);
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!form.full_name.trim()) { setError("نام و نام خانوادگی الزامی است"); return; }
+    if (!editRow && !form.username.trim()) { setError("نام کاربری الزامی است (پیشنهاد: کد ملی)"); return; }
+    setSubmitting(true); setError(null);
+    try {
+      if (editRow) {
+        const payload: Record<string, unknown> = {
+          full_name: form.full_name.trim(),
+          email: form.email.trim() || null,
+          status: form.status,
+        };
+        // مدیر سیستم نمی‌تواند امور/وضعیت خودش را محدود کند
+        if (!editingSelf) payload.district_id = form.district_id ? Number(form.district_id) : null;
+        if (form.password.trim()) payload.password = form.password.trim();
+        await putUser(editRow.id, payload);
+      } else {
+        await postUser({
+          username: form.username.trim(),
+          full_name: form.full_name.trim(),
+          password: form.password.trim() || "123456",
+          email: form.email.trim() || null,
+          district_id: form.district_id ? Number(form.district_id) : null,
+          status: form.status,
+          module_permissions: compactPermissions(presetRows(form.preset as "full" | "view-only" | "none")),
+        });
+      }
+      onSaved();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "خطا");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto" dir="rtl">
+        <DialogHeader>
+          <DialogTitle className="text-right">
+            {editRow
+              ? `ویرایش کاربر: ${editRow.full_name}`
+              : duplicateFrom
+                ? `کپی کاربر جدید (از: ${duplicateFrom.full_name})`
+                : "ثبت کاربر جدید"}
+          </DialogTitle>
+        </DialogHeader>
+        <form onSubmit={submit} className="space-y-4">
+          {error && <div className="bg-red-50 dark:bg-red-950 text-red-600 text-sm p-3 rounded-lg text-right">{error}</div>}
+          <FormSection title="مشخصات حساب">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label className="text-right block">نام کاربری (اجباری)</Label>
+                <Input
+                  value={form.username}
+                  onChange={e => setForm({ ...form, username: e.target.value.replace(/\s/g, "") })}
+                  placeholder={editRow ? "" : "مثلاً کد ملی — 0069876543"}
+                  disabled={!!editRow}
+                  dir="ltr"
+                  className="text-left disabled:opacity-60"
+                />
+                {editRow && <p className="text-[10px] text-slate-400 text-right">نام کاربری قابل تغییر نیست</p>}
+              </div>
+              <div className="space-y-2">
+                <Label className="text-right block">نام و نام خانوادگی (اجباری)</Label>
+                <Input value={form.full_name} onChange={e => setForm({ ...form, full_name: e.target.value })} className="text-right" autoFocus={!editRow} />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label className="text-right block">رمز عبور</Label>
+                <Input
+                  type="password"
+                  value={form.password}
+                  onChange={e => setForm({ ...form, password: e.target.value })}
+                  placeholder={editRow ? "خالی = بدون تغییر" : "خالی = 123456"}
+                  dir="ltr"
+                  className="text-left"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-right block">ایمیل</Label>
+                <Input value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} dir="ltr" className="text-left" placeholder="example@mail.com" />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label className="text-right block">امور بهره‌برداری</Label>
+                <DistrictSelect
+                  autoLock={false}
+                  value={form.district_id}
+                  onChange={v => setForm({ ...form, district_id: v })}
+                  placeholder="نامشخص — مدیر سیستم (همهٔ امور)"
+                />
+                {editingSelf && <p className="text-[10px] text-amber-600 text-right">امور و وضعیت حساب خودتان قابل تغییر نیست</p>}
+                {!editingSelf && !form.district_id && (
+                  <p className="text-[10px] text-amber-600 text-right">بدون امور = مدیر سیستم با دسترسی کامل</p>
+                )}
+              </div>
+              <div className="space-y-2">
+                <Label className="text-right block">وضعیت</Label>
+                <Select value={form.status} onValueChange={v => setForm({ ...form, status: v })} disabled={editingSelf}>
+                  <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="active">فعال</SelectItem>
+                    <SelectItem value="inactive">غیرفعال</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            {!editRow && (
+              <div className="space-y-2">
+                <Label className="text-right block">دسترسی اولیه</Label>
+                <Select value={form.preset} onValueChange={v => setForm({ ...form, preset: v })}>
+                  <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="view-only">فقط مشاهدهٔ همهٔ بخش‌ها (پیش‌فرض)</SelectItem>
+                    <SelectItem value="full">دسترسی کامل به همهٔ ابزارها</SelectItem>
+                    <SelectItem value="none">بدون دسترسی به هیچ بخشی</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-[10px] text-slate-400 text-right leading-5">بعداً از تب «دسترسی‌ها» به‌صورت ریز (بخش × ابزار) تنظیم می‌شود</p>
+              </div>
+            )}
+          </FormSection>
+
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={onClose}>انصراف</Button>
+            <Button type="submit" disabled={submitting} className="bg-indigo-600 hover:bg-indigo-700">
+              {submitting ? <><Loader2 className="w-4 h-4 ml-2 animate-spin" />در حال ثبت...</> : editRow ? "اعمال ویرایش" : "ثبت کاربر"}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
   );
 }

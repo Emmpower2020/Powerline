@@ -232,6 +232,7 @@ export function CircuitsPage() {
       {showStats && <CircuitsStatsBar total={data.length} byVoltage={byVoltage} />}
 
       <DataTable
+        accessKey="circuits"
         data={data}
         columns={columns}
         loading={loading}

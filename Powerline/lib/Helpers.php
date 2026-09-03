@@ -352,6 +352,153 @@ class Helpers
         return '0.0.0.0';
     }
 
+    // ─────────────────────────────────────────────────────────────
+    // v4.3.82 — گارد مرکزی دسترسی ابزارها (module × tool)
+    // همان ماتریس دسترسی تب «کاربران ← دسترسی‌ها» اینجا روی سرور اعمال می‌شود:
+    // POST→ایجاد، PUT→ویرایش، DELETE→حذف، bulk-import→ایمپورت و ...
+    // مدیر سیستم (بدون امور) همیشه مجاز است؛ کاربر بدون نقشه فقط‌خواننده است.
+    // ─────────────────────────────────────────────────────────────
+
+    /** نقشهٔ مسیر اول → کلید ماژول دسترسی (MODULE_ACCESS فرانت) */
+    private static array $routeModuleMap = [
+        'lines' => 'lines',
+        'towers' => 'towers',
+        'circuits' => 'circuits',
+        'personnel' => 'personnel',
+        'defects' => 'defects',
+        'defect-categories' => 'defects',
+        'defect-definitions' => 'defects',
+        'inspections' => 'inspections',
+        'work-orders' => 'work-orders',
+        'contracts' => 'contracts',
+        'invoices' => 'invoices',
+        'safety-incidents' => 'safety',
+        'contractors' => 'contractors',
+        'equipment' => 'equipment',
+        'price-lists' => 'price-lists',
+        'price-list-items' => 'price-lists',
+        'conductors' => 'conductors',
+        'tower-structures' => 'tower-structures',
+        'tower-type-codes' => 'tower-type-codes',
+        'districts' => 'districts',
+        'users' => 'users',
+    ];
+
+    /** مسیرهایی که گارد ابزار روی آنها اعمال نمی‌شود */
+    private static array $guardSkipSegments = [
+        'auth', 'backend-version', 'dashboard', 'organization', 'crews',
+        'checklist-templates', 'audit-log', 'files', 'upload',
+    ];
+
+    /** برچسب فارسی ماژول‌ها برای پیام 403 */
+    private static array $moduleLabelsFa = [
+        'lines' => 'خطوط انتقال', 'towers' => 'دکل‌ها', 'circuits' => 'مدارها',
+        'personnel' => 'پرسنل پیمانکار', 'defects' => 'عیوب',
+        'inspections' => 'بازدیدها', 'work-orders' => 'دستورکارها',
+        'contracts' => 'قراردادها', 'invoices' => 'صورت‌وضعیت‌ها',
+        'safety' => 'حوادث ایمنی', 'contractors' => 'پیمانکاران',
+        'equipment' => 'تجهیزات', 'price-lists' => 'فهرست بها',
+        'conductors' => 'انواع سیم‌ها', 'tower-structures' => 'انواع ساختار دکل',
+        'tower-type-codes' => 'انواع کد دکل', 'districts' => 'امور بهره‌برداری',
+        'users' => 'کاربران',
+    ];
+
+    /** برچسب فارسی ابزارها */
+    private static array $toolLabelsFa = [
+        'create' => 'ایجاد', 'edit' => 'ویرایش', 'delete' => 'حذف',
+        'import' => 'ایمپورت', 'export' => 'اکسپورت',
+    ];
+
+    /**
+     * آیا کاربر (غیرمدیر) به ابزار مشخصی از ماژول دسترسی دارد؟
+     * $entry مقدار users.module_permissions[module] است:
+     *   true → دسترسی کامل | false/غایب → فقط‌خواننده | آرایه → view + کلیدهای true
+     */
+    public static function moduleToolAllowed(?array $entry, string $tool): bool
+    {
+        if ($entry === true) return true;
+        if (!is_array($entry)) return false; // false یا null
+        if (($entry['view'] ?? true) === false) return false;
+        return !empty($entry[$tool]);
+    }
+
+    /** پیام رد دسترسی و توقف درخواست */
+    private static function denyTool(string $module, string $tool): void
+    {
+        $m = self::$moduleLabelsFa[$module] ?? $module;
+        $t = self::$toolLabelsFa[$tool] ?? $tool;
+        Response::error(403, "دسترسی «{$t}» در بخش «{$m}» برای حساب شما فعال نیست — از مدیر سیستم بخواهید در بخش کاربران ← دسترسی‌ها این ابزار را فعال کند");
+    }
+
+    /**
+     * گارد مرکزی — قبل از dispatch در api.php صدا زده می‌شود.
+     * مسیر و روش درخواست را به (ماژول، ابزار) تبدیل و برای کاربرِ اموردار
+     * مجاز بودن را از users.module_permissions می‌خواند.
+     */
+    public static function guardModuleWrite(string $method, string $requestUri, string $scriptName = ''): void
+    {
+        $method = strtoupper($method);
+        if (!in_array($method, ['POST', 'PUT', 'DELETE', 'PATCH'], true)) return;
+
+        $path = parse_url($requestUri, PHP_URL_PATH);
+        if (!is_string($path) || $path === '') return;
+        if ($scriptName !== '' && strpos($path, $scriptName) === 0) {
+            $path = substr($path, strlen($scriptName));
+        } elseif ($scriptName !== '' && ($pos = strpos($path, basename($scriptName))) !== false) {
+            $path = substr($path, $pos + strlen(basename($scriptName)));
+        }
+        $path = trim($path, '/');
+        if ($path === '') return;
+
+        $segments = explode('/', $path);
+        $first = $segments[0];
+        if (in_array($first, self::$guardSkipSegments, true)) return;
+
+        $module = self::$routeModuleMap[$first] ?? null;
+        if ($module === null) return; // مسیر ناشناخته — گارد اینجا مسئول نیست
+
+        // تعیین ابزار از روش/پسوند مسیر
+        if ($method === 'PUT' || $method === 'PATCH') {
+            $tool = 'edit';
+        } elseif ($method === 'DELETE') {
+            $tool = 'delete';
+        } elseif (preg_match('~/bulk-import$~', $path)) {
+            $tool = 'import';
+        } elseif (preg_match('~/bulk-delete$~', $path)) {
+            $tool = 'delete';
+        } elseif (preg_match('~/bulk-update$~', $path)) {
+            $tool = 'edit';
+        } elseif (preg_match('~/[0-9]+/(approve|pay|verify|assign|close|complete|start|status|reset)(/[a-z0-9_-]+)?$~', $path)) {
+            $tool = 'edit';
+        } else {
+            $tool = 'create';
+        }
+
+        // احراز هویت (بدون توکن → 401 مثل بقیه endpointها)
+        $user = Auth::authenticate();
+        $district = $user['district_id'] ?? null;
+        if ($district === null || $district === '' || (int) $district <= 0) return; // مدیر سیستم
+
+        // پیش از اجرای migration 4.3.81 → ستون وجود ندارد؛ محدودیتی اعمال نمی‌شود
+        if (!self::columnExists('users', 'module_permissions')) return;
+
+        $row = Database::getInstance()->fetchOne(
+            'SELECT module_permissions FROM users WHERE id = ?',
+            [(int) $user['id']]
+        );
+        $raw = $row['module_permissions'] ?? null;
+        if (is_string($raw) && $raw !== '') {
+            $decoded = json_decode($raw, true);
+            if (is_array($decoded)) {
+                $entry = $decoded[$module] ?? null;
+                if (self::moduleToolAllowed($entry, $tool)) return;
+                self::denyTool($module, $tool);
+            }
+        }
+        // نقشهٔ null / نامعتبر → فقط‌خواننده (هماهنگ با فرانت v4.3.82)
+        self::denyTool($module, $tool);
+    }
+
     /**
      * اعتبارسنجی GPS
      */

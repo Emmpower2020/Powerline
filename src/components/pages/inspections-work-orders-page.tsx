@@ -53,7 +53,7 @@ export function InspectionsPage() {
 
   return (
     <div className="space-y-4">
-      <DataTable data={data} columns={columns} loading={loading}
+      <DataTable data={data} columns={columns} loading={loading} accessKey="inspections"
         searchKeys={columns.map(c => c.key)}
         title="بازدیدها" onAdd={() => setShowCreate(true)} onRefresh={() => setRefreshKey(k => k + 1)}
         onCopy={() => {}} onDelete={handleDelete} onDuplicate={handleDuplicate} onImport={() => alert("برای وارد کردن اطلاعات بازدید از قالب اکسل پروژه استفاده کنید.")} onLoadAllRows={async () => data}
@@ -105,7 +105,7 @@ export function WorkOrdersPage() {
 
   return (
     <div className="space-y-4">
-      <DataTable data={data} columns={columns} loading={loading}
+      <DataTable data={data} columns={columns} loading={loading} accessKey="work-orders"
         searchKeys={columns.map(c => c.key)}
         title="دستورکارها" onAdd={() => setShowCreate(true)} onRefresh={() => setRefreshKey(k => k + 1)}
         onCopy={() => {}} onDelete={handleDelete} onDuplicate={handleDuplicate} onImport={() => alert("برای وارد کردن اطلاعات دستورکار از قالب اکسل پروژه استفاده کنید.")} onLoadAllRows={async () => data}

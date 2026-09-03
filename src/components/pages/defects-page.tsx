@@ -404,6 +404,7 @@ export function DefectsPage() {
       {showStats && <DefectsStatsBar data={data} />}
 
       <DataTable
+        accessKey="defects"
         data={data}
         columns={columns}
         loading={loading}

@@ -104,6 +104,140 @@ function invalidateAllCache(): void {
   GET_CACHE.clear();
 }
 
+// ─── v4.3.82 (فقط توسعه): شبیه‌ساز مدیریت کاربران ───
+// بک‌اند قدیمی هاست (4.3.81) مقدار آبجکتی ماتریس دسترسی را false ذخیره می‌کرد و
+// POST/DELETE کاربر نداشت. تا زمان آپلود بک‌اند 4.3.82، نوشتن‌های /users در حالت
+// توسعه به‌صورت محلی شبیه‌سازی می‌شوند (روی overlay حافظه‌ای) و هرگز به هاست نمی‌رسند.
+// با آپلود بک‌اند جدید، شبیه‌ساز خودش غیرفعال می‌شود و همه‌چیز واقعی می‌شود.
+const SIM_VERSION = [4, 3, 82];
+let upstreamVersionCache: number[] | null = null;
+
+function versionAtLeast(v: number[], ref: number[]): boolean {
+  for (let i = 0; i < 3; i++) {
+    if (v[i] > ref[i]) return true;
+    if (v[i] < ref[i]) return false;
+  }
+  return true;
+}
+
+/** نسخهٔ واقعی بک‌اند هاست (کش‌شده) — [major, minor, patch] یا [] در خطا */
+async function upstreamBackendVersion(): Promise<number[]> {
+  if (upstreamVersionCache) return upstreamVersionCache;
+  try {
+    const res = await fetch(`${API_BASE_URL}/backend-version`, { cache: "no-store" });
+    const text = await res.text();
+    const parsed = JSON.parse(text);
+    const m = /(\d+)\.(\d+)\.(\d+)/.exec(String(parsed?.data?.version ?? ""));
+    upstreamVersionCache = m ? [Number(m[1]), Number(m[2]), Number(m[3])] : [];
+  } catch {
+    upstreamVersionCache = [];
+  }
+  return upstreamVersionCache;
+}
+
+/** وضعیت حافظه‌ای شبیه‌ساز کاربران */
+const simUserPatches = new Map<number, Record<string, any>>();
+const simCreatedUsers: any[] = [];
+const simDeletedIds = new Set<number>();
+let simNextUserId = 100001;
+let simDistrictNames: Map<number, string> | null = null;
+
+async function simDistrictName(id: number | null, authHeader = ""): Promise<string | null> {
+  if (id == null) return null;
+  if (!simDistrictNames) {
+    simDistrictNames = new Map();
+    try {
+      const res = await fetch(`${API_BASE_URL}/districts?page=1&page_size=100`, {
+        cache: "no-store",
+        headers: authHeader ? { Authorization: authHeader } : undefined,
+      });
+      const parsed = await res.json();
+      const list = parsed?.data?.data ?? parsed?.data ?? [];
+      if (Array.isArray(list)) {
+        for (const d of list) simDistrictNames.set(Number(d.id), String(d.name ?? ""));
+      }
+    } catch { /* بدون نام — فقط شناسه */ }
+  }
+  return simDistrictNames.get(Number(id)) ?? null;
+}
+
+/** شبیه‌سازی نوشتن روی /users — همیشه فقط در DEV */
+async function simulateUsersWrite(method: string, path: string, bodyText: string, authHeader = ""): Promise<Response> {
+  let body: any = {};
+  try { body = bodyText ? JSON.parse(bodyText) : {}; } catch { /* خالی */ }
+  const idMatch = /^\/users\/(\d+)$/.exec(path);
+  const json = (payload: any, status = 200) => new NextResponse(JSON.stringify(payload), {
+    status,
+    headers: { "Content-Type": "application/json; charset=utf-8", "X-Dev-Simulated": "users" },
+  });
+
+  if (method === "PUT" && idMatch) {
+    const id = Number(idMatch[1]);
+    simUserPatches.set(id, { ...(simUserPatches.get(id) ?? {}), ...body });
+    simDeletedIds.delete(id);
+    console.log(`[DEV SIM] users PUT ${id} — patch اعمال شد روی overlay`);
+    return json({ success: true, message: "کاربر ویرایش شد (شبیه‌ساز توسعه)", data: null });
+  }
+  if (method === "DELETE" && idMatch) {
+    const id = Number(idMatch[1]);
+    simDeletedIds.add(id);
+    simUserPatches.delete(id);
+    const idx = simCreatedUsers.findIndex(u => u.id === id);
+    if (idx >= 0) simCreatedUsers.splice(idx, 1);
+    console.log(`[DEV SIM] users DELETE ${id}`);
+    return json({ success: true, message: "کاربر حذف شد (شبیه‌ساز توسعه)", data: null });
+  }
+  if (method === "POST" && path === "/users") {
+    const id = simNextUserId++;
+    const districtId = body.district_id != null ? Number(body.district_id) : null;
+    const user = {
+      id,
+      username: String(body.username ?? ""),
+      full_name: String(body.full_name ?? ""),
+      email: body.email ?? null,
+      status: body.status === "inactive" ? "inactive" : "active",
+      roles: districtId != null ? "کاربر امور" : "مدیر ارشد سیستم",
+      district_id: districtId,
+      district_name: await simDistrictName(districtId, authHeader),
+      module_permissions: body.module_permissions ?? null,
+      last_login_at: null,
+      created_at: new Date().toISOString().slice(0, 19).replace("T", " "),
+    };
+    simCreatedUsers.push(user);
+    console.log(`[DEV SIM] users POST — کاربر ${user.username} ساخته شد`);
+    return json({ success: true, message: `کاربر ایجاد شد (شبیه‌ساز توسعه)${body.password ? "" : " — رمز پیش‌فرض 123456"}`, data: { id } }, 201);
+  }
+  return json({ success: false, error: { code: 404, message: "مسیر شبیه‌ساز کاربران پیدا نشد" } }, 404);
+}
+
+/** اعمال overlay شبیه‌ساز روی پاسخ GET /users (فقط DEV) */
+function applyUsersSimulatorToGet(bodyText: string): string {
+  try {
+    const parsed = JSON.parse(bodyText);
+    if (parsed?.success === false) return bodyText;
+    let rows: any[] = parsed?.data?.data ?? (Array.isArray(parsed?.data) ? parsed.data : []);
+    if (!Array.isArray(rows)) return bodyText;
+    rows = rows.filter((u: any) => !simDeletedIds.has(Number(u.id)));
+    rows = rows.map((u: any) => {
+      const patch = simUserPatches.get(Number(u.id));
+      return patch ? { ...u, ...patch } : u;
+    });
+    // مثل بک‌اند واقعی (ORDER BY id DESC) کاربران ساخته‌شده در ابتدای فهرست می‌آیند
+    rows = [...simCreatedUsers.slice().reverse(), ...rows];
+    let total = parsed?.data?.total;
+    if (typeof total === "number") total = rows.length;
+    if (parsed?.data && !Array.isArray(parsed.data)) {
+      parsed.data.data = rows;
+      if (typeof total === "number") parsed.data.total = total;
+    } else {
+      parsed.data = rows;
+    }
+    return JSON.stringify(parsed);
+  } catch {
+    return bodyText;
+  }
+}
+
 export async function POST(request: NextRequest) {
   return handleRequest(request);
 }
@@ -215,6 +349,28 @@ async function handleRequest(request: NextRequest) {
         ],
       },
     });
+  }
+
+  // v4.3.82 (فقط توسعه): نسخهٔ بک‌اند هاست قدیمی است؟ نسخهٔ بستهٔ فعلی گزارش می‌شود تا
+  // گیت بک‌اند فرانت (users-api) در پیش‌نمایش باز باشد؛ خود هاست با آپلود واقعی می‌رسد.
+  if (DEV_MODE && isGet && path === "/backend-version") {
+    const upstream = await upstreamBackendVersion();
+    if (!upstream.length || !versionAtLeast(upstream, SIM_VERSION)) {
+      console.log(`[DEV SIM] backend-version هاست ${upstream.join(".") || "?"} قدیمی است — نسخهٔ بستهٔ 4.3.82 گزارش شد`);
+      return NextResponse.json({
+        success: true,
+        message: "نسخه بک‌اند",
+        data: { version: "v4.3.82", component: "Powerline PHP Backend (dev-sim)" },
+      });
+    }
+  }
+
+  // v4.3.82 (فقط توسعه): نوشتن‌های /users — تا آپلود بک‌اند 4.3.82 روی هاست، محلی شبیه‌سازی می‌شوند
+  if (DEV_MODE && !isGet && path.startsWith("/users")) {
+    const upstream = await upstreamBackendVersion();
+    if (!upstream.length || !versionAtLeast(upstream, SIM_VERSION)) {
+      return await simulateUsersWrite(request.method, path, bodyText ?? "", request.headers.get("authorization") || "");
+    }
   }
 
   /** تلاش به سرور اصلی با retry یک‌باره روی 5xx (v3.2.1) + حل چالش ضد DDoS (v3.5.1) */
@@ -351,6 +507,13 @@ async function handleRequest(request: NextRequest) {
   // ─── پاسخ واقعی سرور ───
   const respContentType = response!.headers.get("content-type") || "application/json";
 
+  // v4.3.82 (فقط توسعه): اعمال overlay شبیه‌ساز کاربران روی GET /users
+  let finalText = responseText;
+  if (DEV_MODE && isGet && path === "/users" && response!.status === 200 && respContentType.includes("json")
+      && (simUserPatches.size || simCreatedUsers.length || simDeletedIds.size)) {
+    finalText = applyUsersSimulatorToGet(responseText);
+  }
+
   // v3.3.1: کش پاسخ‌های موفق GET (فقط JSON موفق)
   if (isGet && response!.status === 200 && respContentType.includes("json")) {
     try {
@@ -368,7 +531,7 @@ async function handleRequest(request: NextRequest) {
     invalidateAllCache();
   }
 
-  return new NextResponse(responseText, {
+  return new NextResponse(finalText, {
     status: response!.status,
     headers: {
       "Content-Type": respContentType,

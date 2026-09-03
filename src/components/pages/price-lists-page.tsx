@@ -257,6 +257,7 @@ export function PriceListsPage() {
         </Card>
       ) : (
         <DataTable
+          accessKey="price-lists"
           data={items}
           columns={columns}
           loading={itemsLoading}

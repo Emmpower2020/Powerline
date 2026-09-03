@@ -14,6 +14,7 @@ import {
   REFRESH_TOKEN_KEY,
   USER_KEY,
 } from "./api-config";
+import { userCanAccessModule, userCanUseTool, type ModulePermValue, type ToolKey } from "./module-access";
 
 export interface User {
   id: number;
@@ -24,8 +25,8 @@ export interface User {
   // v4.3.78: امور بهره‌برداری کاربر — null یعنی مدیر (همهٔ امور)
   district_id?: number | null;
   district_name?: string | null;
-  // v4.3.81: دسترسی ماژول‌ها — null یعنی همهٔ بخش‌ها؛ false یعنی مسدود
-  module_permissions?: Record<string, boolean> | null;
+  // v4.3.81: دسترسی ماژول‌ها — v4.3.82: مقدار هر ماژول می‌تواند بولین یا آبجکت ابزارها باشد
+  module_permissions?: Record<string, ModulePermValue> | null;
 }
 
 export interface UserRole {
@@ -45,6 +46,8 @@ interface AuthContextType {
   refreshUser: () => Promise<void>;
   /** v4.3.81: آیا کاربر جاری به ماژول (بخش) دسترسی دارد؟ */
   canAccessModule: (moduleKey: string) => boolean;
+  /** v4.3.82: آیا کاربر جاری اجازهٔ استفاده از ابزار مشخصی در ماژول را دارد؟ (ایجاد/ویرایش/حذف/ایمپورت/اکسپورت) */
+  canUseTool: (moduleKey: string, tool: ToolKey) => boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -149,14 +152,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return roles.some((r) => r.name === role);
   };
 
-  // v4.3.81: دسترسی ماژول — مدیر (بدون امور) همیشه کامل؛ نقشهٔ null یعنی همه مجاز
-  const canAccessModule = (moduleKey: string): boolean => {
-    if (!user) return true; // پیش از لاگین فیلتر نکن
-    if (user.district_id == null) return true; // مدیر سیستم
-    const mp = user.module_permissions;
-    if (!mp || typeof mp !== "object") return true;
-    return mp[moduleKey] !== false;
-  };
+  // v4.3.81: دسترسی ماژول — مدیر (بدون امور) همیشه کامل
+  // v4.3.82: منطق به module-access منتقل شد (پشتیبانی مقدار بولین + آبجکت ابزارها)
+  const canAccessModule = (moduleKey: string): boolean => userCanAccessModule(user, moduleKey);
+
+  // v4.3.82: دسترسی ابزار — دکمه‌های نوار ابزار جدول‌ها بر اساس همین مخفی می‌شوند
+  const canUseTool = (moduleKey: string, tool: ToolKey): boolean => userCanUseTool(user, moduleKey, tool);
 
   return (
     <AuthContext.Provider
@@ -171,6 +172,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         hasRole,
         refreshUser,
         canAccessModule,
+        canUseTool,
       }}
     >
       {children}

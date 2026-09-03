@@ -19,6 +19,8 @@ import {
   DropdownMenuTrigger, DropdownMenuSeparator, DropdownMenuLabel,
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/lib/auth-context";
+import type { ToolKey } from "@/lib/module-access";
 import { isActiveStatus, statusLabel, STATUS_ACTIVE_LABEL, STATUS_INACTIVE_LABEL } from "@/lib/status";
 import { toJalali } from "@/lib/jalali";
 import { ExportDialog, type ExportOptions, type ExportScope } from "@/components/export-dialog";
@@ -72,6 +74,13 @@ interface DataTableProps<T extends { id: number }> {
    * ترتیب/مخفی‌سازی ستون‌ها برای هر کاربر در localStorage نگهداری و در ورود بعدی بازیابی می‌شود
    */
   layoutKey?: string;
+  /**
+   * v4.3.82: کلید ماژول دسترسی (از MODULE_ACCESS) — وقتی پاس شود، دکمه‌های نوار ابزار
+   * فقط برای کاربری که «ابزار» مربوطه را در ماتریس دسترسی دارد نمایش داده می‌شوند:
+   * افزودن→ایجاد، ویرایش/کپی‌ردیف→ویرایش، حذف→حذف، ایمپورت→ایمپورت، اکسپورت/چاپ/کپی-TSV→اکسپورت،
+   * منوی عملیات گروهی→ویرایش یا حذف. مدیر سیستم همیشه همه دکمه‌ها را می‌بیند.
+   */
+  accessKey?: string;
   /** مرتب‌سازی اولیهٔ جدول؛ فقط در بارگذاری اولیه اعمال می‌شود و مرتب‌سازی دستی کاربر را تحت تأثیر قرار نمی‌دهد */
   defaultSort?: Array<{ key: string; direction?: "asc" | "desc"; order?: Array<string | number> }>;
 }
@@ -101,9 +110,24 @@ function DataTableInner<T extends { id: number }>({
   data, columns, loading, searchKeys, title,
   onAdd, onRefresh, onRowClick, onCopy, onDelete, onEdit, onDuplicate,
   onImport, onLoadAllRows, toolbarExtra,
-  pageSize = 15, searchable = true, tableRef, layoutKey, defaultSort,
+  pageSize = 15, searchable = true, tableRef, layoutKey, defaultSort, accessKey,
 }: DataTableProps<T>) {
   const { toast } = useToast();
+  // v4.3.82: گیت دسترسی ابزارها — بدون accessKey (یا برای مدیر سیستم) همه دکمه‌ها آزاد است
+  const { canUseTool } = useAuth();
+  const toolAllowed = useCallback(
+    (tool: ToolKey) => !accessKey || canUseTool(accessKey, tool),
+    [accessKey, canUseTool]
+  );
+  const effOnAdd = toolAllowed("create") ? onAdd : undefined;
+  const effOnEdit = toolAllowed("edit") ? onEdit : undefined;
+  const effOnDuplicate = toolAllowed("edit") ? onDuplicate : undefined;
+  const effOnCopy = toolAllowed("export") ? onCopy : undefined;
+  const effOnDelete = toolAllowed("delete") ? onDelete : undefined;
+  const effOnImport = toolAllowed("import") ? onImport : undefined;
+  // منوی عملیات گروهی شامل تغییر گروهی (ویرایش) و گاه حذف گروهی است
+  const effToolbarExtra = toolAllowed("edit") || toolAllowed("delete") ? toolbarExtra : undefined;
+  const canExport = toolAllowed("export");
   const [search, setSearch] = useState("");
   const [sortKey, setSortKey] = useState<string | null>(null);
   const [sortDir, setSortDir] = useState<SortState>("none");
@@ -646,7 +670,7 @@ function DataTableInner<T extends { id: number }>({
 
   const handleDelete = () => {
     const sel = filtered.filter(r => selectedRows.has(r.id));
-    if (statusColumn && onDelete) {
+    if (statusColumn && effOnDelete) {
       const activeRows = sel.filter(r => isActiveStatus(r[statusColumn.key as keyof T]));
       if (activeRows.length > 0) {
         toast({
@@ -657,7 +681,7 @@ function DataTableInner<T extends { id: number }>({
         return;
       }
     }
-    if (onDelete) onDelete(sel);
+    if (effOnDelete) effOnDelete(sel);
   };
 
   const renderCell = (row: T, col: DataTableColumn<T>) => {
@@ -696,14 +720,14 @@ function DataTableInner<T extends { id: number }>({
     }
     // exactly 1 visible row — find it directly from the filtered data set
     const row = visibleSelectedRows[0];
-    if (row && onEdit) onEdit(row);
+    if (row && effOnEdit) effOnEdit(row);
   };
 
   // Duplicate handler — same single-selection rule as edit
   const handleDuplicateClick = () => {
     if (selCount === 0 || selCount > 1) return;
     const row = visibleSelectedRows[0];
-    if (row && onDuplicate) onDuplicate(row);
+    if (row && effOnDuplicate) effOnDuplicate(row);
   };
 
   const actionButton = (button: ReactNode, title: string, disabled = false) =>
@@ -714,27 +738,27 @@ function DataTableInner<T extends { id: number }>({
       {/* Toolbar */}
       <div className="flex flex-wrap items-center gap-2 justify-between">
         <div className="flex items-center gap-1 flex-wrap">
-          {onAdd && <Button onClick={onAdd} className="bg-green-600 hover:bg-green-700 h-9 w-9 p-0" title="افزودن"><Plus className="w-4 h-4" /></Button>}
-          {onEdit && actionButton(
+          {effOnAdd && <Button onClick={effOnAdd} className="bg-green-600 hover:bg-green-700 h-9 w-9 p-0" title="افزودن"><Plus className="w-4 h-4" /></Button>}
+          {effOnEdit && actionButton(
             <Button variant="outline" size="icon" onClick={handleEditClick} disabled={selCount === 0} title={selCount === 0 ? "ابتدا یک ردیف انتخاب کنید" : selCount > 1 ? "فقط یک ردیف باید انتخاب شود" : "ویرایش ردیف انتخاب شده"} className="h-9 w-9 text-indigo-600 hover:bg-indigo-50 border-indigo-200">
               <Pencil className="w-4 h-4" />
             </Button>,
             selCount === 0 ? "ابتدا یک ردیف انتخاب کنید" : selCount > 1 ? "فقط یک ردیف باید انتخاب شود" : "ویرایش ردیف انتخاب شده",
             selCount === 0
           )}
-          {onDuplicate && actionButton(
+          {effOnDuplicate && actionButton(
             <Button variant="outline" size="icon" onClick={handleDuplicateClick} disabled={selCount !== 1} title={selCount !== 1 ? "ابتدا دقیقاً یک ردیف انتخاب کنید" : "کپی به‌عنوان ردیف جدید"} className="h-9 w-9 text-emerald-600 hover:bg-emerald-50 border-emerald-200">
               <CopyPlus className="w-4 h-4" />
             </Button>,
             selCount !== 1 ? "ابتدا دقیقاً یک ردیف انتخاب کنید" : "کپی به‌عنوان ردیف جدید",
             selCount !== 1
           )}
-          {onCopy && (
+          {effOnCopy && (
             <Button variant="outline" size="icon" onClick={handleCopy} title="کپی برای اکسل" className="h-9 w-9">
               <Copy className="w-4 h-4" />
             </Button>
           )}
-          {onDelete && actionButton(
+          {effOnDelete && actionButton(
             <Button variant="outline" size="icon" onClick={handleDelete} disabled={selCount === 0} title={selCount === 0 ? "ابتدا یک یا چند ردیف انتخاب کنید" : "حذف ردیف‌های انتخاب‌شده"} className="h-9 w-9 text-red-600 hover:bg-red-50 border-red-200">
               <Trash2 className="w-4 h-4" />
             </Button>,
@@ -742,17 +766,17 @@ function DataTableInner<T extends { id: number }>({
             selCount === 0
           )}
 
-          {/* عنصر اضافه ماژول (مثل دکمه عملیات گروهی) — همان ردیف دکمه‌های اصلی */}
-          {typeof toolbarExtra === "function" ? toolbarExtra(visibleSelectedRows) : toolbarExtra}
+          {/* عنصر اضافه ماژول (مثل دکمه عملیات گروهی) — v4.3.82: فقط با دسترسی ویرایش/حذف */}
+          {typeof effToolbarExtra === "function" ? effToolbarExtra(visibleSelectedRows) : effToolbarExtra}
 
-          {onImport && (
-            <Button variant="outline" size="icon" onClick={onImport} title="وارد کردن از اکسل" className="h-9 w-9 text-green-600 hover:bg-green-50 border-green-200">
+          {effOnImport && (
+            <Button variant="outline" size="icon" onClick={effOnImport} title="وارد کردن از اکسل" className="h-9 w-9 text-green-600 hover:bg-green-50 border-green-200">
               <Download className="w-4 h-4" />
             </Button>
           )}
-          <Button variant="outline" size="icon" onClick={handleExport} title="خروجی گرفتن" className="h-9 w-9 text-blue-600 hover:bg-blue-50 border-blue-200"><Upload className="w-4 h-4" /></Button>
+          {canExport && <Button variant="outline" size="icon" onClick={handleExport} title="خروجی گرفتن" className="h-9 w-9 text-blue-600 hover:bg-blue-50 border-blue-200"><Upload className="w-4 h-4" /></Button>}
           {onRefresh && <Button variant="outline" size="icon" onClick={onRefresh} title="بارگذاری مجدد" className="h-9 w-9"><RefreshCw className="w-4 h-4" /></Button>}
-          <Button variant="outline" size="icon" onClick={handlePrint} title="چاپ گزارش" className="h-9 w-9 text-indigo-600 hover:bg-indigo-50 border-indigo-200"><Printer className="w-4 h-4" /></Button>
+          {canExport && <Button variant="outline" size="icon" onClick={handlePrint} title="چاپ گزارش" className="h-9 w-9 text-indigo-600 hover:bg-indigo-50 border-indigo-200"><Printer className="w-4 h-4" /></Button>}
 
           {/* بازنشانی کامل فیلترها و مرتب‌سازی — در حالت عادی قرمز نیست؛ فقط هنگام فعال بودن فیلتر/مرتب‌سازی قرمز می‌شود */}
           <Button
