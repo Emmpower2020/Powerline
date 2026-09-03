@@ -283,7 +283,7 @@ export function DashboardLayout({ children, currentPage, onNavigate, title, subt
                     </div>
                     <div className="min-w-0 flex-1">
                       <p className="text-sm font-bold text-slate-800 dark:text-slate-100 truncate">{user?.full_name}</p>
-                      <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate">{user?.email || user?.username}</p>
+                      <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate">@{user?.username}</p>
                     </div>
                   </div>
                 </div>

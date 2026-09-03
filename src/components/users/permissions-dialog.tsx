@@ -19,7 +19,6 @@ export interface UserRow {
   id: number;
   username: string;
   full_name: string;
-  email: string | null;
   status: string;
   roles: string | null;
   /** v4.3.83: نقش اختصاص‌یافته (تک‌نقشی) */
@@ -287,7 +286,7 @@ export function PermissionsDialog({
 
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!o && !saving) onClose(); }}>
-      <DialogContent className="w-[95vw] max-w-[1400px] max-h-[92vh] overflow-y-auto" dir="rtl">
+      <DialogContent className="w-[95vw] max-w-[1400px] sm:max-w-[1400px] max-h-[92vh] overflow-y-auto" dir="rtl">
         <DialogHeader>
           <DialogTitle className="text-right flex items-center gap-2">
             <ShieldCheck className="w-5 h-5 text-indigo-600" />

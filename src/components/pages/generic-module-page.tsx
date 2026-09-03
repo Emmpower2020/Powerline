@@ -47,7 +47,7 @@ const FIELD_LABELS: Record<string, string> = {
   contract_code: "کد قرارداد", title: "عنوان", start_date: "تاریخ شروع", end_date: "تاریخ پایان",
   amount: "مبلغ (ریال)", status: "وضعیت", notes: "یادداشت",
   first_name: "نام", last_name: "نام خانوادگی", position: "سمت",
-  phone: "تلفن", mobile: "موبایل", email: "ایمیل", hire_date: "تاریخ استخدام",
+  phone: "تلفن", mobile: "موبایل", hire_date: "تاریخ استخدام",
   incident_type: "نوع حادثه", severity: "شدت", description: "توضیحات",
   location_desc: "محل وقوع", occurred_at: "تاریخ وقوع", line_id: "خط", tower_id: "دکل",
   period_start: "شروع دوره", period_end: "پایان دوره", total_amount: "مبلغ کل",
@@ -150,7 +150,7 @@ const configs: Record<string, GenericConfig> = {
     { key: "status", header: "مرحله بررسی", type: "badge", badgeLabels: { reported: "گزارش شده", under_investigation: "در حال بررسی", resolved: "حل شده", closed: "بسته شده" }, badgeColors: { reported: "bg-blue-100 text-blue-700", resolved: "bg-green-100 text-green-700", closed: "bg-slate-100 text-slate-500" } },
     { key: "activity_status", header: "وضعیت", type: "status", filterable: true, align: "right" },
   ]},
-  personnel: { title: "پرسنل", singular: "پرسنل", editKeys: ["contract_id","district_id","first_name","last_name","position","phone","mobile","email"], importKeys: ["contract_id","first_name","last_name","position","phone","mobile","email"], columns: [
+  personnel: { title: "پرسنل", singular: "پرسنل", editKeys: ["contract_id","district_id","first_name","last_name","position","mobile"], importKeys: ["contract_id","first_name","last_name","position","mobile"], columns: [
     { key: "personnel_code", header: "کد", sortable: true, filterable: true, align: "left" },
     { key: "contract_title", header: "قرارداد", sortable: true, filterable: true, wrap: true },
     { key: "district_name", header: "امور بهره‌برداری", sortable: true, filterable: true },

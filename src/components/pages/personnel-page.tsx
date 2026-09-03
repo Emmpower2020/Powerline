@@ -43,9 +43,7 @@ interface Person {
   national_id?: string | null;
   father_name?: string | null;
   position?: string | null;
-  phone?: string | null;
   mobile?: string | null;
-  email?: string | null;
   supervisor_name?: string | null;
   collaboration_start?: string | null;
   status?: string;
@@ -143,9 +141,7 @@ export function PersonnelPage() {
       national_id: row.national_id || null,
       father_name: row.father_name || null,
       position: row.position || null,
-      phone: row.phone || null,
       mobile: row.mobile || null,
-      email: row.email || null,
       supervisor_name: row.supervisor_name || null,
       collaboration_start: row.collaboration_start || null,
       // v4.3.81: امورِ ایمپورت برای کاربر اموردار خودکار — قابل تغییر دستی نیست
@@ -183,7 +179,6 @@ export function PersonnelPage() {
     "تاریخ شروع همکاری": "collaboration_start",
     "شماره همراه": "mobile",
     "موبایل": "mobile",
-    "تلفن": "phone",
     "سرپرست": "supervisor_name",
   };
   const importTemplateColumns = [
@@ -344,7 +339,7 @@ function PersonnelDialog({ open, editRow, duplicateFrom, onClose, onSaved }: {
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState({
     personnel_code: "", first_name: "", last_name: "", national_id: "", father_name: "",
-    position: "", mobile: "", phone: "",
+    position: "", mobile: "",
     supervisor_name: "", collaboration_start: "", contract_id: "", district_id: "",
   });
 
@@ -362,7 +357,6 @@ function PersonnelDialog({ open, editRow, duplicateFrom, onClose, onSaved }: {
         father_name: sourceRow?.father_name || "",
         position: sourceRow?.position || "",
         mobile: sourceRow?.mobile || "",
-        phone: sourceRow?.phone || "",
         supervisor_name: sourceRow?.supervisor_name || "",
         collaboration_start: sourceRow?.collaboration_start || "",
         contract_id: sourceRow?.contract_id != null ? String(sourceRow.contract_id) : "",
@@ -385,7 +379,6 @@ function PersonnelDialog({ open, editRow, duplicateFrom, onClose, onSaved }: {
         father_name: form.father_name.trim() || null,
         position: form.position.trim() || null,
         mobile: form.mobile.trim() || null,
-        phone: form.phone.trim() || null,
         supervisor_name: form.supervisor_name.trim() || null,
         collaboration_start: form.collaboration_start.trim() || null,
         contract_id: form.contract_id ? Number(form.contract_id) : null,
@@ -472,14 +465,10 @@ function PersonnelDialog({ open, editRow, duplicateFrom, onClose, onSaved }: {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="space-y-2">
               <Label className="text-right block">موبایل</Label>
               <Input value={form.mobile} onChange={e => setForm({ ...form, mobile: e.target.value })} dir="ltr" className="text-left" />
-            </div>
-            <div className="space-y-2">
-              <Label className="text-right block">تلفن</Label>
-              <Input value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} dir="ltr" className="text-left" />
             </div>
             <div className="space-y-2">
               <Label className="text-right block">سرپرست</Label>

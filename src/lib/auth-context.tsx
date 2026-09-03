@@ -20,7 +20,6 @@ export interface User {
   id: number;
   username: string;
   full_name: string;
-  email: string | null;
   organization_id?: number | null;
   // v4.3.78: امور بهره‌برداری کاربر — null یعنی مدیر (همهٔ امور)
   district_id?: number | null;

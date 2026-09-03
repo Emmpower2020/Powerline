@@ -16,7 +16,7 @@ import { Loader2, Lock } from "lucide-react";
 
 /**
  * فرم نقش — ثبت / ویرایش / کپی (همان الگوی فرم‌های برنامه) — v4.3.83
- * ماتریس دسترسی نقش از تب «دسترسی‌ها» تنظیم می‌شود.
+ * ماتریس دسترسی نقش از ستون «دسترسی‌ها» در تب «نقش‌ها و دسترسی‌ها» تنظیم می‌شود.
  * نقش‌های سیستمی: نام قفل است ولی توضیح/وضعیت قابل ویرایش است.
  */
 export function RoleDialog({
@@ -133,7 +133,7 @@ export function RoleDialog({
 
           {duplicateFrom?.module_permissions && (
             <p className="text-[10px] text-slate-400 text-right leading-5">
-              دسترسی‌های نقش «{duplicateFrom.display_name}» کپی می‌شود — بعداً از تب «دسترسی‌ها» قابل تغییر است
+              دسترسی‌های نقش «{duplicateFrom.display_name}» کپی می‌شود — بعداً از ستون «دسترسی‌ها» در جدول نقش‌ها قابل تغییر است
             </p>
           )}
 

@@ -168,7 +168,7 @@ export function UsersStatusActions({
           </DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem className="gap-2 cursor-pointer" onClick={() => { if (requiresSelection()) return; setRoleOpen(true); }}>
-            <UserCog className="w-4 h-4 text-indigo-600" />تغییر نقش...
+            <UserCog className="w-4 h-4 text-indigo-600" />تغییر نقش
           </DropdownMenuItem>
           <DropdownMenuItem className="gap-2 cursor-pointer" onClick={resetPasswords}>
             <KeyRound className="w-4 h-4 text-amber-600" />ریست رمز به 123456

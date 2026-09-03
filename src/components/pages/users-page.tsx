@@ -24,23 +24,22 @@ import { useDistrictOptions } from "@/hooks/use-district-options";
 import { useAuth } from "@/lib/auth-context";
 import { useToast } from "@/hooks/use-toast";
 import { toJalali } from "@/lib/jalali";
-import { Loader2, Users as UsersIcon, ShieldCheck, IdCard } from "lucide-react";
+import { Loader2, Users as UsersIcon, ShieldCheck } from "lucide-react";
 import { PermissionsDialog, type UserRow } from "@/components/users/permissions-dialog";
 import { RoleDialog } from "@/components/users/role-dialog";
 import { UsersStatusActions, RolePermissionsBulkActions, PermSummaryCell } from "@/components/users/users-bulk-actions";
 
 /**
- * صفحه کاربران — v4.3.83 (RBAC): سه تب
+ * صفحه کاربران — v4.3.84 (RBAC): دو تب
  *
  * تب «اطلاعات کاربران»: جدول هم‌شکل خطوط/پرسنل + نوار ابزار کامل + کمبوباکس نقش
  * در فرم + عملیات گروهی وضعیت/نقش/ریست رمز.
  *
- * تب «نقش‌ها»: تعریف نقش‌ها (جدول استاندارد: افزودن/ویرایش/کپی/حذف/ایمپورت اکسل/
- * اکسپورت/چاپ) — دسترسی‌ها به‌جای هر نفر روی نقش تعریف می‌شود؛ مثلاً ۴۰ سیمبان
- * فقط نقش «سیمبان» می‌گیرند.
- *
- * تب «دسترسی‌ها»: ماتریس ریز بخش×ابزار برای هر نقش (تکی/گروهی/کپی از نقش دیگر).
- * مدیر سیستم (بدون امور) همیشه دسترسی کامل دارد.
+ * تب «نقش‌ها و دسترسی‌ها» (ادغام v4.3.84): جدول استاندارد نقش‌ها (افزودن/ویرایش/
+ * کپی/حذف/ایمپورت اکسل) + ستون «دسترسی‌ها» — کلیک روی ردیف یا همان ستون ماتریس
+ * ریز بخش×ابزار همان نقش را باز می‌کند؛ تغییر گروهی/کپی از نقش دیگر از منوی
+ * عملیات گروهی. مثلاً ۴۰ سیمبان فقط نقش «سیمبان» می‌گیرند و دسترسی همان یک
+ * نقش تنظیم می‌شود. مدیر سیستم (بدون امور) همیشه دسترسی کامل دارد.
  */
 export function UsersPage() {
   const { toast } = useToast();
@@ -77,7 +76,6 @@ export function UsersPage() {
 
   const tableRef = useRef<DataTableHandle | null>(null);
   const rolesTableRef = useRef<DataTableHandle | null>(null);
-  const accessTableRef = useRef<DataTableHandle | null>(null);
 
   const { rows: districtRows } = useDistrictOptions();
 
@@ -130,7 +128,6 @@ export function UsersPage() {
         ? <Badge variant="outline" className="text-[11px] border-indigo-200 text-indigo-700 dark:text-indigo-300">{u.district_name || `امور ${u.district_id}`}</Badge>
         : <Badge variant="outline" className="text-[11px] border-slate-200 text-slate-400">همهٔ امور (مدیر)</Badge>,
     },
-    { key: "email", header: "ایمیل", align: "right", render: (u) => u.email ? <span dir="ltr" className="text-xs text-slate-500">{u.email}</span> : <span className="text-slate-300">—</span> },
     { key: "status", header: "وضعیت", type: "status", align: "right" },
     {
       key: "last_login_at", header: "آخرین ورود", align: "right",
@@ -140,7 +137,7 @@ export function UsersPage() {
     },
   ];
 
-  // ─── ستون‌های تب نقش‌ها ───
+  // ─── ستون‌های تب نقش‌ها و دسترسی‌ها (ادغام v4.3.84) ───
   const roleColumns: DataTableColumn<RoleRow>[] = [
     {
       key: "display_name", header: "نام نقش", sortable: true, filterable: true, align: "right",
@@ -157,39 +154,26 @@ export function UsersPage() {
         ? <span className="text-xs text-slate-500 dark:text-slate-400">{r.description}</span>
         : <span className="text-slate-300">—</span>,
     },
+    // v4.3.84: ستون دسترسی‌ها آمد داخل جدول نقش‌ها — کلیک = ماتریس همان نقش
+    {
+      key: "access", header: "دسترسی‌ها", align: "right",
+      render: (r) => (
+        <button
+          type="button"
+          onClick={(e) => { e.stopPropagation(); setPermRoleSource(null); setPermRoleTargets([r]); }}
+          className="text-right rounded-md px-1.5 py-1 -m-1 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 transition-colors cursor-pointer"
+          title="کلیک: ویرایش دسترسی‌های این نقش"
+        >
+          <PermSummaryCell map={r.module_permissions} />
+        </button>
+      ),
+    },
     { key: "users_count", header: "تعداد کاربران", type: "number", sortable: true, align: "right" },
     { key: "status", header: "وضعیت", type: "status", align: "right" },
     {
       key: "created_at", header: "تاریخ ایجاد", align: "right",
       render: (r) => r.created_at ? <span className="text-xs text-slate-500 nums-fa">{toJalali(String(r.created_at))}</span> : <span className="text-slate-300">—</span>,
     },
-  ];
-
-  // ─── ستون‌های تب دسترسی‌ها (نقش × دسترسی) ───
-  const accessColumns: DataTableColumn<RoleRow>[] = [
-    {
-      key: "display_name", header: "نقش", sortable: true, filterable: true, align: "right",
-      render: (r) => (
-        <div className="flex flex-col">
-          <div className="flex items-center gap-1.5">
-            <span className="font-medium text-slate-700 dark:text-slate-100 text-right">{r.display_name}</span>
-            {Number(r.is_system) === 1 && <Badge variant="outline" className="text-[10px] px-1 py-0 h-4 border-slate-200 text-slate-400">سیستمی</Badge>}
-          </div>
-          {r.name && r.name !== r.display_name && (
-            <span className="text-[10px] text-slate-400 text-right" dir="ltr">{r.name}</span>
-          )}
-        </div>
-      ),
-    },
-    {
-      key: "description", header: "توضیحات", align: "right",
-      render: (r) => r.description
-        ? <span className="text-xs text-slate-500 dark:text-slate-400">{r.description}</span>
-        : <span className="text-slate-300">—</span>,
-    },
-    { key: "users_count", header: "کاربران", type: "number", sortable: true, align: "right" },
-    { key: "status", header: "وضعیت", type: "status", align: "right" },
-    { key: "access", header: "دسترسی‌ها", align: "right", render: (r) => <PermSummaryCell map={r.module_permissions} /> },
   ];
 
   // ─── حذف زنجیره‌ای کاربران ───
@@ -276,14 +260,13 @@ export function UsersPage() {
     }
     const payload: Record<string, unknown> = {
       full_name: String(row.full_name ?? "").trim(),
-      email: row.email ? String(row.email).trim() : null,
       district_id: districtId,
       status: "active",
     };
     if (row.role_name) {
       const roleId = resolveRoleIdByName(row.role_name);
       if (roleId == null) {
-        throw new Error(`نقش «${String(row.role_name)}» پیدا نشد — ابتدا از تب «نقش‌ها» بسازید یا ستون نقش را خالی بگذارید`);
+        throw new Error(`نقش «${String(row.role_name)}» پیدا نشد — ابتدا از تب «نقش‌ها و دسترسی‌ها» بسازید یا ستون نقش را خالی بگذارید`);
       }
       payload.role_id = roleId;
     }
@@ -328,7 +311,6 @@ export function UsersPage() {
     "نام کامل": "full_name",
     "رمز عبور": "password",
     "رمز": "password",
-    "ایمیل": "email",
     "امور بهره‌برداری": "district_name",
     "امور": "district_name",
     "نقش": "role_name",
@@ -338,7 +320,6 @@ export function UsersPage() {
     { key: "full_name", header: "نام و نام خانوادگی" },
     { key: "district_name", header: "امور بهره‌برداری" },
     { key: "role_name", header: "نقش (خالی = بدون نقش)" },
-    { key: "email", header: "ایمیل (اختیاری)" },
     { key: "password", header: "رمز عبور (خالی = 123456)" },
   ];
 
@@ -392,10 +373,10 @@ export function UsersPage() {
   return (
     <div className="space-y-4">
       <Tabs defaultValue="info" dir="rtl" className="w-full">
-        <TabsList className="grid w-full max-w-xl grid-cols-3">
+        {/* v4.3.84: ادغام تب نقش‌ها و دسترسی‌ها — دو تب */}
+        <TabsList className="grid w-full max-w-xl grid-cols-2">
           <TabsTrigger value="info" className="text-xs gap-1.5"><UsersIcon className="w-3.5 h-3.5" />اطلاعات کاربران</TabsTrigger>
-          <TabsTrigger value="roles" className="text-xs gap-1.5"><IdCard className="w-3.5 h-3.5" />نقش‌ها</TabsTrigger>
-          <TabsTrigger value="access" className="text-xs gap-1.5"><ShieldCheck className="w-3.5 h-3.5" />دسترسی‌ها</TabsTrigger>
+          <TabsTrigger value="roles" className="text-xs gap-1.5"><ShieldCheck className="w-3.5 h-3.5" />نقش‌ها و دسترسی‌ها</TabsTrigger>
         </TabsList>
 
         {/* ─── تب ۱: اطلاعات کاربران — جدول هم‌شکل بقیه بخش‌ها ─── */}
@@ -404,7 +385,7 @@ export function UsersPage() {
             data={users}
             columns={columns}
             loading={loading}
-            searchKeys={["username", "full_name", "email", "role_name", "roles", "district_name"]}
+            searchKeys={["username", "full_name", "role_name", "roles", "district_name"]}
             title="کاربران"
             layoutKey="users"
             accessKey="users"
@@ -436,7 +417,7 @@ export function UsersPage() {
           />
         </TabsContent>
 
-        {/* ─── تب ۲: نقش‌ها — تعریف نقش‌های سازمان (جدول استاندارد) ─── */}
+        {/* ─── تب ۲: نقش‌ها و دسترسی‌ها (ادغام) — جدول نقش‌ها + ستون دسترسی ─── */}
         <TabsContent value="roles" className="mt-4">
           {rolesError && (
             <div className="bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-900 rounded-lg p-3 text-xs text-red-700 dark:text-red-300 leading-6 mb-3">
@@ -448,13 +429,14 @@ export function UsersPage() {
             columns={roleColumns}
             loading={loading}
             searchKeys={["display_name", "name", "description"]}
-            title="نقش‌ها"
+            title="نقش‌ها و دسترسی‌ها"
             layoutKey="roles"
             accessKey="users"
             tableRef={rolesTableRef}
             onAdd={() => { setEditRoleRow(null); setDuplicateRoleFrom(null); setShowRoleCreate(true); }}
             onRefresh={() => setRefreshKey(k => k + 1)}
-            onRowClick={(row) => { setDuplicateRoleFrom(null); setEditRoleRow(row); }}
+            // v4.3.84: کلیک ردیف = ماتریس دسترسی همان نقش (تکی)
+            onRowClick={(row) => { setPermRoleSource(null); setPermRoleTargets([row]); }}
             onEdit={(row) => { setDuplicateRoleFrom(null); setEditRoleRow(row); }}
             onDuplicate={(row) => { setEditRoleRow(null); setDuplicateRoleFrom(row); setShowRoleCreate(true); }}
             onCopy={(rows) => {
@@ -469,28 +451,6 @@ export function UsersPage() {
             }}
             onDelete={(rows) => setPendingRoleDelete(rows)}
             onImport={() => setShowRoleImport(true)}
-          />
-        </TabsContent>
-
-        {/* ─── تب ۳: دسترسی‌ها — ماتریس نقش × ابزار ─── */}
-        <TabsContent value="access" className="mt-4">
-          {rolesError && (
-            <div className="bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-900 rounded-lg p-3 text-xs text-red-700 dark:text-red-300 leading-6 mb-3">
-              {rolesError}
-            </div>
-          )}
-          <DataTable
-            data={roles}
-            columns={accessColumns}
-            loading={loading}
-            searchKeys={["display_name", "name", "description"]}
-            title="دسترسی نقش‌ها"
-            layoutKey="roles-access"
-            accessKey="users"
-            tableRef={accessTableRef}
-            onRefresh={() => setRefreshKey(k => k + 1)}
-            onRowClick={(row) => { setPermRoleSource(null); setPermRoleTargets([row]); }}
-            onEdit={(row) => { setPermRoleSource(null); setPermRoleTargets([row]); }}
             toolbarExtra={(selected) => (
               <RolePermissionsBulkActions
                 selectedRoles={selected}
@@ -591,7 +551,7 @@ export function UsersPage() {
   );
 }
 
-/** فرم کاربر — ایجاد / ویرایش / کپی (مثل فرم پرسنل) — v4.3.83: کمبوباکس نقش */
+/** فرم کاربر — ایجاد / ویرایش / کپی (مثل فرم پرسنل) — v4.3.83: کمبوباکس نقش · v4.3.84: حذف ایمیل */
 function UserDialog({ open, editRow, duplicateFrom, roles, selfUserId, onClose, onSaved }: {
   open: boolean;
   editRow: UserRow | null;
@@ -604,7 +564,7 @@ function UserDialog({ open, editRow, duplicateFrom, roles, selfUserId, onClose, 
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState({
-    username: "", full_name: "", password: "", email: "",
+    username: "", full_name: "", password: "",
     district_id: "", status: "active", role_id: "",
   });
 
@@ -619,7 +579,6 @@ function UserDialog({ open, editRow, duplicateFrom, roles, selfUserId, onClose, 
         username: duplicateFrom ? "" : (sourceRow?.username || ""),
         full_name: sourceRow?.full_name || "",
         password: "",
-        email: sourceRow?.email || "",
         district_id: sourceRow?.district_id != null ? String(sourceRow.district_id) : "",
         status: sourceRow?.status === "inactive" ? "inactive" : "active",
         // v4.3.83: نقش کاربر — کپی از روی کاربر مبدأ
@@ -638,7 +597,6 @@ function UserDialog({ open, editRow, duplicateFrom, roles, selfUserId, onClose, 
       if (editRow) {
         const payload: Record<string, unknown> = {
           full_name: form.full_name.trim(),
-          email: form.email.trim() || null,
           status: form.status,
         };
         // مدیر سیستم نمی‌تواند امور/وضعیت/نقش خودش را محدود کند
@@ -653,7 +611,6 @@ function UserDialog({ open, editRow, duplicateFrom, roles, selfUserId, onClose, 
           username: form.username.trim(),
           full_name: form.full_name.trim(),
           password: form.password.trim() || "123456",
-          email: form.email.trim() || null,
           district_id: form.district_id ? Number(form.district_id) : null,
           status: form.status,
           role_id: roleId,
@@ -714,12 +671,18 @@ function UserDialog({ open, editRow, duplicateFrom, roles, selfUserId, onClose, 
                 />
               </div>
               <div className="space-y-2">
-                <Label className="text-right block">ایمیل</Label>
-                <Input value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} dir="ltr" className="text-left" placeholder="example@mail.com" />
+                <Label className="text-right block">وضعیت</Label>
+                <Select value={form.status} onValueChange={v => setForm({ ...form, status: v })} disabled={editingSelf}>
+                  <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="active">فعال</SelectItem>
+                    <SelectItem value="inactive">غیرفعال</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 gap-3">
               <div className="space-y-2">
                 <Label className="text-right block">امور بهره‌برداری</Label>
                 <DistrictSelect
@@ -732,16 +695,6 @@ function UserDialog({ open, editRow, duplicateFrom, roles, selfUserId, onClose, 
                 {!editingSelf && !form.district_id && (
                   <p className="text-[10px] text-amber-600 text-right">بدون امور = مدیر سیستم با دسترسی کامل</p>
                 )}
-              </div>
-              <div className="space-y-2">
-                <Label className="text-right block">وضعیت</Label>
-                <Select value={form.status} onValueChange={v => setForm({ ...form, status: v })} disabled={editingSelf}>
-                  <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="active">فعال</SelectItem>
-                    <SelectItem value="inactive">غیرفعال</SelectItem>
-                  </SelectContent>
-                </Select>
               </div>
             </div>
           </FormSection>
@@ -768,7 +721,7 @@ function UserDialog({ open, editRow, duplicateFrom, roles, selfUserId, onClose, 
               {editingSelf && <p className="text-[10px] text-amber-600 text-right">نقش حساب خودتان قابل تغییر نیست</p>}
               {!editingSelf && !form.role_id && (
                 <p className="text-[10px] text-slate-400 text-right leading-5">
-                  بدون نقش = همهٔ بخش‌ها فقط مشاهده — با انتخاب نقش، دسترسی‌های همان نقش اعمال می‌شود (تنظیم از تب «دسترسی‌ها»)
+                  بدون نقش = همهٔ بخش‌ها فقط مشاهده — با انتخاب نقش، دسترسی‌های همان نقش اعمال می‌شود (تنظیم از تب «نقش‌ها و دسترسی‌ها»)
                 </p>
               )}
             </div>

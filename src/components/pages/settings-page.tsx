@@ -47,7 +47,6 @@ export function SettingsPage() {
             <div className="text-right">
               <h3 className="text-xl font-bold text-slate-800 dark:text-slate-100">{user?.full_name}</h3>
               <p className="text-sm text-slate-500">@{user?.username}</p>
-              {user?.email && <p className="text-sm text-slate-400">{user.email}</p>}
             </div>
           </div>
         </CardContent>
