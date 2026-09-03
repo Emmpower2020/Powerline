@@ -343,6 +343,8 @@ function registerModuleRoutes(Router $router): void
 
     $router->post('districts', function () use ($guardedDelete) {
         Auth::authenticate(); Auth::requirePermissionSoft('districts.create');
+        // v4.3.81: تعریف/ویرایش امور فقط برای مدیر سیستم
+        if (!Helpers::userCanChangeDistrict()) Response::error(403, 'مدیریت امور بهره‌برداری فقط برای مدیر سیستم مجاز است');
         $b = Helpers::getJsonBody();
         $name = trim((string)($b['name'] ?? ''));
         if ($name === '') Response::error(400, 'نام امور بهره‌برداری الزامی است');
@@ -357,6 +359,8 @@ function registerModuleRoutes(Router $router): void
 
     $router->put('districts/{id}', function ($id) {
         Auth::authenticate(); Auth::requirePermissionSoft('districts.update');
+        // v4.3.81: تعریف/ویرایش امور فقط برای مدیر سیستم
+        if (!Helpers::userCanChangeDistrict()) Response::error(403, 'مدیریت امور بهره‌برداری فقط برای مدیر سیستم مجاز است');
         $b = Helpers::getJsonBody();
         $pdo = Database::getInstance()->getConnection();
         $fields = []; $params = [];
@@ -379,6 +383,8 @@ function registerModuleRoutes(Router $router): void
     // حذف امور — فقط رکورد غیرفعال؛ وابستگی‌ها (خطوط/دکل‌ها/...) از طریق FK بررسی می‌شوند
     $router->delete('districts/{id}', function ($id) use ($guardedDelete) {
         Auth::authenticate(); Auth::requirePermissionSoft('districts.delete');
+        // v4.3.81: حذف امور فقط برای مدیر سیستم
+        if (!Helpers::userCanChangeDistrict()) Response::error(403, 'مدیریت امور بهره‌برداری فقط برای مدیر سیستم مجاز است');
         $guardedDelete('districts', 'امور بهره‌برداری', (int)$id);
     });
 
@@ -541,6 +547,8 @@ function registerModuleRoutes(Router $router): void
         Auth::authenticate();
         Auth::requirePermissionSoft('contracts.update');
         $body = Helpers::getJsonBody(); $pdo = Database::getInstance()->getConnection();
+        // v4.3.81: قفل امور — تغییر امور رکورد فقط برای مدیر
+        $body = Helpers::stripDistrictForNonAdmin($body);
         $fields = ['contract_code', 'title', 'contractor_id', 'contract_type', 'start_date', 'end_date', 'amount', 'status', 'notes'];
         $updates = []; $params = [];
         foreach ($fields as $f) {
@@ -630,6 +638,8 @@ function registerModuleRoutes(Router $router): void
         Auth::authenticate();
         Auth::requirePermission('financial.update');
         $body = Helpers::getJsonBody(); $pdo = Database::getInstance()->getConnection();
+        // v4.3.81: قفل امور — تغییر امور رکورد فقط برای مدیر
+        $body = Helpers::stripDistrictForNonAdmin($body);
 
         $existing = $pdo->prepare('SELECT id FROM invoices WHERE id = ?');
         $existing->execute([(int)$id]);
@@ -721,6 +731,8 @@ function registerModuleRoutes(Router $router): void
         Auth::authenticate();
         Auth::requirePermissionSoft('safety.update');
         $body = Helpers::getJsonBody(); $pdo = Database::getInstance()->getConnection();
+        // v4.3.81: قفل امور — تغییر امور رکورد فقط برای مدیر
+        $body = Helpers::stripDistrictForNonAdmin($body);
         $fields = ['title', 'description', 'severity', 'status', 'root_cause', 'corrective_actions', 'preventive_actions', 'contract_id', 'line_id', 'tower_id', 'occurred_at', 'location_desc', 'incident_type'];
         // v4.3.78: ویرایش امور بهره‌برداری و وضعیت فعال/غیرفعال
         if (Helpers::columnExists('safety_incidents', 'district_id')) $fields[] = 'district_id';
@@ -817,6 +829,8 @@ function registerModuleRoutes(Router $router): void
         Auth::authenticate();
         Auth::requirePermissionSoft('personnel.update');
         $body = Helpers::getJsonBody(); $pdo = Database::getInstance()->getConnection();
+        // v4.3.81: قفل امور — تغییر امور رکورد فقط برای مدیر
+        $body = Helpers::stripDistrictForNonAdmin($body);
         $cols = $personnelCols($pdo);
         $posCol = $personnelPositionCol($pdo);
         if ($posCol !== null && $posCol !== 'position' && array_key_exists('position', $body)) { $body[$posCol] = $body['position']; unset($body['position']); }
@@ -947,7 +961,8 @@ function registerModuleRoutes(Router $router): void
 
         $body = Helpers::getJsonBody();
         $ids = $body['ids'] ?? [];
-        $patch = $body['patch'] ?? [];
+        // v4.3.81: قفل امور — وصلهٔ گروهی امور فقط برای مدیر
+        $patch = Helpers::stripDistrictForNonAdmin($body['patch'] ?? []);
         if (!is_array($ids) || count($ids) === 0) Response::error(400, 'لیست شناسه‌ها ارسال نشده');
         if (count($ids) > 100) Response::error(400, 'حداکثر ۱۰۰ پرسنل در هر درخواست');
         if (!is_array($patch) || count($patch) === 0) Response::error(400, 'مقدار ویرایش ارسال نشده');
@@ -989,7 +1004,8 @@ function registerModuleRoutes(Router $router): void
         $user = Auth::authenticate();
         Auth::requirePermissionSoft('personnel.create');
         $body = Helpers::getJsonBody();
-        $rows = $body['rows'] ?? [];
+        // v4.3.81: امورِ ایمپورت برای کاربر اموردار خودکار
+        $rows = Helpers::forceDistrictOnRows($body['rows'] ?? []);
         if (!is_array($rows) || count($rows) === 0) Response::error(400, 'لیست ردیف‌ها ارسال نشده');
         if (count($rows) > 500) Response::error(400, 'حداکثر ۵۰۰ ردیف در هر درخواست');
 
@@ -1332,6 +1348,8 @@ function registerModuleRoutes(Router $router): void
         Auth::authenticate();
         Auth::requirePermissionSoft('circuits.update');
         $body = Helpers::getJsonBody(); $pdo = Database::getInstance()->getConnection();
+        // v4.3.81: قفل امور — تغییر امور رکورد فقط برای مدیر
+        $body = Helpers::stripDistrictForNonAdmin($body);
         $fields = ['dispatch_code', 'name', 'voltage', 'line_id', 'contract_id'];
         // v4.3.78: ویرایش وضعیت (فعال/غیرفعال) و امور بهره‌برداری
         if (Helpers::columnExists('circuits', 'status')) $fields[] = 'status';
@@ -1392,7 +1410,8 @@ function registerModuleRoutes(Router $router): void
         $user = Auth::authenticate();
         Auth::requirePermissionSoft('circuits.create');
         $body = Helpers::getJsonBody();
-        $rows = $body['rows'] ?? [];
+        // v4.3.81: امورِ ایمپورت برای کاربر اموردار خودکار
+        $rows = Helpers::forceDistrictOnRows($body['rows'] ?? []);
         if (!is_array($rows) || count($rows) === 0) Response::error(400, 'لیست ردیف‌ها ارسال نشده');
         if (count($rows) > 500) Response::error(400, 'حداکثر ۵۰۰ ردیف در هر درخواست');
 
@@ -1516,6 +1535,8 @@ function registerModuleRoutes(Router $router): void
         Auth::authenticate();
         Auth::requirePermissionSoft('contractors.update');
         $body = Helpers::getJsonBody(); $pdo = Database::getInstance()->getConnection();
+        // v4.3.81: قفل امور — تغییر امور رکورد فقط برای مدیر
+        $body = Helpers::stripDistrictForNonAdmin($body);
         $fields = ['contractor_code', 'contractor_name', 'ceo_name', 'contractor_phone', 'mobile', 'address', 'status'];
         $updates = []; $params = [];
         foreach ($fields as $f) {
@@ -1609,6 +1630,8 @@ function registerModuleRoutes(Router $router): void
         Auth::authenticate();
         Auth::requirePermissionSoft('equipment.update');
         $body = Helpers::getJsonBody(); $pdo = Database::getInstance()->getConnection();
+        // v4.3.81: قفل امور — تغییر امور رکورد فقط برای مدیر
+        $body = Helpers::stripDistrictForNonAdmin($body);
         $fields = ['serial_number', 'manufacturer', 'model', 'install_date', 'warranty_expiry', 'contract_id', 'status'];
         // v4.3.78: ویرایش امور بهره‌برداری تجهیز
         if (Helpers::columnExists('equipment', 'district_id')) $fields[] = 'district_id';
@@ -1705,6 +1728,8 @@ function registerModuleRoutes(Router $router): void
         Auth::authenticate();
         Auth::requirePermissionSoft('price_lists.update');
         $body = Helpers::getJsonBody(); $pdo = Database::getInstance()->getConnection();
+        // v4.3.81: قفل امور — تغییر امور رکورد فقط برای مدیر
+        $body = Helpers::stripDistrictForNonAdmin($body);
         $fields = ['code','title','unit','unit_price','category','status'];
         $updates = []; $params = [];
         foreach ($fields as $f) { if (array_key_exists($f, $body)) { $updates[] = "`$f` = ?"; $params[] = $body[$f]; } }

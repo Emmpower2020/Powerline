@@ -45,6 +45,23 @@ export function currentUserIsDistrictAdmin(): boolean {
 }
 
 /**
+ * v4.3.81: مقدار نهایی «امور بهره‌برداری» برای ذخیره در فرم‌ها/ایمپورت.
+ * کاربر اموردار (غیرمدیر) همیشه امور خودش را برمی‌گرداند — هر چه در فرم باشد؛
+ * مدیر همان مقدار فرم را (خالی = نامشخص).
+ */
+export function resolveDistrictValue(formValue: string | number | null | undefined): number | null {
+  const own = currentUserDistrictId();
+  if (own !== null) return own;
+  const v = formValue as string | number | null | undefined;
+  return (v === null || v === undefined || v === "" || Number(v) <= 0) ? null : Number(v);
+}
+
+/** v4.3.81: آیا کاربر جاری اجازهٔ تغییر امورِ رکوردها را دارد؟ (فقط مدیران) */
+export function canChangeDistrict(): boolean {
+  return currentUserIsDistrictAdmin();
+}
+
+/**
  * گزینه‌های «امور بهره‌برداری» — مشترک همهٔ فرم‌ها.
  * همهٔ امور (فعال و غیرفعال) نمایش داده می‌شوند تا ویرایش رکوردهای
  * امورِ غیرفعال هم ممکن باشد؛ امورهای فعال با نشان سبز جدا می‌شوند.

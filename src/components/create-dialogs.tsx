@@ -18,7 +18,7 @@ import { JalaliDatePicker } from "@/components/jalali-date-picker";
 import { fromJalali, fromPersianNumber } from "@/lib/jalali";
 import { ContractSelect } from "@/components/contract-select";
 import { DistrictSelect } from "@/components/district-select";
-import { currentUserDistrictId } from "@/hooks/use-district-options";
+import { currentUserDistrictId, resolveDistrictValue } from "@/hooks/use-district-options";
 import { FormSection } from "@/components/form-section";
 
 // قرارداد
@@ -230,7 +230,7 @@ export function CreateInspectionDialog({ open, onClose, onCreated }: { open: boo
     e.preventDefault();
     if (!form.inspection_date) { setError("تاریخ بازدید الزامی است"); return; }
     setSubmitting(true); setError(null);
-    try { await apiClient.post(API_ENDPOINTS.inspections, { inspection_date: form.inspection_date, priority: form.priority, weather: form.weather || null, notes: form.notes || null, contract_id: form.contract_id ? Number(form.contract_id) : null, district_id: form.district_id ? Number(form.district_id) : null }); setForm({ inspection_date: "", priority: "routine", weather: "", notes: "", contract_id: "", district_id: currentUserDistrictId() !== null ? String(currentUserDistrictId()) : "" }); onCreated(); } catch (err) { setError(err instanceof Error ? err.message : "خطا"); } finally { setSubmitting(false); }
+    try { await apiClient.post(API_ENDPOINTS.inspections, { inspection_date: form.inspection_date, priority: form.priority, weather: form.weather || null, notes: form.notes || null, contract_id: form.contract_id ? Number(form.contract_id) : null, district_id: resolveDistrictValue(form.district_id) }); setForm({ inspection_date: "", priority: "routine", weather: "", notes: "", contract_id: "", district_id: currentUserDistrictId() !== null ? String(currentUserDistrictId()) : "" }); onCreated(); } catch (err) { setError(err instanceof Error ? err.message : "خطا"); } finally { setSubmitting(false); }
   };
 
   return (
@@ -242,7 +242,7 @@ export function CreateInspectionDialog({ open, onClose, onCreated }: { open: boo
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <Field label="قرارداد"><ContractSelect value={form.contract_id} onChange={v => setForm({ ...form, contract_id: v })} /></Field>
         {/* v4.3.78: امور بهره‌برداری بازدید */}
-        <Field label="امور بهره‌برداری"><DistrictSelect value={form.district_id} onChange={v => setForm({ ...form, district_id: v })} /></Field>
+        <Field label="امور بهره‌برداری"><DistrictSelect autoLock value={form.district_id} onChange={v => setForm({ ...form, district_id: v })} /></Field>
       </div>
       <Field label="وضعیت هوا"><Input value={form.weather} onChange={e => setForm({ ...form, weather: e.target.value })} className="text-right" /></Field>
       <Field label="یادداشت"><Textarea value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} rows={3} className="text-right" /></Field>
@@ -271,7 +271,7 @@ export function CreateWorkOrderDialog({ open, onClose, onCreated }: { open: bool
     e.preventDefault();
     if (!form.title) { setError("عنوان الزامی است"); return; }
     setSubmitting(true); setError(null);
-    try { await apiClient.post(API_ENDPOINTS.workOrders, { title: form.title, description: form.description || null, priority: form.priority, planned_start: form.planned_start || null, planned_end: form.planned_end || null, crew_id: form.crew_id ? Number(form.crew_id) : null, outage_required: form.outage_required, contract_id: form.contract_id ? Number(form.contract_id) : null, district_id: form.district_id ? Number(form.district_id) : null }); setForm({ title: "", description: "", priority: "medium", planned_start: "", planned_end: "", crew_id: "", outage_required: false, contract_id: "", district_id: currentUserDistrictId() !== null ? String(currentUserDistrictId()) : "" }); onCreated(); } catch (err) { setError(err instanceof Error ? err.message : "خطا"); } finally { setSubmitting(false); }
+    try { await apiClient.post(API_ENDPOINTS.workOrders, { title: form.title, description: form.description || null, priority: form.priority, planned_start: form.planned_start || null, planned_end: form.planned_end || null, crew_id: form.crew_id ? Number(form.crew_id) : null, outage_required: form.outage_required, contract_id: form.contract_id ? Number(form.contract_id) : null, district_id: resolveDistrictValue(form.district_id) }); setForm({ title: "", description: "", priority: "medium", planned_start: "", planned_end: "", crew_id: "", outage_required: false, contract_id: "", district_id: currentUserDistrictId() !== null ? String(currentUserDistrictId()) : "" }); onCreated(); } catch (err) { setError(err instanceof Error ? err.message : "خطا"); } finally { setSubmitting(false); }
   };
 
   return (
@@ -284,7 +284,7 @@ export function CreateWorkOrderDialog({ open, onClose, onCreated }: { open: bool
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <Field label="قرارداد"><ContractSelect value={form.contract_id} onChange={v => setForm({ ...form, contract_id: v })} /></Field>
         {/* v4.3.78: امور بهره‌برداری دستورکار */}
-        <Field label="امور بهره‌برداری"><DistrictSelect value={form.district_id} onChange={v => setForm({ ...form, district_id: v })} /></Field>
+        <Field label="امور بهره‌برداری"><DistrictSelect autoLock value={form.district_id} onChange={v => setForm({ ...form, district_id: v })} /></Field>
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
       <Field label="شروع پلن"><JalaliDatePicker value={form.planned_start} onChange={v => setForm({ ...form, planned_start: v })} type="datetime" /></Field>

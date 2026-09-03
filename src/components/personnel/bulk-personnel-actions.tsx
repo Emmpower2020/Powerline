@@ -18,6 +18,7 @@ import { SearchableSelect } from "@/components/searchable-select";
 import { ContractSelect } from "@/components/contract-select";
 import { DistrictSelect } from "@/components/district-select";
 import { usePersonnelOptions } from "@/hooks/use-personnel-options";
+import { canChangeDistrict as userCanChangeDistrict } from "@/hooks/use-district-options";
 import { useToast } from "@/hooks/use-toast";
 import { BulkOperationPanel, type BulkOperationProgress } from "@/components/bulk-operation-dialog";
 
@@ -31,10 +32,11 @@ interface BulkPersonnelActionsProps {
 type FieldAction = "position" | "supervisor" | "contract" | "district";
 
 const actionMeta: Record<FieldAction, { title: string; label: string }> = {
-  position:   { title: "تغییر گروهی سمت", label: "تغییر سمت" },
-  supervisor: { title: "تغییر گروهی سرپرست", label: "تغییر سرپرست" },
-  contract:   { title: "تغییر گروهی قرارداد", label: "تغییر قرارداد" },
-  district:   { title: "تغییر گروهی امور بهره‌برداری", label: "تغییر امور بهره‌برداری" },
+  // v4.3.81: لیبل‌ها بدون پیشوند «تغییر» — استاندارد واحد با سایر جدول‌ها
+  position:   { title: "تغییر گروهی سمت", label: "سمت" },
+  supervisor: { title: "تغییر گروهی سرپرست", label: "سرپرست" },
+  contract:   { title: "تغییر گروهی قرارداد", label: "قرارداد" },
+  district:   { title: "تغییر گروهی امور بهره‌برداری", label: "امور بهره‌برداری" },
 };
 
 /**
@@ -52,6 +54,8 @@ export function BulkPersonnelActions({ getSelection, onApplied, positionOptions 
   const [operationOpen, setOperationOpen] = useState(false);
   const { supervisorOptions } = usePersonnelOptions();
   const { toast } = useToast();
+  // v4.3.81: تغییر امور فقط برای مدیران — آیتم برای کاربر اموردار نمایش داده نمی‌شود
+  const districtAllowed = userCanChangeDistrict();
 
   const requireSelection = useCallback((): boolean => {
     const sel = getSelection();
@@ -158,7 +162,7 @@ export function BulkPersonnelActions({ getSelection, onApplied, positionOptions 
           <ItemRow icon={<Briefcase className="w-4 h-4 text-indigo-600" />} label="سمت" onClick={() => startFieldAction("position")} />
           <ItemRow icon={<UserCog className="w-4 h-4 text-indigo-600" />} label="سرپرست" onClick={() => startFieldAction("supervisor")} />
           <ItemRow icon={<FileText className="w-4 h-4 text-indigo-600" />} label="قرارداد" onClick={() => startFieldAction("contract")} />
-          <ItemRow icon={<MapPin className="w-4 h-4 text-emerald-600" />} label="امور بهره‌برداری" onClick={() => startFieldAction("district")} />
+          {districtAllowed && <ItemRow icon={<MapPin className="w-4 h-4 text-emerald-600" />} label="امور بهره‌برداری" onClick={() => startFieldAction("district")} />}
         </DropdownMenuContent>
       </DropdownMenu>
 

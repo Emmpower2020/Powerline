@@ -13,6 +13,7 @@ import { getTowerIssues } from "@/lib/towers-quality";
 import { usePersonnelOptions } from "@/hooks/use-personnel-options";
 import { useToast } from "@/hooks/use-toast";
 import { useStatsVisible } from "@/hooks/use-stats-visible";
+import { resolveDistrictValue } from "@/hooks/use-district-options";
 import { logError } from "@/lib/error-log";
 import { cn } from "@/lib/utils";
 import {
@@ -252,6 +253,8 @@ export function TowersPage() {
         }
       }
     }
+    // v4.3.81: امورِ ایمپورت برای کاربر اموردار خودکار — قابل تغییر دستی نیست
+    payload.district_id = resolveDistrictValue((row as any).district_id);
 
     if (mode === "insert") {
       await apiClient.post(API_ENDPOINTS.towers, payload);
@@ -264,7 +267,7 @@ export function TowersPage() {
   const handleImportBatch = useCallback(async (
     items: Array<{ row: Record<string, unknown>; mode: "insert" | "update"; existingId?: number }>
   ): Promise<Array<{ status: "inserted" | "updated" | "skipped" | "failed"; error?: string }>> => {
-    const rows = items.map(it => ({ ...it.row, ...(it.mode === "update" && it.existingId ? { id: it.existingId } : {}) }));
+    const rows = items.map(it => ({ ...it.row, ...(it.mode === "update" && it.existingId ? { id: it.existingId } : {}), district_id: resolveDistrictValue((it.row as any).district_id) }));
     // v2.4.1: مهلت ۶۰ ثانیه — بچ‌های بزرگ روی هاست اشتراکی زمان‌برند
     const res = await apiClient.post<any>("towers/bulk-import", { rows }, { timeoutMs: 60_000 });
     const statuses: string[] = res?.statuses || [];

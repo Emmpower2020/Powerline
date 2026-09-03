@@ -21,6 +21,11 @@ export interface User {
   full_name: string;
   email: string | null;
   organization_id?: number | null;
+  // v4.3.78: امور بهره‌برداری کاربر — null یعنی مدیر (همهٔ امور)
+  district_id?: number | null;
+  district_name?: string | null;
+  // v4.3.81: دسترسی ماژول‌ها — null یعنی همهٔ بخش‌ها؛ false یعنی مسدود
+  module_permissions?: Record<string, boolean> | null;
 }
 
 export interface UserRole {
@@ -38,6 +43,8 @@ interface AuthContextType {
   hasPermission: (permission: string) => boolean;
   hasRole: (role: string) => boolean;
   refreshUser: () => Promise<void>;
+  /** v4.3.81: آیا کاربر جاری به ماژول (بخش) دسترسی دارد؟ */
+  canAccessModule: (moduleKey: string) => boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -142,6 +149,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return roles.some((r) => r.name === role);
   };
 
+  // v4.3.81: دسترسی ماژول — مدیر (بدون امور) همیشه کامل؛ نقشهٔ null یعنی همه مجاز
+  const canAccessModule = (moduleKey: string): boolean => {
+    if (!user) return true; // پیش از لاگین فیلتر نکن
+    if (user.district_id == null) return true; // مدیر سیستم
+    const mp = user.module_permissions;
+    if (!mp || typeof mp !== "object") return true;
+    return mp[moduleKey] !== false;
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -154,6 +170,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         hasPermission,
         hasRole,
         refreshUser,
+        canAccessModule,
       }}
     >
       {children}

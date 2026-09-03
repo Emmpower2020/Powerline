@@ -20,6 +20,7 @@ import { useConductors } from "@/hooks/use-conductors";
 import { usePersonnelOptions } from "@/hooks/use-personnel-options";
 import { useToast } from "@/hooks/use-toast";
 import { useTowerReferences } from "@/hooks/use-tower-references";
+import { canChangeDistrict as userCanChangeDistrict } from "@/hooks/use-district-options";
 import { ContractSelect } from "@/components/contract-select";
 import { DistrictSelect } from "@/components/district-select";
 import { BulkOperationPanel, type BulkOperationProgress } from "@/components/bulk-operation-dialog";
@@ -69,6 +70,8 @@ export function BulkLinesActions({ getSelection, onApplied }: BulkLinesActionsPr
   const { options: conductorOptions } = useConductors();
   const { structures: towerStructures } = useTowerReferences(fieldAction === "tower_structure");
   const { toast } = useToast();
+  // v4.3.81: تغییر امور فقط برای مدیران — آیتم برای کاربر اموردار نمایش داده نمی‌شود
+  const districtAllowed = userCanChangeDistrict();
 
   // لیست پیمانکارها فقط وقتی لازم شد بارگذاری می‌شود
   useEffect(() => {
@@ -221,7 +224,7 @@ export function BulkLinesActions({ getSelection, onApplied }: BulkLinesActionsPr
           <ItemRow icon={<UserCog className="w-4 h-4 text-indigo-600" />} label="کارشناس خط" onClick={() => startFieldAction("expert")} />
           <ItemRow icon={<UserCog className="w-4 h-4 text-indigo-600" />} label="پیمانکار" onClick={() => startFieldAction("contractor")} />
           <ItemRow icon={<FileText className="w-4 h-4 text-indigo-600" />} label="قرارداد" onClick={() => startFieldAction("contract")} />
-          <ItemRow icon={<MapPin className="w-4 h-4 text-emerald-600" />} label="امور بهره‌برداری" onClick={() => startFieldAction("district")} />
+          {districtAllowed && <ItemRow icon={<MapPin className="w-4 h-4 text-emerald-600" />} label="امور بهره‌برداری" onClick={() => startFieldAction("district")} />}
         </DropdownMenuContent>
       </DropdownMenu>
 

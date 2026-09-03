@@ -233,6 +233,9 @@ function registerLineRoutes(Router $router): void
         Auth::requirePermission('lines.update');
 
         $body = Helpers::getJsonBody();
+        // v4.3.81: قفل امور — تغییر امور رکورد فقط برای مدیر
+        $body = Helpers::stripDistrictForNonAdmin($body);
+
         $db = Database::getInstance();
 
         // بررسی وجود خط
@@ -315,7 +318,8 @@ function registerLineRoutes(Router $router): void
 
         $body = Helpers::getJsonBody();
         $ids = $body['ids'] ?? [];
-        $patch = $body['patch'] ?? [];
+        // v4.3.81: قفل امور — وصلهٔ گروهی امور فقط برای مدیر
+        $patch = Helpers::stripDistrictForNonAdmin($body['patch'] ?? []);
 
         if (!is_array($ids) || count($ids) === 0) Response::error(400, 'لیست شناسه‌ها ارسال نشده');
         if (count($ids) > 100) Response::error(400, 'حداکثر ۱۰۰ خط در هر درخواست');
@@ -417,7 +421,8 @@ function registerLineRoutes(Router $router): void
         Auth::requirePermission('lines.create');
 
         $body = Helpers::getJsonBody();
-        $rows = $body['rows'] ?? [];
+        // v4.3.81: امورِ ایمپورت برای کاربر اموردار خودکار
+        $rows = Helpers::forceDistrictOnRows($body['rows'] ?? []);
 
         if (!is_array($rows) || count($rows) === 0) {
             Response::error(400, 'لیست ردیف‌ها ارسال نشده');

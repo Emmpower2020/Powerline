@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { resolveDistrictValue } from "@/hooks/use-district-options";
 import { apiClient } from "@/lib/api-client";
 import { API_ENDPOINTS } from "@/lib/api-config";
 import type { Inspection, WorkOrder, PaginatedResponse } from "@/lib/types";
@@ -32,7 +33,7 @@ export function InspectionsPage() {
     setRefreshKey(k => k + 1);
   };
   const handleDuplicate = async (row: Inspection) => {
-    try { await apiClient.post(API_ENDPOINTS.inspections, { inspection_date: row.inspection_date, priority: row.priority, weather: row.weather || null, notes: row.notes || null, line_id: row.line_id || null, tower_id: row.tower_id || null, contract_id: row.contract_id || null, district_id: (row as any).district_id ?? null }); setRefreshKey(k => k + 1); } catch (e) { console.error(e); }
+    try { await apiClient.post(API_ENDPOINTS.inspections, { inspection_date: row.inspection_date, priority: row.priority, weather: row.weather || null, notes: row.notes || null, line_id: row.line_id || null, tower_id: row.tower_id || null, contract_id: row.contract_id || null, district_id: resolveDistrictValue((row as any).district_id) }); setRefreshKey(k => k + 1); } catch (e) { console.error(e); }
   };
 
   const columns: DataTableColumn<Inspection>[] = [
@@ -85,7 +86,7 @@ export function WorkOrdersPage() {
     setRefreshKey(k => k + 1);
   };
   const handleDuplicate = async (row: WorkOrder) => {
-    try { await apiClient.post(API_ENDPOINTS.workOrders, { title: row.title, description: row.description || null, priority: row.priority, planned_start: row.planned_start || null, planned_end: row.planned_end || null, crew_id: row.crew_id || null, outage_required: !!row.outage_required, contract_id: row.contract_id || null, district_id: (row as any).district_id ?? null }); setRefreshKey(k => k + 1); } catch (e) { console.error(e); }
+    try { await apiClient.post(API_ENDPOINTS.workOrders, { title: row.title, description: row.description || null, priority: row.priority, planned_start: row.planned_start || null, planned_end: row.planned_end || null, crew_id: row.crew_id || null, outage_required: !!row.outage_required, contract_id: row.contract_id || null, district_id: resolveDistrictValue((row as any).district_id) }); setRefreshKey(k => k + 1); } catch (e) { console.error(e); }
   };
 
   const columns: DataTableColumn<WorkOrder>[] = [

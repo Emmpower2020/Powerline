@@ -211,6 +211,9 @@ function registerDefectRoutes(Router $router): void
         Auth::requirePermission('defects.update');
 
         $body = Helpers::getJsonBody();
+        // v4.3.81: قفل امور — تغییر امور رکورد فقط برای مدیر
+        $body = Helpers::stripDistrictForNonAdmin($body);
+
         $db = Database::getInstance();
         $existing = $db->fetchOne("SELECT id, status FROM defects WHERE id = ?", [(int) $id]);
         if (!$existing) Response::error(404, 'عیب پیدا نشد');
@@ -313,7 +316,8 @@ function registerDefectRoutes(Router $router): void
         $user = Auth::authenticate();
         Auth::requirePermission('defects.create');
         $body = Helpers::getJsonBody();
-        $rows = $body['rows'] ?? [];
+        // v4.3.81: امورِ ایمپورت برای کاربر اموردار خودکار
+        $rows = Helpers::forceDistrictOnRows($body['rows'] ?? []);
         if (!is_array($rows) || count($rows) === 0) Response::error(400, 'لیست ردیف‌ها ارسال نشده');
         if (count($rows) > 500) Response::error(400, 'حداکثر ۵۰۰ ردیف در هر درخواست');
 
@@ -461,7 +465,9 @@ function registerDefectRoutes(Router $router): void
 
         // v4.3.78: امور بهره‌برداری کاربر — فقط اگر migration اجرا شده باشد
         $districtColSel = (Helpers::districtsReady() && Helpers::columnExists('users', 'district_id')) ? ', u.district_id' : '';
-        $sql = "SELECT u.id, u.username, u.full_name, u.email, u.status, u.organization_id$districtColSel,
+        // v4.3.81: نقشهٔ دسترسی ماژول‌ها (اگر ستون وجود داشته باشد)
+        $permColSel = Helpers::columnExists('users', 'module_permissions') ? ', u.module_permissions' : '';
+        $sql = "SELECT u.id, u.username, u.full_name, u.email, u.status, u.organization_id$districtColSel$permColSel,
                        u.created_at, u.last_login_at,
                        GROUP_CONCAT(r.display_name SEPARATOR '، ') AS roles
                 FROM users u
@@ -495,6 +501,15 @@ function registerDefectRoutes(Router $router): void
             'organization_id' => $r['organization_id'] ? (int) $r['organization_id'] : null,
             'district_id' => !empty($r['district_id']) ? (int) $r['district_id'] : null,
             'district_name' => $districtNames[(int) $r['id']] ?? null,
+            // v4.3.81: نقشهٔ دسترسی ماژول‌ها — null یعنی همهٔ بخش‌ها مجاز
+            'module_permissions' => (function () use ($r) {
+                $raw = $r['module_permissions'] ?? null;
+                if (is_string($raw) && $raw !== '') {
+                    $decoded = json_decode($raw, true);
+                    if (is_array($decoded)) return $decoded;
+                }
+                return null;
+            })(),
             'roles' => $r['roles'], 'created_at' => $r['created_at'], 'last_login_at' => $r['last_login_at'],
         ], $rows);
 
@@ -531,6 +546,21 @@ function registerDefectRoutes(Router $router): void
         if (array_key_exists('email', $body)) {
             $updates[] = '`email` = ?';
             $params[] = trim((string) $body['email']) === '' ? null : trim((string) $body['email']);
+        }
+        // v4.3.81: ماتریس دسترسی ماژول‌ها — نقشهٔ {کلید ماژول: boolean} به JSON ذخیره می‌شود؛
+        // null یعنی همهٔ بخش‌ها مجاز (ریست دسترسی‌ها)
+        if (array_key_exists('module_permissions', $body) && Helpers::columnExists('users', 'module_permissions')) {
+            $mp = $body['module_permissions'];
+            if ($mp === null) {
+                $updates[] = '`module_permissions` = NULL';
+            } elseif (is_array($mp)) {
+                $clean = [];
+                foreach ($mp as $k => $v) {
+                    if (is_string($k) && $k !== '' && $k !== 'id') $clean[$k] = ($v === true);
+                }
+                $updates[] = '`module_permissions` = ?';
+                $params[] = json_encode($clean, JSON_UNESCAPED_UNICODE);
+            }
         }
         if (!$updates) Response::error(400, 'هیچ فیلدی برای ویرایش ارسال نشده');
         $updates[] = 'updated_at = NOW()';

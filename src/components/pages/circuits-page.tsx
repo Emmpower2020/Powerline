@@ -21,7 +21,7 @@ import { useStatsVisible } from "@/hooks/use-stats-visible";
 import { GenericBulkActions } from "@/components/generic-bulk-actions";
 import { ContractSelect } from "@/components/contract-select";
 import { DistrictSelect } from "@/components/district-select";
-import { currentUserDistrictId } from "@/hooks/use-district-options";
+import { currentUserDistrictId, resolveDistrictValue } from "@/hooks/use-district-options";
 import { logError } from "@/lib/error-log";
 import { cn } from "@/lib/utils";
 import { Loader2, Zap } from "lucide-react";
@@ -198,6 +198,8 @@ export function CircuitsPage() {
       dispatch_code: row.dispatch_code,
       name: row.name || null,
       voltage: Number(row.voltage),
+      // v4.3.81: امورِ ایمپورت برای کاربر اموردار خودکار — قابل تغییر دستی نیست
+      district_id: resolveDistrictValue((row as any).district_id),
     };
     if (mode === "update" && existingId) {
       await apiClient.put(`${API_ENDPOINTS.circuits}/${existingId}`, payload);
@@ -209,7 +211,11 @@ export function CircuitsPage() {
   const handleImportBatch = async (
     items: Array<{ row: Record<string, unknown>; mode: "insert" | "update"; existingId?: number }>
   ): Promise<Array<{ status: "inserted" | "updated" | "skipped" | "failed"; error?: string }>> => {
-    const rows = items.map(it => it.row);
+    // v4.3.81: امورِ ایمپورت انبوه برای کاربر اموردار خودکار روی همهٔ ردیف‌ها اعمال می‌شود
+    const rows = items.map(it => ({
+      ...it.row,
+      district_id: resolveDistrictValue((it.row as any).district_id),
+    }));
     const res = await apiClient.post<any>("circuits/bulk-import", { rows }, { timeoutMs: 60_000 });
     const statuses: string[] = res?.statuses || [];
     const errors: Array<string | null> = res?.errors || [];
@@ -381,8 +387,8 @@ function CircuitDialog({ open, editRow, duplicateFrom, existingCodes, onClose, o
         name: form.name.trim() || null,
         voltage: Number(form.voltage),
         contract_id: form.contract_id ? Number(form.contract_id) : null,
-        // v4.3.78: امور بهره‌برداری
-        district_id: form.district_id ? Number(form.district_id) : null,
+        // v4.3.81: امور بهره‌برداری — برای کاربر اموردار همیشه امور خودش (قفل)
+        district_id: resolveDistrictValue(form.district_id),
       };
       if (editRow) {
         await apiClient.put(`${API_ENDPOINTS.circuits}/${editRow.id}`, payload);
@@ -436,10 +442,10 @@ function CircuitDialog({ open, editRow, duplicateFrom, existingCodes, onClose, o
             <Label className="text-right block">قرارداد</Label>
             <ContractSelect value={form.contract_id} onChange={v => setForm({ ...form, contract_id: v })} />
           </div>
-          {/* v4.3.78: امور بهره‌برداری مدار */}
+          {/* v4.3.78: امور بهره‌برداری مدار — v4.3.81: برای غیرمدیر قفل و خودکار */}
           <div className="space-y-2">
             <Label className="text-right block">امور بهره‌برداری</Label>
-            <DistrictSelect value={form.district_id} onChange={v => setForm({ ...form, district_id: v })} />
+            <DistrictSelect autoLock value={form.district_id} onChange={v => setForm({ ...form, district_id: v })} />
           </div>
           <div className="space-y-2">
             <Label className="text-right block">نام مدار</Label>

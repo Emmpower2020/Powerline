@@ -14,6 +14,7 @@ import { usePersonnelOptions } from "@/hooks/use-personnel-options";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { useStatsVisible } from "@/hooks/use-stats-visible";
+import { resolveDistrictValue } from "@/hooks/use-district-options";
 import { logError } from "@/lib/error-log";
 import { cn } from "@/lib/utils";
 import {
@@ -184,6 +185,8 @@ export function LinesPage() {
         }
       }
     }
+    // v4.3.81: امورِ ایمپورت برای کاربر اموردار خودکار — قابل تغییر دستی نیست
+    payload.district_id = resolveDistrictValue((row as any).district_id);
 
     if (mode === "insert") {
       await apiClient.post(API_ENDPOINTS.lines, payload);
@@ -196,7 +199,8 @@ export function LinesPage() {
   const handleImportBatch = useCallback(async (
     items: Array<{ row: Record<string, unknown>; mode: "insert" | "update"; existingId?: number }>
   ): Promise<Array<{ status: "inserted" | "updated" | "skipped" | "failed"; error?: string }>> => {
-    const rows = items.map(it => it.row);
+    // v4.3.81: امورِ ایمپورت برای کاربر اموردار خودکار روی همهٔ ردیف‌ها
+    const rows = items.map(it => ({ ...it.row, district_id: resolveDistrictValue((it.row as any).district_id) }));
     // v2.4.1: مهلت ۶۰ ثانیه — بچ‌های بزرگ روی هاست اشتراکی زمان‌برند
     const res = await apiClient.post<any>("lines/bulk-import", { rows }, { timeoutMs: 60_000 });
     const statuses: string[] = res?.statuses || [];

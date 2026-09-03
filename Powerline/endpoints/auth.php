@@ -81,6 +81,22 @@ function registerAuthRoutes(Router $router): void
             }
         }
 
+        // v4.3.81: نقشهٔ دسترسی ماژول‌های کاربر (اگر ستون وجود داشته باشد) —
+        // null یعنی همهٔ بخش‌ها مجاز؛ مقدار false یعنی آن بخش مسدود است
+        $modulePermissions = null;
+        if ($districtId !== null && Helpers::columnExists('users', 'module_permissions')) {
+            try {
+                $row = Database::getInstance()->fetchOne("SELECT module_permissions FROM users WHERE id = ?", [$user['id']]);
+                $raw = $row['module_permissions'] ?? null;
+                if (is_string($raw) && $raw !== '') {
+                    $decoded = json_decode($raw, true);
+                    if (is_array($decoded)) $modulePermissions = $decoded;
+                }
+            } catch (Throwable $e) {
+                $modulePermissions = null;
+            }
+        }
+
         Response::success([
             'user' => [
                 'id'              => (int) $user['id'],
@@ -91,6 +107,8 @@ function registerAuthRoutes(Router $router): void
                 // null = مدیر برنامه (دیدن همهٔ امور) | شماره = امور اختصاص‌یافته
                 'district_id'     => $districtId,
                 'district_name'   => $districtName,
+                // v4.3.81: دسترسی ماژول‌ها — null یعنی همه (مدیرها همیشه null می‌مانند)
+                'module_permissions' => $modulePermissions,
             ],
             'roles'       => $roles,
             'permissions' => $permissions,

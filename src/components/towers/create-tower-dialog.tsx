@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { DistrictSelect } from "@/components/district-select";
-import { currentUserDistrictId } from "@/hooks/use-district-options";
+import { currentUserDistrictId, resolveDistrictValue } from "@/hooks/use-district-options";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { SearchableSelect } from "@/components/searchable-select";
 import { usePersonnelOptions } from "@/hooks/use-personnel-options";
@@ -184,7 +184,8 @@ export function CreateTowerDialog({ open, onClose, onCreated, editRow, duplicate
         line_id: form.line_id ? Number(form.line_id) : null,
         contract_id: form.contract_id ? Number(form.contract_id) : null,
         // v4.3.78: امور بهره‌برداری دکل
-        district_id: form.district_id ? Number(form.district_id) : null,
+        // v4.3.81: امور بهره‌برداری — برای کاربر اموردار همیشه امور خودش (قفل)
+        district_id: resolveDistrictValue(form.district_id),
         tower_code: autoCode,
         tower_number: num(form.tower_number),
         tower_structure: form.tower_structure,
@@ -281,7 +282,7 @@ export function CreateTowerDialog({ open, onClose, onCreated, editRow, duplicate
                 </Field>
                 {/* v4.3.78: امور بهره‌برداری دکل */}
                 <Field label="امور بهره‌برداری">
-                  <DistrictSelect value={form.district_id} onChange={v => set("district_id", v)} />
+                  <DistrictSelect autoLock value={form.district_id} onChange={v => set("district_id", v)} />
                 </Field>
               </div>
               {/* v2.8.0: فیلد «کد دکل خودکار» حذف شد — کد دکل به‌طور خودکار در سرور از کد خط + شماره دکل تولید می‌شود */}

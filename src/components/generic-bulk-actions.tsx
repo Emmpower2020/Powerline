@@ -8,6 +8,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiClient } from "@/lib/api-client";
 import { ContractSelect } from "@/components/contract-select";
 import { DistrictSelect } from "@/components/district-select";
+import { canChangeDistrict as userCanChangeDistrict } from "@/hooks/use-district-options";
 import { BulkOperationPanel, type BulkOperationProgress } from "@/components/bulk-operation-dialog";
 
 export function GenericBulkActions({
@@ -43,6 +44,9 @@ export function GenericBulkActions({
   const [districtOpen, setDistrictOpen] = useState(false);
   const [districtId, setDistrictId] = useState("");
   const { toast } = useToast();
+
+  // v4.3.81: تغییر امور بهره‌برداری فقط برای مدیران — آیتم برای کاربر اموردار نمایش داده نمی‌شود
+  const districtAllowed = canChangeDistrict && userCanChangeDistrict();
 
   const requestRun = (patch: Record<string, unknown>, label: string) => {
     if (!rows.length) {
@@ -145,14 +149,15 @@ export function GenericBulkActions({
           <DropdownMenuItem className="gap-2 cursor-pointer" onClick={() => requestRun({[statusField]: "active"}, "فعال کردن") }><Power className="w-4 h-4 text-emerald-600"/>فعال کردن</DropdownMenuItem>
           <DropdownMenuItem className="gap-2 cursor-pointer" onClick={() => requestRun({[statusField]: "inactive"}, "غیرفعال کردن") }><PowerOff className="w-4 h-4 text-slate-500"/>غیرفعال کردن</DropdownMenuItem>
         </>}
-        {canToggleStatus && (canChangeContract || canChangeDistrict || additionalActions) && <DropdownMenuSeparator />}
+        {canToggleStatus && (canChangeContract || districtAllowed || additionalActions) && <DropdownMenuSeparator />}
         {canChangeContract && <DropdownMenuItem className="gap-2 cursor-pointer" onClick={openContractDialog}>
-          <FileText className="w-4 h-4 text-indigo-600" /> تغییر قرارداد
+          {/* v4.3.81: بدون پیشوند «تغییر» — استاندارد واحد با خطوط/دکل‌ها/پرسنل */}
+          <FileText className="w-4 h-4 text-indigo-600" /> قرارداد
         </DropdownMenuItem>}
-        {canChangeDistrict && <DropdownMenuItem className="gap-2 cursor-pointer" onClick={openDistrictDialog}>
-          <MapPin className="w-4 h-4 text-emerald-600" /> تغییر امور بهره‌برداری
+        {districtAllowed && <DropdownMenuItem className="gap-2 cursor-pointer" onClick={openDistrictDialog}>
+          <MapPin className="w-4 h-4 text-emerald-600" /> امور بهره‌برداری
         </DropdownMenuItem>}
-        {(canChangeContract || canChangeDistrict) && additionalActions && <DropdownMenuSeparator />}
+        {(canChangeContract || districtAllowed) && additionalActions && <DropdownMenuSeparator />}
         {additionalActions}
       </DropdownMenuContent>
     </DropdownMenu>

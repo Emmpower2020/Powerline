@@ -60,7 +60,7 @@ const pageInfo: Record<Page, { title: string; subtitle?: string }> = {
 };
 
 export default function Home() {
-  const { user, loading } = useAuth();
+  const { user, loading, canAccessModule } = useAuth();
   // صفحه فعلی در session حفظ می‌شود تا تغییر Scope قرارداد یا refresh ناخواسته
   // باعث برگشت کاربر به پیشخوان نشود.
   const [currentPage, setCurrentPageState] = useState<Page>(() => {
@@ -77,10 +77,12 @@ export default function Home() {
   if (loading) return <div className="min-h-screen flex items-center justify-center"><Loader2 className="w-10 h-10 text-indigo-600 animate-spin" /></div>;
   if (!user) return <LoginForm />;
 
-  const info = pageInfo[currentPage];
+  // v4.3.81: اگر دسترسی صفحهٔ ذخیره‌شده بعداً محدود شده باشد، کاربر به داشبورد برمی‌گردد
+  const effectivePage: Page = currentPage === "dashboard" || canAccessModule(currentPage) ? currentPage : "dashboard";
+  const info = pageInfo[effectivePage];
 
   const renderPage = () => {
-    switch (currentPage) {
+    switch (effectivePage) {
       case "dashboard": return <DashboardPage />;
       case "lines": return <LinesPage />;
       case "towers": return <TowersPage />;
@@ -114,7 +116,7 @@ export default function Home() {
   };
 
   return (
-    <DashboardLayout currentPage={currentPage} onNavigate={(p) => setCurrentPage(p as Page)} title={info.title} subtitle={info.subtitle}>
+    <DashboardLayout currentPage={effectivePage} onNavigate={(p) => setCurrentPage(p as Page)} title={info.title} subtitle={info.subtitle}>
       {renderPage()}
     </DashboardLayout>
   );

@@ -182,6 +182,41 @@ async function handleRequest(request: NextRequest) {
   const isAuthPath = path.startsWith("/auth");
   const allowMock = DEV_MODE && isAuthPath;
 
+  // v4.3.81 (فقط توسعه): شبیه‌ساز کاربر اموردار — لاگین «dev:12» و توکن‌های
+  // شبیه‌ساز مستقیم به mock می‌روند تا UI بدون اجرای SQL روی هاست قابل تست باشد.
+  if (DEV_MODE && isAuthPath) {
+    const authHeader = request.headers.get("authorization") || "";
+    const isSimToken = authHeader.includes("dev-mock-token-");
+    const isSimLogin = request.method === "POST" && path === "/auth/login" && (bodyText || "").includes('"dev:');
+    // رفرش هم بدون هدر Authorization می‌آید — از بدنه تشخیص داده می‌شود
+    const isSimRefresh = request.method === "POST" && path === "/auth/refresh" && (bodyText || "").includes("dev-mock-token-");
+    if (isSimToken || isSimLogin || isSimRefresh) {
+      const mockRequest = new NextRequest(request.url, {
+        method: request.method,
+        headers: request.headers,
+        body: bodyText,
+      });
+      console.log(`[DEV SIM] شبیه‌ساز کاربر اموردار → mock ${request.method} ${path}`);
+      return await handleMockRequest(mockRequest);
+    }
+  }
+
+  // v4.3.81 (فقط توسعه): فهرست امور برای کاربر شبیه‌ساز — تا کمبوباکس امورِ قفل،
+  // نام امور خودش را نشان دهد (شناسه‌های دو رقمی ۱۰..۱۳ مثل SQL نسخه)
+  if (DEV_MODE && isGet && path === "/districts" && (request.headers.get("authorization") || "").includes("dev-mock-token-")) {
+    return NextResponse.json({
+      success: true,
+      data: {
+        data: [
+          { id: 10, name: "کردستان", status: "active" },
+          { id: 11, name: "ایلام", status: "active" },
+          { id: 12, name: "کرمانشاه غربی", status: "active" },
+          { id: 13, name: "کرمانشاه شرقی", status: "active" },
+        ],
+      },
+    });
+  }
+
   /** تلاش به سرور اصلی با retry یک‌باره روی 5xx (v3.2.1) + حل چالش ضد DDoS (v3.5.1) */
   const fetchUpstream = async (): Promise<Response> => {
     const doFetch = () => {

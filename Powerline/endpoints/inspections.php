@@ -153,6 +153,8 @@ function registerInspectionRoutes(Router $router): void
         Auth::authenticate();
         Auth::requirePermissionSoft('inspections.update');
         $body = Helpers::getJsonBody();
+        // v4.3.81: قفل امور — تغییر امور رکورد فقط برای مدیر
+        $body = Helpers::stripDistrictForNonAdmin($body);
         $fields = ['inspection_date','priority','weather','notes','line_id','tower_id','contract_id','inspector_id','crew_id','status'];
         // v4.3.78: ویرایش امور بهره‌برداری و وضعیت فعال/غیرفعال بازدید
         if (Helpers::columnExists('inspections', 'district_id')) $fields[] = 'district_id';

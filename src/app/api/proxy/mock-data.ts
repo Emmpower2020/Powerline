@@ -33,6 +33,23 @@ const MOCK_USER = {
   permissions: ["*"],
 };
 
+/**
+ * v4.3.81 (فقط توسعه): شبیه‌ساز کاربر اموردار برای تست رابط کاربری —
+ * لاگین با نام کاربری «dev:شناسه‌امور» (مثلاً dev:12) کاربری آزمایشی با همان امور
+ * و چند محدودیت نمونهٔ دسترسی می‌سازد. در production هرگز فعال نمی‌شود.
+ */
+const DEV_SIM_TOKEN_PREFIX = "dev-mock-token-";
+const devSimUser = (districtId: number) => ({
+  id: 900000 + districtId,
+  username: `dev:${districtId}`,
+  full_name: `کارشناس آزمایشی (امور ${districtId})`,
+  email: null,
+  organization_id: null,
+  district_id: districtId,
+  district_name: null,
+  module_permissions: { lines: false, users: false, "error-log": false },
+});
+
 // ─── خطوط نمونه (با همه ستون‌های جدول lines) ───
 // v3.2.2: طبق درخواست کاربر، هیچ داده نمایشی بارگذاری نمی‌شود — جداول از دیتابیس واقعی پر می‌شوند
 // (قبلاً ۷ خط نمونه «پارس خزر» و... اینجا بود که هنگام قطعی موقت هاست نمایش داده می‌شد و سبب سردرگمی می‌شد)
@@ -242,6 +259,23 @@ export async function handleMockRequest(request: NextRequest): Promise<NextRespo
     let body: any = {};
     try { body = await request.json(); } catch { /* empty */ }
     const { username, password } = body;
+    // v4.3.81: شبیه‌ساز کاربر اموردار — dev:12 یعنی کاربر امور ۱۲
+    const devMatch = /^dev:(\d+)$/.exec(String(username || ""));
+    if (devMatch && password === "123") {
+      const districtId = Number(devMatch[1]);
+      return NextResponse.json({
+        success: true,
+        data: {
+          user: devSimUser(districtId),
+          tokens: {
+            access_token: `${DEV_SIM_TOKEN_PREFIX}${districtId}`,
+            refresh_token: `${DEV_SIM_TOKEN_PREFIX}${districtId}-refresh`,
+            token_type: "Bearer",
+            expires_in: 3600,
+          },
+        },
+      });
+    }
     if (username === "admin" && (password === "admin123" || password === "admin")) {
       // v2.8.1: ساختار پاسخ با PHP واقعی و auth-context هم‌راستا شد — tokens داخل آبجکت tokens (قبلاً تخت بود و لاگین در حالت mock کرش می‌کرد)
       return NextResponse.json({
@@ -266,6 +300,20 @@ export async function handleMockRequest(request: NextRequest): Promise<NextRespo
   // ─── auth/me ───
   // v2.8.1: ساختار با GET /auth/me در PHP هم‌راستا شد — {user, roles, permissions} (قبلاً خود کاربر مستقیم برمی‌گشت)
   if (path === "/auth/me" && method === "GET") {
+    // v4.3.81: اگر توکن شبیه‌ساز است، همان کاربر آزمایشی برگردد
+    const auth = request.headers.get("authorization") || "";
+    const simMatch = new RegExp(`${DEV_SIM_TOKEN_PREFIX}(\\d+)$`).exec(auth);
+    if (simMatch) {
+      const districtId = Number(simMatch[1]);
+      return NextResponse.json({
+        success: true,
+        data: {
+          user: devSimUser(districtId),
+          roles: [{ name: "district_user", display_name: "کاربر امور" }],
+          permissions: [],
+        },
+      });
+    }
     return NextResponse.json({
       success: true,
       data: {
@@ -279,6 +327,23 @@ export async function handleMockRequest(request: NextRequest): Promise<NextRespo
   // ─── auth/refresh ───
   // v2.8.1: فقط توکن‌ها برگردانده می‌شوند — هماهنگ با POST /auth/refresh در PHP
   if (path === "/auth/refresh" && method === "POST") {
+    let body: any = {};
+    try { body = await request.json(); } catch { /* empty */ }
+    // v4.3.81: توکن شبیه‌ساز همان‌طور تمدید می‌شود تا نشست توسعه بماند
+    const rt = String(body?.refresh_token || "");
+    const simMatch = new RegExp(`^${DEV_SIM_TOKEN_PREFIX}(\\d+)-refresh$`).exec(rt);
+    if (simMatch) {
+      const districtId = Number(simMatch[1]);
+      return NextResponse.json({
+        success: true,
+        data: {
+          access_token: `${DEV_SIM_TOKEN_PREFIX}${districtId}`,
+          refresh_token: `${DEV_SIM_TOKEN_PREFIX}${districtId}-refresh`,
+          token_type: "Bearer",
+          expires_in: 3600,
+        },
+      });
+    }
     return NextResponse.json({
       success: true,
       data: {

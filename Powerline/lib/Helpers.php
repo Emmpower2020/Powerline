@@ -100,16 +100,58 @@ class Helpers
 
     /**
      * دریافت district_id امن از بدنه درخواست — اگر migration اجرا نشده باشد
-     * مقدار نادیده گرفته می‌شود (و اگر کاربر اموردار باشد، پیش‌فرض امور خودش).
+     * مقدار نادیده گرفته می‌شود.
+     *
+     * v4.3.81: امور رکورد جدید برای کاربر اموردار همیشه امور خودش است —
+     * هر مقداری که کاربر ارسال کرده باشد نادیده گرفته می‌شود؛ فقط مدیر
+     * (کاربر بدون امور) می‌تواند امور دلخواه ثبت کند.
      */
     public static function districtFromBody(array $body, string $table): ?int
     {
         if (!self::districtsReady() || !self::columnExists($table, 'district_id')) return null;
+        // v4.3.81: قفل امور — کاربر اموردار همیشه امور خودش
+        $own = self::userDistrictId();
+        if ($own !== null) return $own;
         if (array_key_exists('district_id', $body)) {
             $v = $body['district_id'];
             return ($v === null || $v === '' || (int) $v <= 0) ? null : (int) $v;
         }
         return null;
+    }
+
+    /**
+     * v4.3.81: آیا کاربر جاری اجازهٔ تغییر «امور بهره‌برداری» رکوردها را دارد؟
+     * فقط مدیران (کاربر بدون امور) — کارشناس امور نمی‌تواند ردیفی را به امور دیگر منتقل کند.
+     */
+    public static function userCanChangeDistrict(): bool
+    {
+        return self::userDistrictId() === null;
+    }
+
+    /**
+     * v4.3.81: حذف district_id از بدنه/وصله برای کاربر غیرمدیر —
+     * در PUT/bulk-update صدا زده می‌شود تا فیلتر فیلدهای مجاز، امور را تغییر ندهد.
+     */
+    public static function stripDistrictForNonAdmin(array $data): array
+    {
+        if (self::userCanChangeDistrict()) return $data;
+        unset($data['district_id']);
+        return $data;
+    }
+
+    /**
+     * v4.3.81: اعمال امور خودکار روی ردیف‌های import برای کاربر اموردار —
+     * جلوگیری از رفتن بی‌امورِ داده‌های ایمپورت‌شدهٔ کارشناس امور.
+     */
+    public static function forceDistrictOnRows(array $rows): array
+    {
+        $own = self::userDistrictId();
+        if ($own === null) return $rows;
+        foreach ($rows as &$r) {
+            if (is_array($r)) $r['district_id'] = $own;
+        }
+        unset($r);
+        return $rows;
     }
 
     /**

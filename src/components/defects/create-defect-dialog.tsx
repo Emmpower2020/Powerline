@@ -13,7 +13,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { SearchableSelect } from "@/components/searchable-select";
 import { ContractSelect } from "@/components/contract-select";
 import { DistrictSelect } from "@/components/district-select";
-import { currentUserDistrictId } from "@/hooks/use-district-options";
+import { currentUserDistrictId, resolveDistrictValue } from "@/hooks/use-district-options";
 import { FormSection } from "@/components/form-section";
 import { Loader2, Sparkles } from "lucide-react";
 
@@ -164,7 +164,8 @@ export function CreateDefectDialog({ open, onClose, onCreated, editRow, duplicat
         location_desc: form.location_desc.trim() || null,
         contract_id: form.contract_id ? Number(form.contract_id) : null,
         // v4.3.78: امور بهره‌برداری عیب
-        district_id: form.district_id ? Number(form.district_id) : null,
+        // v4.3.81: امور بهره‌برداری — برای کاربر اموردار همیشه امور خودش (قفل)
+        district_id: resolveDistrictValue(form.district_id),
       };
       // v3.1.0: شناسه عیب استاندارد در صورت انتخاب
       if (standardId) payload.defect_definition_id = Number(standardId);
@@ -243,7 +244,7 @@ export function CreateDefectDialog({ open, onClose, onCreated, editRow, duplicat
           {/* v4.3.78: امور بهره‌برداری عیب */}
           <div className="space-y-2">
             <Label className="text-right block">امور بهره‌برداری</Label>
-            <DistrictSelect value={form.district_id} onChange={v => setForm({ ...form, district_id: v })} />
+            <DistrictSelect autoLock value={form.district_id} onChange={v => setForm({ ...form, district_id: v })} />
           </div>
 
           <div className="space-y-2">

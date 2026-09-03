@@ -173,6 +173,8 @@ function registerWorkOrderRoutes(Router $router): void
         Auth::authenticate();
         Auth::requirePermissionSoft('maintenance.update');
         $body = Helpers::getJsonBody();
+        // v4.3.81: قفل امور — تغییر امور رکورد فقط برای مدیر
+        $body = Helpers::stripDistrictForNonAdmin($body);
         $fields = ['title','description','priority','planned_start','planned_end','crew_id','contractor_id','contract_id','outage_required','status'];
         // v4.3.78: ویرایش امور بهره‌برداری و وضعیت فعال/غیرفعال دستورکار
         if (Helpers::columnExists('work_orders', 'district_id')) $fields[] = 'district_id';

@@ -12,7 +12,7 @@ import { Loader2 } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { ContractSelect } from "@/components/contract-select";
 import { DistrictSelect } from "@/components/district-select";
-import { currentUserDistrictId } from "@/hooks/use-district-options";
+import { currentUserDistrictId, resolveDistrictValue } from "@/hooks/use-district-options";
 import { SearchableSelect } from "@/components/searchable-select";
 import { FormSection } from "@/components/form-section";
 import { DataTable, type DataTableColumn } from "@/components/data-table";
@@ -273,8 +273,10 @@ function EditorDialog({
       keys.forEach(k => {
         const v = form[k] ?? "";
         if (DATE_FIELDS.has(k)) { payload[k] = v.trim() === "" ? null : jalaliTextToIso(v); return; }
+        // v4.3.81: امور بهره‌برداری — برای کاربر اموردار همیشه امور خودش (قفل)
+        if (k === "district_id") { payload[k] = resolveDistrictValue(v); return; }
         // v4.3.78: امور بهره‌برداری مثل بقیه شناسه‌ها عددی ذخیره می‌شود
-        if (["amount","total_amount","contract_id","contractor_id","line_id","tower_id","district_id"].includes(k)) payload[k] = v === "" ? null : Number(v);
+        if (["amount","total_amount","contract_id","contractor_id","line_id","tower_id"].includes(k)) payload[k] = v === "" ? null : Number(v);
         else if (k === "outage_required") payload[k] = v === "1" || v === "true" || v === "بله";
         else payload[k] = v === "" ? null : v;
       });
@@ -308,7 +310,7 @@ function EditorDialog({
             return <div key={k} className={`space-y-2 ${isContractorAddress || (moduleKey === "contracts" && k === "notes") ? "sm:col-span-2" : ""}`}>
               <Label className="text-right block">{label}</Label>
               {k === "contract_id" ? <ContractSelect value={form[k] || ""} onChange={v => setForm({...form, [k]: v})} />
-              : k === "district_id" ? <DistrictSelect value={form[k] || ""} onChange={v => setForm({...form, [k]: v})} />
+              : k === "district_id" ? <DistrictSelect autoLock value={form[k] || ""} onChange={v => setForm({...form, [k]: v})} />
               : k === "contractor_id" && needContractors ? (
                 <SearchableSelect
                   value={form[k] || ""}
@@ -406,6 +408,10 @@ export function GenericModulePage({ moduleKey, endpoint }: { moduleKey: string; 
       } else {
         payload[key] = (v === "" || v == null) ? null : v;
       }
+    }
+    // v4.3.81: امورِ ایمپورت برای کاربر اموردار خودکار — برای ماژول‌هایی که امور دارند
+    if ((config.editKeys || []).includes("district_id")) {
+      payload.district_id = resolveDistrictValue((row as any).district_id);
     }
     if (mode === "update" && existingId) await apiClient.put(`${endpoint}/${existingId}`, payload);
     else await apiClient.post(endpoint, payload);

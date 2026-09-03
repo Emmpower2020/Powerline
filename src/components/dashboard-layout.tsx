@@ -144,7 +144,7 @@ function DataStatusBadge() {
 export function DashboardLayout({ children, currentPage, onNavigate, title, subtitle }: {
   children: React.ReactNode; currentPage: Page; onNavigate: (page: Page) => void; title: string; subtitle?: string;
 }) {
-  const { user, logout, hasPermission } = useAuth();
+  const { user, logout, hasPermission, canAccessModule } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const { rows: contractRows, loading: contractsLoading } = useContractOptions(true);
   const [selectedContract, setSelectedContract] = useState("");
@@ -178,7 +178,11 @@ export function DashboardLayout({ children, currentPage, onNavigate, title, subt
       window.dispatchEvent(new Event("powerline:contract-changed"));
     }
   };
-  const visibleNavItems = navItems.filter(item => !item.permission || hasPermission(item.permission));
+  // v4.3.81: دسترسی ماژول‌ها — داشبورد همیشه دیده می‌شود؛ بقیه بر اساس ماتریس دسترسی کاربر
+  const visibleNavItems = navItems.filter(item =>
+    (item.id === "dashboard" || canAccessModule(item.id)) &&
+    (!item.permission || hasPermission(item.permission))
+  );
   const groups: { [key: string]: NavItem[] } = {};
   visibleNavItems.forEach(item => { const g = item.group || "سایر"; if (!groups[g]) groups[g] = []; groups[g].push(item); });
 

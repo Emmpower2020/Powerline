@@ -16,7 +16,7 @@ import { Loader2, LockKeyhole } from "lucide-react";
 import { useTowerReferences } from "@/hooks/use-tower-references";
 import { ContractSelect } from "@/components/contract-select";
 import { DistrictSelect } from "@/components/district-select";
-import { currentUserDistrictId } from "@/hooks/use-district-options";
+import { currentUserDistrictId, resolveDistrictValue } from "@/hooks/use-district-options";
 
 interface FormData {
   line_code: string; dispatch_code: string; name: string; group_name: string;
@@ -181,8 +181,8 @@ export function CreateLineDialog({ open, onClose, onCreated, editRow, duplicateF
         line_expert: form.line_expert || null,
         notes: form.notes || null,
         contract_id: form.contract_id ? Number(form.contract_id) : null,
-        // v4.3.78: امور بهره‌برداری خط
-        district_id: form.district_id ? Number(form.district_id) : null,
+        // v4.3.81: امور بهره‌برداری — برای کاربر اموردار همیشه امور خودش (قفل)
+        district_id: resolveDistrictValue(form.district_id),
       };
 
       if (isEdit && editRow?.id) {
@@ -261,7 +261,7 @@ export function CreateLineDialog({ open, onClose, onCreated, editRow, duplicateF
             <Field label="نام خط (اجباری)"><Input value={form.name} onChange={e => set("name", e.target.value)} className="text-right" /></Field>
             <Field label="قرارداد"><ContractSelect value={form.contract_id} onChange={v => set("contract_id", v)} /></Field>
             {/* v4.3.78: امور بهره‌برداری خط */}
-            <Field label="امور بهره‌برداری"><DistrictSelect value={form.district_id} onChange={v => set("district_id", v)} /></Field>
+            <Field label="امور بهره‌برداری"><DistrictSelect autoLock value={form.district_id} onChange={v => set("district_id", v)} /></Field>
           </div>
 
           {/* سکشن ۲: مشخصات فنی — v3.4.0: گرید منظم ۳ ستونه و ردیف‌های هم‌عرض */}

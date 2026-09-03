@@ -20,6 +20,7 @@ import { ContractSelect } from "@/components/contract-select";
 import { DistrictSelect } from "@/components/district-select";
 import { usePersonnelOptions } from "@/hooks/use-personnel-options";
 import { useTowerReferences } from "@/hooks/use-tower-references";
+import { canChangeDistrict as userCanChangeDistrict } from "@/hooks/use-district-options";
 import { useToast } from "@/hooks/use-toast";
 import { logError } from "@/lib/error-log";
 import { BulkOperationPanel, type BulkOperationProgress } from "@/components/bulk-operation-dialog";
@@ -65,6 +66,8 @@ export function BulkTowersActions({ getSelection, onApplied }: BulkTowersActions
     fieldAction === "tower_structure" || fieldAction === "tower_type_code"
   );
   const { toast } = useToast();
+  // v4.3.81: تغییر امور فقط برای مدیران — آیتم برای کاربر اموردار نمایش داده نمی‌شود
+  const districtAllowed = userCanChangeDistrict();
 
   // v3.4.0: خطای لود خطوط فقط یک‌بار Toast می‌دهد (نه پشت‌سرهم) و در لاگ خطاها ثبت می‌شود
   const linesErrorShownRef = useRef(false);
@@ -233,7 +236,7 @@ export function BulkTowersActions({ getSelection, onApplied }: BulkTowersActions
           <ItemRow icon={<UserCog className="w-4 h-4 text-indigo-600" />} label="سرپرست خط" onClick={() => startFieldAction("line_supervisor")} />
           <ItemRow icon={<Link2Icon className="w-4 h-4 text-emerald-600" />} label="اتصال به خط" onClick={() => startFieldAction("line_id")} />
           <ItemRow icon={<FileText className="w-4 h-4 text-indigo-600" />} label="قرارداد" onClick={() => startFieldAction("contract")} />
-          <ItemRow icon={<MapPin className="w-4 h-4 text-emerald-600" />} label="امور بهره‌برداری" onClick={() => startFieldAction("district")} />
+          {districtAllowed && <ItemRow icon={<MapPin className="w-4 h-4 text-emerald-600" />} label="امور بهره‌برداری" onClick={() => startFieldAction("district")} />}
         </DropdownMenuContent>
       </DropdownMenu>
 

@@ -22,6 +22,7 @@ import { BulkOperationDialog, type BulkOperationProgress } from "@/components/bu
 import { CreateDefectDialog } from "@/components/defects/create-defect-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { useStatsVisible } from "@/hooks/use-stats-visible";
+import { resolveDistrictValue } from "@/hooks/use-district-options";
 import { logError } from "@/lib/error-log";
 import type { Defect } from "@/lib/types";
 import {
@@ -238,6 +239,8 @@ export function DefectsPage() {
         location_desc: row.location_desc || null,
         line_code: row.line_code || undefined,
         tower_code: row.tower_code || undefined,
+        // v4.3.81: امورِ ایمپورت برای کاربر اموردار خودکار — قابل تغییر دستی نیست
+        district_id: resolveDistrictValue((row as any).district_id),
       });
     }
   };
@@ -245,7 +248,8 @@ export function DefectsPage() {
   const handleImportBatch = async (
     items: Array<{ row: Record<string, unknown>; mode: "insert" | "update"; existingId?: number }>
   ): Promise<Array<{ status: "inserted" | "updated" | "skipped" | "failed"; error?: string }>> => {
-    const rows = items.map(it => it.row);
+    // v4.3.81: امورِ ایمپورت برای کاربر اموردار خودکار روی همهٔ ردیف‌ها
+    const rows = items.map(it => ({ ...it.row, district_id: resolveDistrictValue((it.row as any).district_id) }));
     const res = await apiClient.post<any>("defects/bulk-import", { rows }, { timeoutMs: 60_000 });
     const statuses: string[] = res?.statuses || [];
     const errors: Array<string | null> = res?.errors || [];
