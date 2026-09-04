@@ -463,11 +463,12 @@ function registerDefectRoutes(Router $router): void
         $countStmt->execute($params);
         $total = (int) $countStmt->fetchColumn();
 
-        // v4.3.78: امور بهره‌برداری کاربر — فقط اگر migration اجرا شده باشد
+        // v4.3.78: امور بهره‌برداری کاربر — v4.3.85: ستون district_ids (چند-اموری) هم خوانده می‌شود
         $districtColSel = (Helpers::districtsReady() && Helpers::columnExists('users', 'district_id')) ? ', u.district_id' : '';
+        $districtIdsColSel = Helpers::columnExists('users', 'district_ids') ? ', u.district_ids' : '';
         // v4.3.81: نقشهٔ دسترسی ماژول‌ها (اگر ستون وجود داشته باشد)
         $permColSel = Helpers::columnExists('users', 'module_permissions') ? ', u.module_permissions' : '';
-        $sql = "SELECT u.id, u.username, u.full_name, u.email, u.status, u.organization_id$districtColSel$permColSel,
+        $sql = "SELECT u.id, u.username, u.full_name, u.email, u.status, u.organization_id$districtColSel$districtIdsColSel$permColSel,
                        u.created_at, u.last_login_at,
                        MAX(r.id) AS role_id,
                        GROUP_CONCAT(r.display_name SEPARATOR '، ') AS roles
@@ -482,26 +483,41 @@ function registerDefectRoutes(Router $router): void
         $stmt->execute($params);
         $rows = $stmt->fetchAll();
 
-        // v4.3.78: امور بهره‌برداری هر کاربر — با یک کوئری سبک برای همهٔ کاربران صفحه
-        $districtNames = [];
-        if (Helpers::districtsReady() && Helpers::columnExists('users', 'district_id') && $rows) {
+        // v4.3.78/85: نقشهٔ نام امورها — یک کوئری سبک برای همهٔ کاربران صفحه
+        $disMap = [];
+        if (Helpers::districtsReady() && $rows) {
             try {
-                $disMap = [];
                 foreach ($pdo->query('SELECT id, name FROM districts')->fetchAll() as $d) {
                     $disMap[(int) $d['id']] = (string) $d['name'];
-                }
-                foreach ($rows as $r) {
-                    $districtNames[(int) $r['id']] = !empty($r['district_id']) ? ($disMap[(int) $r['district_id']] ?? null) : null;
                 }
             } catch (Throwable $e) { /* جدول امور هنوز ساخته نشده — نامش بدون نام امور */ }
         }
 
-        $data = array_map(fn($r) => [
+        // v4.3.85: هر کاربر می‌تواند چند امور داشته باشد — district_ids (JSON) مقدم،
+        // تک‌امور قدیمی district_id پشتیبان؛ [] یعنی همهٔ امور (مدیر سیستم)
+        $data = array_map(function ($r) use ($disMap) {
+            $ids = [];
+            $rawIds = $r['district_ids'] ?? null;
+            if (is_string($rawIds) && $rawIds !== '') {
+                $decoded = json_decode($rawIds, true);
+                if (is_array($decoded)) {
+                    foreach ($decoded as $one) { $i = (int) $one; if ($i > 0) $ids[$i] = true; }
+                    $ids = array_keys($ids);
+                }
+            }
+            if (!$ids && !empty($r['district_id'])) $ids = [(int) $r['district_id']];
+            $names = [];
+            foreach ($ids as $i) $names[] = $disMap[$i] ?? null;
+            return [
             'id' => (int) $r['id'], 'username' => $r['username'], 'full_name' => $r['full_name'],
             'email' => $r['email'], 'status' => (string) $r['status'],
             'organization_id' => $r['organization_id'] ? (int) $r['organization_id'] : null,
-            'district_id' => !empty($r['district_id']) ? (int) $r['district_id'] : null,
-            'district_name' => $districtNames[(int) $r['id']] ?? null,
+            // v4.3.85: امور اصلی (اولین لیست) + نامش — سازگار با کلاینت‌های قبلی
+            'district_id' => $ids ? (int) $ids[0] : null,
+            'district_name' => $ids ? ($disMap[$ids[0]] ?? null) : null,
+            // v4.3.85: لیست کامل — [] = همهٔ امور (مدیر سیستم)
+            'district_ids' => $ids,
+            'district_names' => $names,
             // v4.3.81: نقشهٔ دسترسی ماژول‌ها — null یعنی همهٔ بخش‌ها مجاز
             'module_permissions' => (function () use ($r) {
                 $raw = $r['module_permissions'] ?? null;
@@ -515,7 +531,8 @@ function registerDefectRoutes(Router $router): void
             'role_id' => !empty($r['role_id']) ? (int) $r['role_id'] : null,
             'role_name' => $r['roles'],
             'roles' => $r['roles'], 'created_at' => $r['created_at'], 'last_login_at' => $r['last_login_at'],
-        ], $rows);
+            ];
+        }, $rows);
 
         Response::paginated($data, $page, $pageSize, $total);
     });
@@ -539,6 +556,10 @@ function registerDefectRoutes(Router $router): void
             if (array_key_exists('district_id', $body) && $body['district_id'] !== null && (int) $body['district_id'] > 0) {
                 Response::error(403, 'امور بهره‌برداری حساب خودتان قابل محدودکردن نیست — دسترسی مدیر سیستم از بین می‌رود');
             }
+            // v4.3.85: چند-اموری — لیست پر یعنی محدودکردن حساب خود
+            if (array_key_exists('district_ids', $body) && !empty(Helpers::normalizeDistrictIds($body['district_ids'])['ids'])) {
+                Response::error(403, 'امورهای بهره‌برداری حساب خودتان قابل محدودکردن نیست — دسترسی مدیر سیستم از بین می‌رود');
+            }
             if (array_key_exists('status', $body) && in_array((string) $body['status'], ['inactive', '0'], true)) {
                 Response::error(403, 'حساب کاربری خودتان را نمی‌توانید غیرفعال کنید');
             }
@@ -552,10 +573,36 @@ function registerDefectRoutes(Router $router): void
         }
 
         $updates = []; $params = [];
+        // v4.3.85: لیست چند-اموری — district_ids (آرایه/JSON)؛ district_id همگام با امور اصلی می‌ماند
+        // لیست خالی = همهٔ امور (مدیر سیستم) → هر دو ستون NULL
+        $districtIdsProvided = false;
+        if (array_key_exists('district_ids', $body) && Helpers::columnExists('users', 'district_ids')) {
+            $districtIdsProvided = true;
+            $norm = Helpers::normalizeDistrictIds($body['district_ids']);
+            if (!empty($norm['ids'])) {
+                $updates[] = '`district_ids` = ?';
+                $params[] = $norm['json'];
+                if (Helpers::columnExists('users', 'district_id')) {
+                    $updates[] = '`district_id` = ?';
+                    $params[] = (int) $norm['ids'][0]; // امور اصلی — سازگار کدهای قبلی
+                }
+            } else {
+                $updates[] = '`district_ids` = NULL';
+                if (Helpers::columnExists('users', 'district_id')) {
+                    $updates[] = '`district_id` = NULL';
+                }
+            }
+        }
         if (array_key_exists('district_id', $body) && Helpers::columnExists('users', 'district_id')) {
             $v = $body['district_id'];
             $updates[] = '`district_id` = ?';
             $params[] = ($v === null || $v === '' || (int) $v <= 0) ? null : (int) $v;
+            // v4.3.85: همگام‌سازی لیست با تک‌امور قدیمی (ایمپورت/کلاینت قدیمی)
+            if (!$districtIdsProvided && Helpers::columnExists('users', 'district_ids')) {
+                $sv = ($v === null || $v === '' || (int) $v <= 0) ? null : (int) $v;
+                $updates[] = '`district_ids` = ?';
+                $params[] = $sv === null ? null : json_encode([$sv]);
+            }
         }
         if (array_key_exists('status', $body)) {
             $sv = (string) $body['status'];
@@ -611,7 +658,10 @@ function registerDefectRoutes(Router $router): void
 
             // آیا این حساب بعد از همین ویرایش هم مدیر سیستم می‌ماند؟
             $remainsAdmin = true;
-            if (array_key_exists('district_id', $body)) {
+            if (array_key_exists('district_ids', $body) && Helpers::columnExists('users', 'district_ids')) {
+                // v4.3.85: لیست خالی = مدیر سیستم (همهٔ امور)
+                $remainsAdmin = empty(Helpers::normalizeDistrictIds($body['district_ids'])['ids']);
+            } elseif (array_key_exists('district_id', $body)) {
                 $v = $body['district_id'];
                 $remainsAdmin = ($v === null || $v === '' || (int) $v <= 0);
             } else {
@@ -659,12 +709,21 @@ function registerDefectRoutes(Router $router): void
         $dup->execute([$username]);
         if ($dup->fetch()) Response::error(409, 'این نام کاربری قبلاً ثبت شده است');
 
-        $districtId = null;
-        if (array_key_exists('district_id', $b) && $b['district_id'] !== null && (int) $b['district_id'] > 0) {
+        // v4.3.85: چند-اموری — district_ids (آرایه) مقدم؛ district_id تک‌امور پشتیبان
+        $hasDistrictIdsCol = Helpers::columnExists('users', 'district_ids');
+        $districtIds = [];
+        if (array_key_exists('district_ids', $b) && $b['district_ids'] !== null) {
+            $districtIds = Helpers::normalizeDistrictIds($b['district_ids'])['ids'];
+        } elseif (array_key_exists('district_id', $b) && $b['district_id'] !== null && (int) $b['district_id'] > 0) {
             if (Helpers::districtsReady() && Helpers::columnExists('users', 'district_id')) {
-                $districtId = (int) $b['district_id'];
+                $districtIds = [(int) $b['district_id']];
             }
         }
+        if (!$hasDistrictIdsCol) {
+            // بدون SQL 4.3.85 — فقط امور اصلی روی ستون قدیمی می‌نشیند
+            $districtIds = $districtIds ? [(int) $districtIds[0]] : [];
+        }
+        $districtId = $districtIds ? (int) $districtIds[0] : null; // خالی = همهٔ امور (مدیر سیستم)
 
         $status = in_array((string) ($b['status'] ?? 'active'), ['inactive', '0'], true) ? 'inactive' : 'active';
 
@@ -699,6 +758,8 @@ function registerDefectRoutes(Router $router): void
             $vals[] = $email === '' ? null : $email;
         }
         if ($districtId !== null) { $cols[] = 'district_id'; $vals[] = $districtId; }
+        // v4.3.85: لیست کامل امورها — کاربر داده‌های همهٔ این امورها را می‌بیند
+        if ($districtIds && $hasDistrictIdsCol) { $cols[] = 'district_ids'; $vals[] = json_encode($districtIds); }
         if ($mpJson !== null) { $cols[] = 'module_permissions'; $vals[] = $mpJson; }
 
         $sql = 'INSERT INTO users (`' . implode('`, `', $cols) . '`, created_at) VALUES (' . implode(', ', array_fill(0, count($cols), '?')) . ', NOW())';

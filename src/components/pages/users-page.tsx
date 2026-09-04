@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useCallback, useRef, useMemo } from "react";
 import { apiClient } from "@/lib/api-client";
 import { API_ENDPOINTS } from "@/lib/api-config";
 import { putUser, postUser, deleteUser } from "@/lib/users-api";
@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { DistrictSelect } from "@/components/district-select";
+import { DistrictMultiSelect } from "@/components/district-multi-select";
 import { SearchableSelect } from "@/components/searchable-select";
 import { DataTable, type DataTableColumn, type DataTableHandle } from "@/components/data-table";
 import { ImportExcelDialog } from "@/components/import-excel-dialog";
@@ -30,7 +30,7 @@ import { RoleDialog } from "@/components/users/role-dialog";
 import { UsersStatusActions, RolePermissionsBulkActions, PermSummaryCell } from "@/components/users/users-bulk-actions";
 
 /**
- * صفحه کاربران — v4.3.84 (RBAC): دو تب
+ * صفحه کاربران — v4.3.85: دو تب + چند-اموری
  *
  * تب «اطلاعات کاربران»: جدول هم‌شکل خطوط/پرسنل + نوار ابزار کامل + کمبوباکس نقش
  * در فرم + عملیات گروهی وضعیت/نقش/ریست رمز.
@@ -40,6 +40,11 @@ import { UsersStatusActions, RolePermissionsBulkActions, PermSummaryCell } from 
  * ریز بخش×ابزار همان نقش را باز می‌کند؛ تغییر گروهی/کپی از نقش دیگر از منوی
  * عملیات گروهی. مثلاً ۴۰ سیمبان فقط نقش «سیمبان» می‌گیرند و دسترسی همان یک
  * نقش تنظیم می‌شود. مدیر سیستم (بدون امور) همیشه دسترسی کامل دارد.
+ *
+ * v4.3.85: هر کاربر می‌تواند به «چند امور بهره‌برداری» دسترسی داشته باشد —
+ * انتخاب چندتایی در فرم (چک‌باکس + جستجو)، چند بج در جدول؛ لیست خالی =
+ * همهٔ امور (مدیر سیستم). مثال: کارشناس انبار مشترک دو امور، مدیر پیمانکار
+ * با همهٔ امورهای خودش.
  */
 export function UsersPage() {
   const { toast } = useToast();
@@ -78,6 +83,22 @@ export function UsersPage() {
   const rolesTableRef = useRef<DataTableHandle | null>(null);
 
   const { rows: districtRows } = useDistrictOptions();
+
+  /** v4.3.85: نام امور از فهرست محلی — سازگار با district_names بک‌اند */
+  const districtNameOf = useCallback((id: number): string => {
+    const hit = districtRows.find(r => Number(r.id) === Number(id));
+    return hit?.name ?? `امور ${id}`;
+  }, [districtRows]);
+
+  /** v4.3.85: برچسب متنی امورها برای جستجو/مرتب‌سازی جدول + نرمال‌سازی district_ids */
+  const usersForTable = useMemo(() => users.map(u => {
+    const ids = (u.district_ids && u.district_ids.length
+      ? u.district_ids
+      : (u.district_id != null ? [u.district_id] : [])
+    ).map(Number);
+    const names = ids.map(districtNameOf);
+    return { ...u, district_ids: ids, districts_label: names.length ? names.join("، ") : "همهٔ امور (مدیر)" };
+  }), [users, districtNameOf]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -123,10 +144,27 @@ export function UsersPage() {
       },
     },
     {
-      key: "district_name", header: "امور بهره‌برداری", sortable: true, filterable: true, align: "right",
-      render: (u) => u.district_id != null
-        ? <Badge variant="outline" className="text-[11px] border-indigo-200 text-indigo-700 dark:text-indigo-300">{u.district_name || `امور ${u.district_id}`}</Badge>
-        : <Badge variant="outline" className="text-[11px] border-slate-200 text-slate-400">همهٔ امور (مدیر)</Badge>,
+      key: "districts_label", header: "امور بهره‌برداری", sortable: true, filterable: true, align: "right",
+      render: (u) => {
+        // v4.3.85: چند-اموری — تا ۲ بج + «+N»؛ خالی = همهٔ امور (مدیر)
+        const ids = u.district_ids ?? [];
+        if (!ids.length) {
+          return <Badge variant="outline" className="text-[11px] border-slate-200 text-slate-400">همهٔ امور (مدیر)</Badge>;
+        }
+        const shown = ids.slice(0, 2);
+        const rest = ids.length - shown.length;
+        const title = ids.map(id => districtNameOf(id)).join("، ");
+        return (
+          <span className="inline-flex flex-wrap items-center gap-1" title={title}>
+            {shown.map(id => (
+              <Badge key={id} variant="outline" className="text-[11px] border-indigo-200 text-indigo-700 dark:text-indigo-300">{districtNameOf(id)}</Badge>
+            ))}
+            {rest > 0 && (
+              <Badge variant="outline" className="text-[11px] border-indigo-200 text-indigo-500 dark:text-indigo-300 nums-fa">+{rest.toLocaleString("fa-IR")}</Badge>
+            )}
+          </span>
+        );
+      },
     },
     { key: "status", header: "وضعیت", type: "status", align: "right" },
     {
@@ -253,14 +291,30 @@ export function UsersPage() {
     return hit ? hit.id : null;
   };
 
-  const importUserPayload = (row: Record<string, unknown>, isCreate: boolean) => {
-    const districtId = resolveDistrictIdByName(row.district_name);
-    if (districtId == null) {
-      throw new Error(`امور بهره‌برداری «${String(row.district_name ?? "")}» پیدا نشود — نام امور در فایل الزامی است`);
+  /** v4.3.85: «امور بهره‌برداری» فایل اکسل می‌تواند چندتایی باشد — با «،» یا «,» جدا شود */
+  const parseDistrictIdsFromCell = (raw: unknown): number[] => {
+    const names = String(raw ?? "").split(/[،,;]+/).map(s => s.trim()).filter(Boolean);
+    if (!names.length) {
+      throw new Error("نام امور بهره‌برداری در فایل الزامی است — برای دسترسی کامل، گزینهٔ «همهٔ امور» را در فرم کاربر تنظیم کنید");
     }
+    const ids: number[] = [];
+    for (const n of names) {
+      const id = resolveDistrictIdByName(n);
+      if (id == null) {
+        throw new Error(`امور بهره‌برداری «${n}» پیدا نشد — نام امور دقیقاً مطابق بخش «داده‌های پایه ← امور بهره‌برداری» باشد`);
+      }
+      if (!ids.includes(id)) ids.push(id);
+    }
+    return ids;
+  };
+
+  const importUserPayload = (row: Record<string, unknown>, isCreate: boolean) => {
+    // v4.3.85: چند امور در یک سلول — «کرمانشاه غربی، ایلام»
+    const districtIds = parseDistrictIdsFromCell(row.district_name);
     const payload: Record<string, unknown> = {
       full_name: String(row.full_name ?? "").trim(),
-      district_id: districtId,
+      district_ids: districtIds,
+      district_id: districtIds[0],
       status: "active",
     };
     if (row.role_name) {
@@ -318,7 +372,7 @@ export function UsersPage() {
   const importTemplateColumns = [
     { key: "username", header: "نام کاربری (کد ملی)" },
     { key: "full_name", header: "نام و نام خانوادگی" },
-    { key: "district_name", header: "امور بهره‌برداری" },
+    { key: "district_name", header: "امور بهره‌برداری (چندتایی با «،» جدا شود)" },
     { key: "role_name", header: "نقش (خالی = بدون نقش)" },
     { key: "password", header: "رمز عبور (خالی = 123456)" },
   ];
@@ -382,10 +436,10 @@ export function UsersPage() {
         {/* ─── تب ۱: اطلاعات کاربران — جدول هم‌شکل بقیه بخش‌ها ─── */}
         <TabsContent value="info" className="mt-4">
           <DataTable
-            data={users}
+            data={usersForTable}
             columns={columns}
             loading={loading}
-            searchKeys={["username", "full_name", "role_name", "roles", "district_name"]}
+            searchKeys={["username", "full_name", "role_name", "roles", "districts_label"]}
             title="کاربران"
             layoutKey="users"
             accessKey="users"
@@ -551,7 +605,7 @@ export function UsersPage() {
   );
 }
 
-/** فرم کاربر — ایجاد / ویرایش / کپی (مثل فرم پرسنل) — v4.3.83: کمبوباکس نقش · v4.3.84: حذف ایمیل */
+/** فرم کاربر — ایجاد / ویرایش / کپی (مثل فرم پرسنل) — v4.3.85: چند-اموری + حذف ایمیل */
 function UserDialog({ open, editRow, duplicateFrom, roles, selfUserId, onClose, onSaved }: {
   open: boolean;
   editRow: UserRow | null;
@@ -565,7 +619,7 @@ function UserDialog({ open, editRow, duplicateFrom, roles, selfUserId, onClose, 
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState({
     username: "", full_name: "", password: "",
-    district_id: "", status: "active", role_id: "",
+    district_ids: [] as number[], status: "active", role_id: "",
   });
 
   const sourceRow = editRow || duplicateFrom;
@@ -579,7 +633,11 @@ function UserDialog({ open, editRow, duplicateFrom, roles, selfUserId, onClose, 
         username: duplicateFrom ? "" : (sourceRow?.username || ""),
         full_name: sourceRow?.full_name || "",
         password: "",
-        district_id: sourceRow?.district_id != null ? String(sourceRow.district_id) : "",
+        // v4.3.85: چند امور — از district_ids (یا تک‌امور قدیمی district_id)
+        district_ids: (sourceRow?.district_ids?.length
+          ? sourceRow.district_ids.map(Number)
+          : (sourceRow?.district_id != null ? [Number(sourceRow.district_id)] : [])
+        ),
         status: sourceRow?.status === "inactive" ? "inactive" : "active",
         // v4.3.83: نقش کاربر — کپی از روی کاربر مبدأ
         role_id: (duplicateFrom?.role_id ?? sourceRow?.role_id) != null ? String(duplicateFrom?.role_id ?? sourceRow?.role_id) : "",
@@ -601,7 +659,8 @@ function UserDialog({ open, editRow, duplicateFrom, roles, selfUserId, onClose, 
         };
         // مدیر سیستم نمی‌تواند امور/وضعیت/نقش خودش را محدود کند
         if (!editingSelf) {
-          payload.district_id = form.district_id ? Number(form.district_id) : null;
+          // v4.3.85: لیست امورها — خالی = همهٔ امور (مدیر سیستم)
+          payload.district_ids = form.district_ids.map(Number);
           payload.role_id = roleId;
         }
         if (form.password.trim()) payload.password = form.password.trim();
@@ -611,7 +670,7 @@ function UserDialog({ open, editRow, duplicateFrom, roles, selfUserId, onClose, 
           username: form.username.trim(),
           full_name: form.full_name.trim(),
           password: form.password.trim() || "123456",
-          district_id: form.district_id ? Number(form.district_id) : null,
+          district_ids: form.district_ids.map(Number),
           status: form.status,
           role_id: roleId,
         });
@@ -684,16 +743,20 @@ function UserDialog({ open, editRow, duplicateFrom, roles, selfUserId, onClose, 
 
             <div className="grid grid-cols-1 gap-3">
               <div className="space-y-2">
-                <Label className="text-right block">امور بهره‌برداری</Label>
-                <DistrictSelect
-                  autoLock={false}
-                  value={form.district_id}
-                  onChange={v => setForm({ ...form, district_id: v })}
-                  placeholder="نامشخص — مدیر سیستم (همهٔ امور)"
+                <Label className="text-right block">امور بهره‌برداری (چندتایی)</Label>
+                <DistrictMultiSelect
+                  value={form.district_ids}
+                  onChange={ids => setForm({ ...form, district_ids: ids })}
+                  disabled={editingSelf}
                 />
-                {editingSelf && <p className="text-[10px] text-amber-600 text-right">امور و وضعیت حساب خودتان قابل تغییر نیست</p>}
-                {!editingSelf && !form.district_id && (
-                  <p className="text-[10px] text-amber-600 text-right">بدون امور = مدیر سیستم با دسترسی کامل</p>
+                {editingSelf && <p className="text-[10px] text-amber-600 text-right">امورها و وضعیت حساب خودتان قابل تغییر نیست</p>}
+                {!editingSelf && form.district_ids.length === 0 && (
+                  <p className="text-[10px] text-amber-600 text-right">بدون انتخاب = مدیر سیستم (دسترسی کامل به همهٔ امور)</p>
+                )}
+                {!editingSelf && form.district_ids.length > 0 && (
+                  <p className="text-[10px] text-slate-400 text-right leading-5">
+                    کاربر داده‌های {form.district_ids.length.toLocaleString("fa-IR")} امورِ انتخاب‌شده را می‌بیند — مثلاً کارشناس مشترک دو امور، هر دو را انتخاب کنید
+                  </p>
                 )}
               </div>
             </div>

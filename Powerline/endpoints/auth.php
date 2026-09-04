@@ -70,15 +70,28 @@ function registerAuthRoutes(Router $router): void
         $permissions = Auth::getCurrentUserPermissions();
 
         // v4.3.78: امور بهره‌برداری کاربر + نام امور (اگر migration اجرا شده باشد)
-        $districtId = !empty($user['district_id']) ? (int) $user['district_id'] : null;
+        // v4.3.85: چند-اموری — لیست امورهای قابل‌مشاهده + نام‌ها؛ [] یعنی همهٔ امور (مدیر)
+        $districtIds = []; // [] = همهٔ امور (مدیر سیستم)
+        if (!empty($user['district_ids'])) {
+            $districtIds = Helpers::normalizeDistrictIds($user['district_ids'])['ids'];
+        } elseif (!empty($user['district_id'])) {
+            $districtIds = [(int) $user['district_id']];
+        }
+        $districtId = $districtIds ? (int) $districtIds[0] : null; // امور اصلی (سازگار قبلی)
+        $districtNames = [];
         $districtName = null;
-        if ($districtId !== null) {
+        if ($districtIds && Helpers::districtsReady()) {
             try {
-                $row = Database::getInstance()->fetchOne("SELECT name FROM districts WHERE id = ?", [$districtId]);
-                $districtName = $row['name'] ?? null;
-            } catch (Throwable $e) {
-                $districtName = null;
-            }
+                $ph = implode(', ', array_fill(0, count($districtIds), '?'));
+                $stmt = Database::getInstance()->getConnection()->prepare("SELECT id, name FROM districts WHERE id IN ($ph)");
+                $stmt->execute(array_map('intval', $districtIds));
+                $nameMap = [];
+                foreach ($stmt->fetchAll() as $d) $nameMap[(int) $d['id']] = (string) $d['name'];
+                foreach ($districtIds as $i) {
+                    $districtNames[] = $nameMap[(int) $i] ?? null;
+                }
+                $districtName = $nameMap[$districtId] ?? null;
+            } catch (Throwable $e) { /* جدول امور هنوز ساخته نشده */ }
         }
 
         // v4.3.83 (RBAC): نقش کاربر + دسترسی مؤثر — ماتریس نقش مقدم بر مجوز شخصی
@@ -98,9 +111,12 @@ function registerAuthRoutes(Router $router): void
                 'full_name'       => $user['full_name'],
                 'email'           => $user['email'],
                 'organization_id' => $user['organization_id'] ? (int) $user['organization_id'] : null,
-                // null = مدیر برنامه (دیدن همهٔ امور) | شماره = امور اختصاص‌یافته
+                // null = مدیر برنامه (دیدن همهٔ امور) | شماره = امور اصلی (اولین لیست)
                 'district_id'     => $districtId,
                 'district_name'   => $districtName,
+                // v4.3.85: لیست امورهای قابل‌مشاهده — [] یعنی همهٔ امور (مدیر سیستم)
+                'district_ids'    => $districtIds,
+                'district_names'  => $districtNames,
                 // v4.3.81: دسترسی ماژول‌ها — null یعنی همه (مدیرها همیشه null می‌مانند)
                 'module_permissions' => $modulePermissions,
                 // v4.3.83: نقش اختصاصیافته — دسترسی مؤثر از ماتریس همین نقش می‌آید

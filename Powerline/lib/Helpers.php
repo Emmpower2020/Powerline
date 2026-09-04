@@ -55,29 +55,57 @@ class Helpers
     }
 
     /**
-     * امور کاربر جاری — null یعنی مدیر برنامه (دیدن همهٔ امور).
-     * کاربر عادی فقط داده‌های امور خودش را می‌بیند.
+     * v4.3.85: لیست امورهای قابل‌مشاهدهٔ کاربر جاری — از users.district_ids (JSON).
+     * null یعنی مدیر برنامه (دیدن همهٔ امور)؛ لیست خالی هم به null نرمال می‌شود
+     * (= دسترسی کامل). سازگار با تک‌امورِ قدیمی district_id.
      */
-    public static function userDistrictId(): ?int
+    public static function userDistrictIds(): ?array
     {
         $user = Auth::getCurrentUser();
+        if (!is_array($user)) return null;
+        $raw = $user['district_ids'] ?? null;
+        if (is_string($raw) && $raw !== '') {
+            $decoded = json_decode($raw, true);
+            if (is_array($decoded)) {
+                $ids = [];
+                foreach ($decoded as $one) {
+                    $i = (int) $one;
+                    if ($i > 0) $ids[$i] = true;
+                }
+                $list = array_keys($ids);
+                return $list ?: null; // خالی = همهٔ امور (مدیر سیستم)
+            }
+        }
+        // فهرست تعریف‌نشده → سازگار با تک‌امور قدیمی
         $d = $user['district_id'] ?? null;
-        return ($d === null || $d === '' || (int) $d <= 0) ? null : (int) $d;
+        if ($d === null || $d === '' || (int) $d <= 0) return null;
+        return [(int) $d];
     }
 
     /**
-     * شرط SQL محدودسازی به امور کاربر — اگر کاربر مدیر بود یا ستون/جدول
-     * هنوز ساخته نشده بود رشتهٔ خالی برمی‌گردد (بدون تغییر رفتار).
-     * $params به‌صورت مرجع پر می‌شود.
+     * امورِ اصلی کاربر جاری — اولین امورِ لیست (برای ثبت رکوردهای جدید).
+     * null یعنی مدیر برنامه (دیدن همهٔ امور).
+     */
+    public static function userDistrictId(): ?int
+    {
+        $ids = self::userDistrictIds();
+        return ($ids === null || $ids === []) ? null : (int) $ids[0];
+    }
+
+    /**
+     * شرط SQL محدودسازی به امورهای کاربر — v4.3.85: چند-اموری (IN).
+     * اگر کاربر مدیر بود (لیست خالی) یا ستون/جدول هنوز ساخته نشده بود رشتهٔ
+     * خالی برمی‌گردد (بدون تغییر رفتار). $params به‌صورت مرجع پر می‌شود.
      */
     public static function districtWhere(string $alias, string $table, array &$params): string
     {
         if (!self::districtsReady()) return '';
-        $d = self::userDistrictId();
-        if ($d === null) return '';
+        $ids = self::userDistrictIds();
+        if ($ids === null) return '';
         if (!self::columnExists($table, 'district_id')) return '';
-        $params[] = $d;
-        return " AND `$alias`.`district_id` = ?";
+        foreach ($ids as $i) $params[] = (int) $i;
+        $ph = implode(', ', array_fill(0, count($ids), '?'));
+        return " AND `$alias`.`district_id` IN ($ph)";
     }
 
     /**
@@ -96,6 +124,31 @@ class Helpers
     {
         if (!self::districtsReady()) return '';
         return ", `$joinAlias`.`name` AS `district_name`";
+    }
+
+    /**
+     * v4.3.85: نرمال‌سازی district_ids دریافتی از کلاینت → [ids, json].
+     * ورودی آرایه/رشته/نول — خروجی: [] یعنی «همهٔ امور» (مدیر سیستم).
+     * خروجی: ['ids' => int[], 'json' => ?string] — json فقط وقتی لیست پر باشد.
+     */
+    public static function normalizeDistrictIds($raw): array
+    {
+        $ids = [];
+        if (is_string($raw) && $raw !== '') {
+            $decoded = json_decode($raw, true);
+            if (is_array($decoded)) $raw = $decoded;
+        }
+        if (is_array($raw)) {
+            foreach ($raw as $one) {
+                if (is_array($one)) continue;
+                $i = (int) $one;
+                if ($i > 0) $ids[$i] = true;
+            }
+        } elseif ($raw !== null && $raw !== '' && (int) $raw > 0) {
+            $ids[(int) $raw] = true;
+        }
+        $list = array_keys($ids);
+        return ['ids' => $list, 'json' => $list ? json_encode($list) : null];
     }
 
     /**

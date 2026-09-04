@@ -12,19 +12,31 @@ export interface DistrictOptionRow {
 }
 
 /**
- * امورِ کاربرِ وارد‌شده — از اطلاعات ذخیره‌شدهٔ لاگین.
- * null یعنی مدیر برنامه است و همهٔ امور را می‌بیند.
+ * v4.3.85: لیست امورهای قابل‌مشاهدهٔ کاربر وارد‌شده — از اطلاعات ذخیره‌شدهٔ لاگین.
+ * [] یعنی مدیر برنامه است و همهٔ امور را می‌بیند (لیست خالی = دسترسی کامل).
  */
-export function currentUserDistrictId(): number | null {
-  if (typeof window === "undefined") return null;
+export function currentUserDistrictIds(): number[] {
+  if (typeof window === "undefined") return [];
   try {
     const raw = localStorage.getItem("powerline_user");
     const user = raw ? JSON.parse(raw) : null;
+    // ستون جدید district_ids مقدم است؛ سازگار با district_id قدیمی
+    const ids = user?.district_ids;
+    if (Array.isArray(ids) && ids.length) return ids.map(Number).filter(n => n > 0);
     const d = user?.district_id;
-    return (d === null || d === undefined || d === "" || Number(d) <= 0) ? null : Number(d);
+    return (d === null || d === undefined || d === "" || Number(d) <= 0) ? [] : [Number(d)];
   } catch {
-    return null;
+    return [];
   }
+}
+
+/**
+ * امورِ اصلی کاربرِ وارد‌شده — اولین امورِ لیست (برای قفل فرم‌ها).
+ * null یعنی مدیر برنامه است و همهٔ امور را می‌بیند.
+ */
+export function currentUserDistrictId(): number | null {
+  const ids = currentUserDistrictIds();
+  return ids.length ? ids[0] : null;
 }
 
 /** نام امور کاربر جاری (اگر موجود باشد) */
@@ -41,7 +53,8 @@ export function currentUserDistrictName(): string | null {
 
 /** آیا کاربر جاری مدیر است (بدون محدودیت امور)؟ */
 export function currentUserIsDistrictAdmin(): boolean {
-  return currentUserDistrictId() === null;
+  // v4.3.85: لیست خالی = همهٔ امور (مدیر سیستم)
+  return currentUserDistrictIds().length === 0;
 }
 
 /**

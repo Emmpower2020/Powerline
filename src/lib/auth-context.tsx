@@ -24,6 +24,9 @@ export interface User {
   // v4.3.78: امور بهره‌برداری کاربر — null یعنی مدیر (همهٔ امور)
   district_id?: number | null;
   district_name?: string | null;
+  // v4.3.85: چند-اموری — لیست امورهای قابل‌مشاهده؛ [] یعنی همهٔ امور (مدیر سیستم)
+  district_ids?: number[] | null;
+  district_names?: string[] | null;
   // v4.3.81: دسترسی ماژول‌ها — v4.3.82: مقدار هر ماژول می‌تواند بولین یا آبجکت ابزارها باشد
   module_permissions?: Record<string, ModulePermValue> | null;
   // v4.3.83: نقش اختصاص‌یافته — دسترسی مؤثر از ماتریس همین نقش می‌آید

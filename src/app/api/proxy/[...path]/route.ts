@@ -105,11 +105,11 @@ function invalidateAllCache(): void {
 }
 
 // ─── v4.3.83 (فقط توسعه): شبیه‌ساز مدیریت کاربران/نقش‌ها ───
-// بک‌اند قدیمی هاست (≤4.3.82) endpoint نقش‌ها ندارد و role_id در PUT /users را
-// نادیده می‌گرفت. تا زمان آپلود بک‌اند 4.3.83، نوشتن‌های /users و /roles در حالت
-// توسعه به‌صورت محلی شبیه‌سازی می‌شوند (روی overlay حافظه‌ای) و هرگز به هاست نمی‌رسند.
-// با آپلود بک‌اند جدید، شبیه‌ساز خودش غیرفعال می‌شود و همه‌چیز واقعی می‌شود.
-const SIM_VERSION = [4, 3, 83];
+// بک‌اند قدیمی هاست endpoint نقش‌ها ندارد و role_id در PUT /users را نادیده
+// می‌گرفت. تا زمان آپلود بک‌اند جدید (4.3.85: چند-اموری)، نوشتن‌های /users
+// و /roles در حالت توسعه به‌صورت محلی شبیه‌سازی می‌شوند (روی overlay حافظه‌ای)
+// و هرگز به هاست نمی‌رسند. با آپلود بک‌اند جدید، شبیه‌ساز خودش غیرفعال می‌شود.
+const SIM_VERSION = [4, 3, 85];
 let upstreamVersionCache: number[] | null = null;
 
 function versionAtLeast(v: number[], ref: number[]): boolean {
@@ -181,6 +181,25 @@ async function simulateUsersWrite(method: string, path: string, bodyText: string
       patch.role_name = role ? role.display_name : null;
       patch.roles = role ? role.display_name : null;
     }
+    // v4.3.85: چند-اموری — district_ids نرمال + همگام‌سازی district_id/district_names
+    if (body.district_ids !== undefined) {
+      const ids: number[] = Array.isArray(body.district_ids)
+        ? [...new Set<number>((body.district_ids as any[]).map((v: any) => Number(v)).filter((n: number) => n > 0))]
+        : [];
+      if (ids.length && !simDistrictNames) await simDistrictName(ids[0], authHeader); // گرم‌کردن کش نام امورها
+      patch.district_ids = ids;
+      patch.district_id = ids.length ? ids[0] : null;
+      patch.district_names = ids.length ? ids.map((n: number) => simDistrictNames?.get(n) ?? null) : [];
+      patch.district_name = ids.length ? (simDistrictNames?.get(ids[0]) ?? null) : null;
+    } else if (body.district_id !== undefined) {
+      // کلاینت قدیمی — تک‌امور
+      const one = body.district_id == null ? null : Number(body.district_id);
+      if (one != null && !simDistrictNames) await simDistrictName(one, authHeader);
+      patch.district_id = one;
+      patch.district_ids = one ? [one] : [];
+      patch.district_name = one != null ? (simDistrictNames?.get(one) ?? null) : null;
+      patch.district_names = one ? [simDistrictNames?.get(one) ?? null] : [];
+    }
     simUserPatches.set(id, patch);
     simDeletedIds.delete(id);
     console.log(`[DEV SIM] users PUT ${id} — patch اعمال شد روی overlay`);
@@ -197,7 +216,11 @@ async function simulateUsersWrite(method: string, path: string, bodyText: string
   }
   if (method === "POST" && path === "/users") {
     const id = simNextUserId++;
-    const districtId = body.district_id != null ? Number(body.district_id) : null;
+    // v4.3.85: چند-اموری — district_ids (آرایه) مقدم؛ district_id پشتیبان
+    const districtIds: number[] = Array.isArray(body.district_ids)
+      ? [...new Set<number>((body.district_ids as any[]).map((v: any) => Number(v)).filter((n: number) => n > 0))]
+      : (body.district_id != null ? [Number(body.district_id)] : []);
+    const districtId = districtIds.length ? districtIds[0] : null;
     const role = body.role_id != null ? simAllRoles().find(r => r.id === Number(body.role_id)) : undefined;
     const user = {
       id,
@@ -210,12 +233,16 @@ async function simulateUsersWrite(method: string, path: string, bodyText: string
       roles: role ? role.display_name : null,
       district_id: districtId,
       district_name: await simDistrictName(districtId, authHeader),
+      district_ids: districtIds,
+      district_names: districtIds.length
+        ? await Promise.all(districtIds.map((n: number) => simDistrictName(n, authHeader)))
+        : [],
       module_permissions: body.module_permissions ?? null,
       last_login_at: null,
       created_at: new Date().toISOString().slice(0, 19).replace("T", " "),
     };
     simCreatedUsers.push(user);
-    console.log(`[DEV SIM] users POST — کاربر ${user.username} ساخته شد`);
+    console.log(`[DEV SIM] users POST — کاربر ${user.username} ساخته شد (${districtIds.length} امور)`);
     return json({ success: true, message: `کاربر ایجاد شد (شبیه‌ساز توسعه)${body.password ? "" : " — رمز پیش‌فرض 123456"}`, data: { id } }, 201);
   }
   return json({ success: false, error: { code: 404, message: "مسیر شبیه‌ساز کاربران پیدا نشد" } }, 404);
@@ -339,6 +366,9 @@ function applyUsersSimulatorToGet(bodyText: string): string {
     let rows: any[] = parsed?.data?.data ?? (Array.isArray(parsed?.data) ? parsed.data : []);
     if (!Array.isArray(rows)) return bodyText;
     rows = rows.filter((u: any) => !simDeletedIds.has(Number(u.id)));
+    // v4.3.85: کاربران ساخته‌شدهٔ شبیه‌ساز اول prepend می‌شوند تا patch های
+    // بعدی (district_ids/role_id/...) روی آن‌ها هم اعمال شود
+    rows = [...simCreatedUsers.slice().reverse(), ...rows];
     rows = rows.map((u: any) => {
       const patch = simUserPatches.get(Number(u.id));
       let merged = patch ? { ...u, ...patch } : u;
@@ -349,8 +379,6 @@ function applyUsersSimulatorToGet(bodyText: string): string {
       }
       return merged;
     });
-    // مثل بک‌اند واقعی (ORDER BY id DESC) کاربران ساخته‌شده در ابتدای فهرست می‌آیند
-    rows = [...simCreatedUsers.slice().reverse(), ...rows];
     let total = parsed?.data?.total;
     if (typeof total === "number") total = rows.length;
     if (parsed?.data && !Array.isArray(parsed.data)) {
@@ -483,11 +511,11 @@ async function handleRequest(request: NextRequest) {
   if (DEV_MODE && isGet && path === "/backend-version") {
     const upstream = await upstreamBackendVersion();
     if (!upstream.length || !versionAtLeast(upstream, SIM_VERSION)) {
-      console.log(`[DEV SIM] backend-version هاست ${upstream.join(".") || "?"} قدیمی است — نسخهٔ بستهٔ 4.3.83 گزارش شد`);
+      console.log(`[DEV SIM] backend-version هاست ${upstream.join(".") || "?"} قدیمی است — نسخهٔ بستهٔ 4.3.85 گزارش شد`);
       return NextResponse.json({
         success: true,
         message: "نسخه بک‌اند",
-        data: { version: "v4.3.83", component: "Powerline PHP Backend (dev-sim)" },
+        data: { version: "v4.3.85", component: "Powerline PHP Backend (dev-sim)" },
       });
     }
   }

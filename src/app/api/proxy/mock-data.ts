@@ -47,6 +47,9 @@ const devSimUser = (districtId: number) => ({
   organization_id: null,
   district_id: districtId,
   district_name: null,
+  // v4.3.85: چند-اموری — shape سازگار با /auth/me جدید
+  district_ids: [districtId],
+  district_names: [null],
   module_permissions: { lines: false, users: false, "error-log": false },
 });
 

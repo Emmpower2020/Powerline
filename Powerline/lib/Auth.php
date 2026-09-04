@@ -35,11 +35,12 @@ class Auth
         }
 
         // بارگذاری کاربر از دیتابیس
-        // v4.3.78: امور بهره‌برداری کاربر — اگر migration اجرا شده باشد همراه کاربر برمی‌گردد
+        // v4.3.78: امور بهره‌برداری کاربر — v4.3.85: لیست چند-اموری هم همراه کاربر برمی‌گردد
         $db = Database::getInstance();
         $districtCol = self::userHasDistrictColumn() ? ', u.district_id' : '';
+        $districtIdsCol = Helpers::columnExists('users', 'district_ids') ? ', u.district_ids' : '';
         $user = $db->fetchOne(
-            "SELECT u.id, u.username, u.full_name, u.email, u.status, u.organization_id$districtCol
+            "SELECT u.id, u.username, u.full_name, u.email, u.status, u.organization_id$districtCol$districtIdsCol
              FROM users u
              WHERE u.id = ? AND u.status = 'active'",
             [$payload['sub']]
@@ -66,8 +67,9 @@ class Auth
 
         $db = Database::getInstance();
         $districtColOpt = self::userHasDistrictColumn() ? ', u.district_id' : '';
+        $districtIdsColOpt = Helpers::columnExists('users', 'district_ids') ? ', u.district_ids' : '';
         $user = $db->fetchOne(
-            "SELECT u.id, u.username, u.full_name, u.email, u.status, u.organization_id$districtColOpt
+            "SELECT u.id, u.username, u.full_name, u.email, u.status, u.organization_id$districtColOpt$districtIdsColOpt
              FROM users u
              WHERE u.id = ? AND u.status = 'active'",
             [$payload['sub']]
@@ -297,8 +299,9 @@ class Auth
 
         // پیدا کردن کاربر
         $districtColLogin = self::userHasDistrictColumn() ? ', district_id' : '';
+        $districtIdsColLogin = Helpers::columnExists('users', 'district_ids') ? ', district_ids' : '';
         $user = $db->fetchOne(
-            "SELECT id, username, password_hash, full_name, email, status, failed_attempts, locked_until$districtColLogin
+            "SELECT id, username, password_hash, full_name, email, status, failed_attempts, locked_until$districtColLogin$districtIdsColLogin
              FROM users
              WHERE username = ?",
             [$username]
@@ -365,6 +368,13 @@ class Auth
                 'email'    => $user['email'],
                 // v4.3.78: امور بهره‌برداری کاربر (null = مدیر، دیدن همه)
                 'district_id' => isset($user['district_id']) && $user['district_id'] ? (int) $user['district_id'] : null,
+                // v4.3.85: لیست چند-اموری — [] یعنی همهٔ امور (مدیر سیستم)
+                'district_ids' => (function () use ($user) {
+                    $norm = Helpers::normalizeDistrictIds($user['district_ids'] ?? null);
+                    if (!empty($norm['ids'])) return $norm['ids'];
+                    // لیست خالی → تک‌امور قدیمی (اگر بود)
+                    return isset($user['district_id']) && $user['district_id'] ? [(int) $user['district_id']] : [];
+                })(),
             ],
             'tokens' => [
                 'access_token'  => $accessToken,

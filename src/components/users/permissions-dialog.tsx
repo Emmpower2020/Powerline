@@ -26,6 +26,9 @@ export interface UserRow {
   role_name?: string | null;
   district_id?: number | null;
   district_name?: string | null;
+  /** v4.3.85: چند-اموری — [] یعنی همهٔ امور (مدیر سیستم) */
+  district_ids?: number[] | null;
+  district_names?: string[] | null;
   module_permissions?: Record<string, ModulePermValue> | null;
   last_login_at: string | null;
 }
@@ -98,22 +101,23 @@ export function PermissionsMatrix({
 
   return (
     <div className="rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
+      {/* v4.3.85: ستون‌های فشرده — جدول در عرض دیالوگ جمع‌وجور بدون اسکرول افقی جا می‌شود */}
       <table className="w-full text-xs border-collapse table-fixed">
         <colgroup>
-          <col style={{ width: "30%" }} />
+          <col style={{ width: "34%" }} />
           {TOOL_KEYS.map(tool => (
-            <col key={tool} style={{ width: `${70 / TOOL_KEYS.length}%` }} />
+            <col key={tool} style={{ width: `${66 / TOOL_KEYS.length}%` }} />
           ))}
         </colgroup>
         <thead>
           <tr className="bg-slate-50 dark:bg-slate-800/70">
-            <th className="sticky right-0 z-10 bg-slate-50 dark:bg-slate-800/70 border-l border-slate-200 dark:border-slate-700 px-3 py-2 text-right font-semibold text-slate-600 dark:text-slate-300 whitespace-nowrap">
+            <th className="sticky right-0 z-10 bg-slate-50 dark:bg-slate-800/70 border-l border-slate-200 dark:border-slate-700 px-2 py-1.5 text-right font-semibold text-slate-600 dark:text-slate-300 whitespace-nowrap text-[11px]">
               بخش
             </th>
             {TOOL_KEYS.map(tool => (
-              <th key={tool} className="px-1 py-2 text-center font-semibold text-slate-600 dark:text-slate-300 whitespace-nowrap border-l border-slate-100 dark:border-slate-800 last:border-l-0">
-                <div className="flex flex-col items-center gap-1">
-                  <span>{TOOL_LABELS[tool]}</span>
+              <th key={tool} className="px-0.5 py-1.5 text-center font-semibold text-slate-600 dark:text-slate-300 whitespace-nowrap border-l border-slate-100 dark:border-slate-800 last:border-l-0">
+                <div className="flex flex-col items-center gap-0.5">
+                  <span className="text-[11px]">{TOOL_LABELS[tool]}</span>
                   <Checkbox
                     checked={toolColumnState(tool)}
                     onCheckedChange={(v) => toggleToolColumn(tool, v === true)}
@@ -164,7 +168,7 @@ function PermissionGroupRows({
   return (
     <>
       <tr className="bg-slate-50/80 dark:bg-slate-800/40">
-        <td colSpan={7} className="px-3 py-1 border-t border-slate-100 dark:border-slate-800">
+        <td colSpan={7} className="px-2 py-1 border-t border-slate-100 dark:border-slate-800">
           <div className="flex items-center gap-2">
             <span className={`w-2 h-2 rounded-full ${GROUP_DOT[group] ?? "bg-slate-400"}`} />
             <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400">{group}</span>
@@ -180,7 +184,7 @@ function PermissionGroupRows({
             key={def.key}
             className={`border-t border-slate-100 dark:border-slate-800 hover:bg-slate-50/60 dark:hover:bg-slate-800/40 ${locked ? "opacity-60 bg-slate-50/50" : ""}`}
           >
-            <td className="sticky right-0 z-10 bg-white dark:bg-slate-900 px-3 py-1.5 border-l border-slate-200 dark:border-slate-700 whitespace-nowrap overflow-hidden text-ellipsis">
+            <td className="sticky right-0 z-10 bg-white dark:bg-slate-900 px-2 py-1.5 border-l border-slate-200 dark:border-slate-700 whitespace-nowrap overflow-hidden text-ellipsis">
               <div className="flex items-center gap-1.5">
                 {locked && <Lock className="w-3 h-3 text-slate-400 shrink-0" />}
                 <span className="font-medium text-slate-700 dark:text-slate-200 text-right">{def.label}</span>
@@ -217,9 +221,9 @@ function PermissionGroupRows({
 }
 
 /**
- * دیالوگ ویرایش دسترسی نقش — v4.3.83 (RBAC)
+ * دیالوگ ویرایش دسترسی نقش — v4.3.83 (RBAC) · v4.3.85: جمع‌وجور و وسط صفحه
  * یک نقش (کلیک ردیف / ویرایش) یا چند نقش (ویرایش گروهی).
- * عرض دیالوگ تا ۹۵٪ صفحه — بدون اسکرول افقی؛ فقط ارتفاع اسکرول دارد.
+ * عرض ثابت جمع‌وجور (~۶۶۰px) — ماتریس بدون اسکرول افقی جا می‌شود؛ فقط ارتفاع اسکرول دارد.
  * ذخیره: PUT /roles/{id} برای هر نقش به‌صورت زنجیره‌ای با نوار پیشرفت.
  */
 export function PermissionsDialog({
@@ -286,7 +290,7 @@ export function PermissionsDialog({
 
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!o && !saving) onClose(); }}>
-      <DialogContent className="w-[95vw] max-w-[1400px] sm:max-w-[1400px] max-h-[92vh] overflow-y-auto" dir="rtl">
+      <DialogContent className="sm:max-w-[660px] max-h-[85vh] overflow-y-auto" dir="rtl">
         <DialogHeader>
           <DialogTitle className="text-right flex items-center gap-2">
             <ShieldCheck className="w-5 h-5 text-indigo-600" />
