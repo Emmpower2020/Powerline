@@ -58,6 +58,13 @@ interface PriceListItem {
   category: string | null;
   status: number;
   contract_title?: string | null;
+  item_kind?: string | null;
+  activity_type?: string | null;
+  voltage_kv?: number | null;
+  circuit_count?: number | null;
+  bundle_count?: number | null;
+  terrain_type?: string | null;
+  inspection_method?: string | null;
 }
 
 const asArray = (r: unknown): any[] => (Array.isArray(r) ? r : ((r as any)?.data || []));
@@ -119,6 +126,12 @@ export function PriceListsPage() {
     { key: "unit", header: "واحد", sortable: true, filterable: true },
     { key: "unit_price", header: "بهای واحد (ریال)", sortable: true, type: "number" },
     { key: "category", header: "دسته", sortable: true, filterable: true },
+    { key: "voltage_kv", header: "ولتاژ", sortable: true, type: "number" },
+    { key: "circuit_count", header: "مدار", sortable: true, type: "number" },
+    { key: "bundle_count", header: "باندل", sortable: true, type: "number" },
+    { key: "terrain_type", header: "زمین", sortable: true, filterable: true },
+    { key: "inspection_method", header: "نوع بازدید", sortable: true, filterable: true },
+    { key: "item_kind", header: "نوع قلم", sortable: true, filterable: true },
     { key: "status", header: "وضعیت", type: "status" },
   ];
 
@@ -150,15 +163,50 @@ export function PriceListsPage() {
     const file = e.target.files?.[0]; if (!file) return;
     try {
       const XLSX = await import("xlsx");
-      const wb = XLSX.read(await file.arrayBuffer(), { type: "array" });
-      const ws = wb.Sheets[wb.SheetNames[0]];
-      const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws, { defval: "" });
-      for (const r of rows) {
-        await apiClient.post(API_ENDPOINTS.priceListItems, { price_list_id: Number(selectedListId), code: r.code || r["کد"], title: r.title || r["شرح"], unit: r.unit || r["واحد"] || "عدد", unit_price: Number(r.unit_price || r["بهای واحد (ریال)"] || 0), category: r.category || r["دسته"] || "عملیات" });
-      }
+      const book = XLSX.read(await file.arrayBuffer(), { type: "array", cellDates: false });
+      const preferred = ["Import - Powerline", "Main"].find(name => book.SheetNames.includes(name));
+      const ws = preferred ? book.Sheets[preferred] : book.Sheets[book.SheetNames[0]];
+      const raw = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws, { defval: "" });
+      const rows = raw.map(r => {
+        const kind = String(r["نوع قلم"] ?? r["item_kind"] ?? "base").trim().toLowerCase();
+        return {
+          code: String(r["کد رسمی"] ?? r["code"] ?? "").trim(),
+          title: String(r["شرح"] ?? r["title"] ?? r["شرح ردیف فصل"] ?? "").trim(),
+          unit: String(r["واحد"] ?? r["unit"] ?? "").trim(),
+          unit_price: Number(r["بهای واحد"] ?? r["unit_price"] ?? 0) || 0,
+          item_kind: kind === "reduction" || kind === "addition" || kind === "adjustment" ? "adjustment" : "base",
+          parent_code: String(r["کد ردیف والد"] ?? r["parent_code"] ?? "").trim(),
+          activity_type: r["فعالیت"] || r["activity_type"] || null,
+          voltage_kv: r["سطح ولتاژ"] === "" ? null : Number(r["سطح ولتاژ"]),
+          circuit_count: r["تعداد مدار"] === "" ? null : Number(r["تعداد مدار"]),
+          bundle_count: r["تعداد باندل"] === "" ? null : Number(r["تعداد باندل"]),
+          terrain_type: r["نوع مسیر"] || null,
+          inspection_method: r["نوع بازدید"] || null,
+          rule_key: r["کلید قانون"] || null,
+          rule_value: r["مقدار قانون"] ?? null,
+          adjustment_type: kind === "reduction" ? "reduction" : kind === "addition" ? "addition" : null,
+          category: "عملیات",
+        };
+      }).filter(r => r.title);
+      if (!rows.length) throw new Error("هیچ ردیف قابل واردسازی در فایل پیدا نشد");
+      const sameList = selectedListId ? Number(selectedListId) : undefined;
+      const payload: Record<string, unknown> = {
+        price_list_id: sameList,
+        name: file.name.replace(/\.(xlsx|xls|csv)$/i, "") || "فهرست بها",
+        version: selectedList?.version || null,
+        effective_date: selectedList?.effective_date || new Date().toISOString().slice(0, 10),
+        rows,
+      };
+      const res = await apiClient.post<any>(API_ENDPOINTS.priceListImport, payload);
+      const data = res?.data ?? res;
+      toast({ title: "واردسازی فهرست بها انجام شد", description: `ردیف اصلی: ${(data?.inserted || 0) + (data?.updated || 0)} | افزایش/کاهش: ${data?.adjustments || 0}` });
       setRefreshKey(k => k + 1);
-    } catch (e) { console.error("خطا در import فهرست بها", e); }
-    finally { e.target.value = ""; }
+      if (!selectedListId && data?.price_list_id) setSelectedListId(String(data.price_list_id));
+    } catch (e) {
+      const message = e instanceof Error ? e.message : "خطای نامشخص";
+      toast({ title: "واردسازی ناموفق بود", description: message, variant: "destructive" });
+      console.error("خطا در import فهرست بها", e);
+    } finally { e.target.value = ""; }
   };
 
   const handleDelete = async () => {
@@ -261,7 +309,7 @@ export function PriceListsPage() {
           data={items}
           columns={columns}
           loading={itemsLoading}
-          searchKeys={["contract_title", "code", "title", "category"]}
+          searchKeys={["contract_title", "code", "title", "category", "activity_type", "terrain_type", "inspection_method"]}
           title="اقلام فهرست بها"
           layoutKey="price-list-items"
           onAdd={() => setShowCreateItem(true)}

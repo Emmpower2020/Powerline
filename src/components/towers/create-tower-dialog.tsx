@@ -30,6 +30,7 @@ interface FormData {
   insulator_count_r1: string; insulator_count_s1: string; insulator_count_t1: string;
   insulator_count_r2: string; insulator_count_s2: string; insulator_count_t2: string;
   gps_lat: string; gps_lng: string;
+  terrain_type: string;
   district_id: string;
 }
 
@@ -41,7 +42,7 @@ const empty: FormData = {
   insulator_r2: "", insulator_s2: "", insulator_t2: "",
   insulator_count_r1: "", insulator_count_s1: "", insulator_count_t1: "",
   insulator_count_r2: "", insulator_count_s2: "", insulator_count_t2: "",
-  gps_lat: "", gps_lng: "", district_id: "",
+  gps_lat: "", gps_lng: "", terrain_type: "", district_id: "",
 };
 
 interface Props {
@@ -158,6 +159,7 @@ export function CreateTowerDialog({ open, onClose, onCreated, editRow, duplicate
           insulator_count_t2: s(sourceRow.insulator_count_t2),
           gps_lat: s(sourceRow.gps_lat),
           gps_lng: s(sourceRow.gps_lng),
+          terrain_type: s(sourceRow.terrain_type),
           // v4.3.78: امور بهره‌برداری دکل
           district_id: (sourceRow as any)?.district_id != null ? String((sourceRow as any).district_id) : "",
         });
@@ -209,6 +211,7 @@ export function CreateTowerDialog({ open, onClose, onCreated, editRow, duplicate
         insulator_count_t2: num(form.insulator_count_t2),
         gps_lat: form.gps_lat ? Number(form.gps_lat) : null,
         gps_lng: form.gps_lng ? Number(form.gps_lng) : null,
+        terrain_type: form.terrain_type || null,
         line_supervisor: str(form.line_supervisor),
       };
 
@@ -321,6 +324,17 @@ export function CreateTowerDialog({ open, onClose, onCreated, editRow, duplicate
                     {TOWER_TYPES.map(t => (
                       <SelectItem key={t} value={t}>{t}</SelectItem>
                     ))}
+                  </SelectContent>
+                </Select>
+              </Field>
+              <Field label="شرایط زمین">
+                <Select value={form.terrain_type || "__none__"} onValueChange={v => set("terrain_type", v === "__none__" ? "" : v)}>
+                  <SelectTrigger className="w-full bg-white"><SelectValue placeholder="انتخاب شرایط زمین..." /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">نامشخص</SelectItem>
+                    <SelectItem value="plain">دشت و تپه‌ماهور</SelectItem>
+                    <SelectItem value="semi_mountainous">نیمه‌کوهستانی</SelectItem>
+                    <SelectItem value="mountainous">صعب‌العبور</SelectItem>
                   </SelectContent>
                 </Select>
               </Field>

@@ -258,6 +258,11 @@ function registerTowerRoutes(Router $router): void
         $columns[]='tower_structure'; $values[]='?'; $params[]=$body['tower_structure'];
         $columns[]='tower_type'; $values[]='?'; $params[]=$body['tower_type'];
         $columns[]=$towerCodeColumn; $values[]='?'; $params[]=$body['tower_type_code'] ?? null;
+        $terrain = $body['terrain_type'] ?? null;
+        if (isset($dbColumns['terrain_type'])) { $columns[]='terrain_type'; $values[]='?'; $params[]=$terrain; }
+        if (isset($dbColumns['plain_terrain'])) { $columns[]='plain_terrain'; $values[]='?'; $params[]=($terrain === 'plain' ? 1 : ($terrain === null || $terrain === '' ? null : 0)); }
+        if (isset($dbColumns['semi_mountainous'])) { $columns[]='semi_mountainous'; $values[]='?'; $params[]=($terrain === 'semi_mountainous' ? 1 : ($terrain === null || $terrain === '' ? null : 0)); }
+        if (isset($dbColumns['mountainous'])) { $columns[]='mountainous'; $values[]='?'; $params[]=($terrain === 'mountainous' ? 1 : ($terrain === null || $terrain === '' ? null : 0)); }
         foreach (['base_height_a','base_height_b','base_height_c','base_height_d','insulator_r1','insulator_s1','insulator_t1','insulator_r2','insulator_s2','insulator_t2','insulator_count_r1','insulator_count_s1','insulator_count_t1','insulator_count_r2','insulator_count_s2','insulator_count_t2'] as $f) { $columns[]=$f; $values[]='?'; $params[]=$body[$f] ?? null; }
         $columns[]='gps_lat'; $values[]='?'; $params[]=$gpsLat;
         $columns[]='gps_lng'; $values[]='?'; $params[]=$gpsLng;
@@ -314,7 +319,7 @@ function registerTowerRoutes(Router $router): void
             'insulator_r1', 'insulator_s1', 'insulator_t1', 'insulator_r2', 'insulator_s2', 'insulator_t2',
             'insulator_count_r1', 'insulator_count_s1', 'insulator_count_t1',
             'insulator_count_r2', 'insulator_count_s2', 'insulator_count_t2',
-            'line_supervisor', 'contract_id', 'status',
+            'line_supervisor', 'contract_id', 'status', 'terrain_type', 'plain_terrain', 'semi_mountainous', 'mountainous',
         ];
         // v4.3.78: ویرایش امور بهره‌برداری دکل (اگر migration اجرا شده باشد)
         if (Helpers::columnExists('towers', 'district_id')) $allowedFields[] = 'district_id';
@@ -325,6 +330,16 @@ function registerTowerRoutes(Router $router): void
             if (array_key_exists($field, $body)) {
                 $updates[] = "`$field` = ?";
                 $params[] = $body[$field];
+            }
+        }
+        if (array_key_exists('terrain_type', $body) && isset($dbColumns['terrain_type'])) {
+            $terrain = $body['terrain_type'];
+            foreach ([
+                'plain_terrain' => ($terrain === 'plain' ? 1 : ($terrain === null || $terrain === '' ? null : 0)),
+                'semi_mountainous' => ($terrain === 'semi_mountainous' ? 1 : ($terrain === null || $terrain === '' ? null : 0)),
+                'mountainous' => ($terrain === 'mountainous' ? 1 : ($terrain === null || $terrain === '' ? null : 0)),
+            ] as $flag => $value) {
+                if (isset($dbColumns[$flag])) { $updates[] = "`$flag` = ?"; $params[] = $value; }
             }
         }
 
@@ -403,7 +418,7 @@ function registerTowerRoutes(Router $router): void
             'tower_structure', 'tower_type', 'tower_type_code',
             'insulator_r1', 'insulator_s1', 'insulator_t1',
             'insulator_r2', 'insulator_s2', 'insulator_t2',
-            'line_supervisor', 'contract_id', 'status', 'line_id',
+            'line_supervisor', 'contract_id', 'status', 'terrain_type', 'plain_terrain', 'semi_mountainous', 'mountainous', 'line_id',
         ];
         // v4.3.78: ویرایش گروهی امور بهره‌برداری دکل‌ها (اگر migration اجرا شده باشد)
         if (Helpers::columnExists('towers', 'district_id')) $allowedFields[] = 'district_id';
@@ -807,6 +822,10 @@ function formatTowerRow(array $row): array
         'tower_type'        => $row['tower_type'] ?? null,
         'tower_structure'   => $row['tower_structure'] ?? null,
         'tower_type_code'   => $row['tower_type_code'] ?? null,
+        'terrain_type'      => $row['terrain_type'] ?? null,
+        'plain_terrain'     => isset($row['plain_terrain']) ? (int) $row['plain_terrain'] : null,
+        'semi_mountainous'  => isset($row['semi_mountainous']) ? (int) $row['semi_mountainous'] : null,
+        'mountainous'       => isset($row['mountainous']) ? (int) $row['mountainous'] : null,
         'base_height_a'     => $num($row['base_height_a'] ?? null),
         'base_height_b'     => $num($row['base_height_b'] ?? null),
         'base_height_c'     => $num($row['base_height_c'] ?? null),

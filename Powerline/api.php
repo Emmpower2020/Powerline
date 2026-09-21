@@ -43,6 +43,7 @@ require_once __DIR__ . '/endpoints/defects.php';
 require_once __DIR__ . '/endpoints/inspections.php';
 require_once __DIR__ . '/endpoints/work_orders.php';
 require_once __DIR__ . '/endpoints/dashboard.php';
+require_once __DIR__ . '/endpoints/price_list_billing.php';
 require_once __DIR__ . '/endpoints/modules.php';
 
 // ============================================================================
@@ -86,6 +87,9 @@ registerWorkOrderRoutes($router);
 
 // داشبورد
 registerDashboardRoutes($router);
+
+// اتصال عملیات به فهرست بها / متره / صدور صورت‌وضعیت
+registerPriceListBillingRoutes($router);
 
 // ماژول‌های اضافی
 registerModuleRoutes($router);

@@ -32,6 +32,9 @@ export const API_ENDPOINTS = {
   districts: "/districts",
   equipment: "/equipment", equipmentClasses: "/equipment-classes",
   priceLists: "/price-lists", priceListItems: "/price-list-items",
+  priceListImport: "/price-lists/import", priceListAdjustments: "/price-list-adjustments",
+  priceListMatch: (sourceType: "inspection" | "work_order", id: number) => `/price-list-match/${sourceType}/${id}`,
+  billingMeasurements: "/billing-measurements", invoiceFromMeasurements: "/invoices/from-measurements",
   checklistTemplates: "/checklist-templates",
   auditLog: "/audit-log", organization: "/organization", crews: "/crews",
 } as const;

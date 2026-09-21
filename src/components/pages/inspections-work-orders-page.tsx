@@ -8,6 +8,9 @@ import type { Inspection, WorkOrder, PaginatedResponse } from "@/lib/types";
 import { DataTable, type DataTableColumn } from "@/components/data-table";
 import { CreateInspectionDialog, CreateWorkOrderDialog } from "@/components/create-dialogs";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Calculator } from "lucide-react";
+import { PriceListMatcherDialog } from "@/components/price-list-matcher-dialog";
 import { GenericBulkActions } from "@/components/generic-bulk-actions";
 
 export function InspectionsPage() {
@@ -15,6 +18,7 @@ export function InspectionsPage() {
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [billingSource, setBillingSource] = useState<Inspection | null>(null);
 
   useEffect(() => {
     const load = async () => {
@@ -57,8 +61,9 @@ export function InspectionsPage() {
         searchKeys={columns.map(c => c.key)}
         title="بازدیدها" onAdd={() => setShowCreate(true)} onRefresh={() => setRefreshKey(k => k + 1)}
         onCopy={() => {}} onDelete={handleDelete} onDuplicate={handleDuplicate} onImport={() => alert("برای وارد کردن اطلاعات بازدید از قالب اکسل پروژه استفاده کنید.")} onLoadAllRows={async () => data}
-        toolbarExtra={(rows) => <GenericBulkActions rows={rows} endpoint={API_ENDPOINTS.inspections} entityName="بازدید" onApplied={() => setRefreshKey(k => k + 1)} canToggleStatus statusField="activity_status" canChangeContract canChangeDistrict />} />
+        toolbarExtra={(rows) => <div className="flex items-center gap-2"><GenericBulkActions rows={rows} endpoint={API_ENDPOINTS.inspections} entityName="بازدید" onApplied={() => setRefreshKey(k => k + 1)} canToggleStatus statusField="activity_status" canChangeContract canChangeDistrict />{rows.length === 1 && <Button size="sm" variant="outline" onClick={() => setBillingSource(rows[0])} title="اتصال بازدید به فهرست بها"><Calculator className="w-4 h-4 ml-2" />فهرست بها / متره</Button>}</div>} />
       <CreateInspectionDialog open={showCreate} onClose={() => setShowCreate(false)} onCreated={() => { setShowCreate(false); setRefreshKey(k => k + 1); }} />
+      <PriceListMatcherDialog open={!!billingSource} onClose={() => setBillingSource(null)} sourceType="inspection" sourceId={billingSource?.id ?? null} sourceLabel={billingSource?.inspection_code} />
     </div>
   );
 }
@@ -68,6 +73,7 @@ export function WorkOrdersPage() {
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [billingSource, setBillingSource] = useState<WorkOrder | null>(null);
 
   useEffect(() => {
     const load = async () => {
@@ -109,8 +115,9 @@ export function WorkOrdersPage() {
         searchKeys={columns.map(c => c.key)}
         title="دستورکارها" onAdd={() => setShowCreate(true)} onRefresh={() => setRefreshKey(k => k + 1)}
         onCopy={() => {}} onDelete={handleDelete} onDuplicate={handleDuplicate} onImport={() => alert("برای وارد کردن اطلاعات دستورکار از قالب اکسل پروژه استفاده کنید.")} onLoadAllRows={async () => data}
-        toolbarExtra={(rows) => <GenericBulkActions rows={rows} endpoint={API_ENDPOINTS.workOrders} entityName="دستورکار" onApplied={() => setRefreshKey(k => k + 1)} canToggleStatus statusField="activity_status" canChangeContract canChangeDistrict />} />
+        toolbarExtra={(rows) => <div className="flex items-center gap-2"><GenericBulkActions rows={rows} endpoint={API_ENDPOINTS.workOrders} entityName="دستورکار" onApplied={() => setRefreshKey(k => k + 1)} canToggleStatus statusField="activity_status" canChangeContract canChangeDistrict />{rows.length === 1 && <Button size="sm" variant="outline" onClick={() => setBillingSource(rows[0])} title="اتصال دستورکار به فهرست بها"><Calculator className="w-4 h-4 ml-2" />فهرست بها / متره</Button>}</div>} />
       <CreateWorkOrderDialog open={showCreate} onClose={() => setShowCreate(false)} onCreated={() => { setShowCreate(false); setRefreshKey(k => k + 1); }} />
+      <PriceListMatcherDialog open={!!billingSource} onClose={() => setBillingSource(null)} sourceType="work_order" sourceId={billingSource?.id ?? null} sourceLabel={billingSource?.wo_code} />
     </div>
   );
 }

@@ -44,6 +44,10 @@ export interface Tower {
   tower_type: TowerType;
   tower_structure: string | null;
   tower_type_code: string | null;
+  terrain_type?: "plain" | "semi_mountainous" | "mountainous" | string | null;
+  plain_terrain?: number | null;
+  semi_mountainous?: number | null;
+  mountainous?: number | null;
   base_height_a: number | null;
   base_height_b: number | null;
   base_height_c: number | null;
@@ -166,6 +170,9 @@ export interface Inspection {
   gps_lng: number | null;
   status: InspectionStatus;
   priority: "routine" | "emergency" | "follow_up" | "commissioning";
+  inspection_method?: "patrol" | "climbing" | string | null;
+  crew_size?: number | null;
+  terrain_type?: "plain" | "semi_mountainous" | "mountainous" | string | null;
   weather: string | null;
   notes: string | null;
   // v4.3.78: وضعیت فعال/غیرفعال + امور بهره‌برداری بازدید

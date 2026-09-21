@@ -136,6 +136,9 @@ function registerInspectionRoutes(Router $router): void
             $body['weather'] ?? null,
             $body['notes'] ?? null,
         ];
+        if (Helpers::columnExists('inspections','inspection_method')) { $insCols[]='inspection_method'; $insVals[]='?'; $insParams[]=$body['inspection_method'] ?? null; }
+        if (Helpers::columnExists('inspections','crew_size')) { $insCols[]='crew_size'; $insVals[]='?'; $insParams[]=$body['crew_size'] ?? null; }
+        if (Helpers::columnExists('inspections','terrain_type')) { $insCols[]='terrain_type'; $insVals[]='?'; $insParams[]=$body['terrain_type'] ?? null; }
         if (Helpers::columnExists('inspections', 'activity_status')) { $insCols[] = 'activity_status'; $insVals[] = "'inactive'"; }
         if (Helpers::columnExists('inspections', 'district_id')) { $insCols[] = 'district_id'; $insVals[] = '?'; $insParams[] = $districtId; }
         $sql = "INSERT INTO inspections (" . implode(', ', $insCols) . ") VALUES (" . implode(', ', $insVals) . ")";
@@ -156,6 +159,7 @@ function registerInspectionRoutes(Router $router): void
         // v4.3.81: قفل امور — تغییر امور رکورد فقط برای مدیر
         $body = Helpers::stripDistrictForNonAdmin($body);
         $fields = ['inspection_date','priority','weather','notes','line_id','tower_id','contract_id','inspector_id','crew_id','status'];
+        foreach (['inspection_method','crew_size','terrain_type'] as $f) { if (Helpers::columnExists('inspections',$f)) $fields[]=$f; }
         // v4.3.78: ویرایش امور بهره‌برداری و وضعیت فعال/غیرفعال بازدید
         if (Helpers::columnExists('inspections', 'district_id')) $fields[] = 'district_id';
         if (Helpers::columnExists('inspections', 'activity_status')) $fields[] = 'activity_status';
@@ -233,6 +237,9 @@ function formatInspectionRow(array $row): array
         'gps_lng'           => $row['gps_lng'] !== null ? (float) $row['gps_lng'] : null,
         'status'            => $row['status'],
         'priority'          => $row['priority'],
+        'inspection_method' => $row['inspection_method'] ?? null,
+        'crew_size'        => isset($row['crew_size']) && $row['crew_size'] !== null ? (int)$row['crew_size'] : null,
+        'terrain_type'     => $row['terrain_type'] ?? null,
         'weather'           => $row['weather'],
         'notes'             => $row['notes'],
         // v4.3.78: وضعیت فعال/غیرفعال + امور بهره‌برداری (بعد از migration)

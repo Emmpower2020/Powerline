@@ -398,6 +398,12 @@ export function TowersPage() {
       key: "tower_structure", header: "ساختار دکل", sortable: true, filterable: true, align: "right",
       render: (row: any) => structureBadge(row.tower_structure),
     },
+    { key: "terrain_type", header: "شرایط زمین", sortable: true, filterable: true, align: "right",
+      render: (row: any) => {
+        const labels: Record<string,string> = { plain: "دشت و تپه‌ماهور", semi_mountainous: "نیمه‌کوهستانی", mountainous: "صعب‌العبور" };
+        return labels[row.terrain_type] || <span className="text-slate-300">—</span>;
+      },
+    },
     { key: "tower_type_code", header: "کد نوع دکل", sortable: true, filterable: true, align: "right" },
     { key: "tower_type", header: "نوع دکل", sortable: true, filterable: true, align: "right" },
     { key: "base_height_a", header: "ارتفاع پایه A", sortable: true, type: "number", hidden: true, align: "right" },
@@ -451,7 +457,7 @@ export function TowersPage() {
         data={filteredData}
         columns={columns}
         loading={loading}
-        searchKeys={["tower_code", "line_code", "line_name", "tower_structure", "tower_type", "tower_type_code", "line_supervisor", "voltage_kv", "contract_title"]}
+        searchKeys={["tower_code", "line_code", "line_name", "tower_structure", "terrain_type", "tower_type", "tower_type_code", "line_supervisor", "voltage_kv", "contract_title"]}
         title="دکل‌ها"
         onAdd={() => { setEditRow(null); setDuplicateFrom(null); setShowCreate(true); }}
         onRefresh={() => setRefreshKey(k => k + 1)}

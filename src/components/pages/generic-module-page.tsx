@@ -18,6 +18,7 @@ import { FormSection } from "@/components/form-section";
 import { DataTable, type DataTableColumn } from "@/components/data-table";
 import type { PaginatedResponse } from "@/lib/types";
 import { GenericBulkActions } from "@/components/generic-bulk-actions";
+import { BillingMeasurementsInvoiceDialog } from "@/components/billing-measurements-invoice-dialog";
 import { ImportExcelDialog } from "@/components/import-excel-dialog";
 import { BulkDeleteDialog } from "@/components/bulk-delete-dialog";
 import { useToast } from "@/hooks/use-toast";
@@ -354,6 +355,7 @@ export function GenericModulePage({ moduleKey, endpoint, accessKey }: { moduleKe
   const [showCreate, setShowCreate] = useState(false);
   const [showImport, setShowImport] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [showInvoiceFromMeasurements, setShowInvoiceFromMeasurements] = useState(false);
   const [editor, setEditor] = useState<{open: boolean; mode: "edit"|"create"|"copy"; row: GenericItem|null}>({open:false,mode:"edit",row:null});
   // v4.3.53: حذف استاندارد با دیالوگ تأیید و نوار پیشرفت (به‌جای window.confirm)
   const [pendingDelete, setPendingDelete] = useState<GenericItem[] | null>(null);
@@ -476,8 +478,12 @@ export function GenericModulePage({ moduleKey, endpoint, accessKey }: { moduleKe
         const result = await apiClient.get<PaginatedResponse<GenericItem>>(endpoint, { page: 1, page_size: 100000 });
         return Array.isArray(result) ? result : (result?.data || []);
       }}
-      toolbarExtra={(rows) => <GenericBulkActions rows={rows} endpoint={endpoint} entityName={config.singular} onApplied={() => setRefreshKey(k => k + 1)} canToggleStatus statusField={config.statusField} canChangeContract={!!config.editKeys?.includes("contract_id")} canChangeDistrict={!!config.editKeys?.includes("district_id")} />}
+      toolbarExtra={(rows) => <div className="flex items-center gap-2">
+        <GenericBulkActions rows={rows} endpoint={endpoint} entityName={config.singular} onApplied={() => setRefreshKey(k => k + 1)} canToggleStatus statusField={config.statusField} canChangeContract={!!config.editKeys?.includes("contract_id")} canChangeDistrict={!!config.editKeys?.includes("district_id")} />
+        {moduleKey === "invoices" && <Button size="sm" variant="outline" onClick={() => setShowInvoiceFromMeasurements(true)}>صدور از متره‌ها</Button>}
+      </div>}
     />
+    {moduleKey === "invoices" && <BillingMeasurementsInvoiceDialog open={showInvoiceFromMeasurements} onClose={() => setShowInvoiceFromMeasurements(false)} onCreated={() => setRefreshKey(k => k + 1)} />}
     <EditorDialog open={editor.open} row={editor.row} keys={selectedKeys} singular={config.singular} moduleKey={moduleKey} mode={editor.mode} endpoint={endpoint} onClose={() => setEditor(prev => ({...prev, open:false, row:null}))} onSaved={() => { setEditor(prev => ({...prev, open:false, row:null})); setRefreshKey(k => k + 1); }} />
 
     {/* ورود انبوه استاندارد از اکسل — همان تجربه مدارها/خطوط */}

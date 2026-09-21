@@ -222,13 +222,13 @@ export function CreateEquipmentDialog({ open, onClose, onCreated }: { open: bool
 export function CreateInspectionDialog({ open, onClose, onCreated }: { open: boolean; onClose: () => void; onCreated: () => void }) {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [form, setForm] = useState({ inspection_date: "", priority: "routine", weather: "", notes: "", contract_id: "", district_id: "" });
+  const [form, setForm] = useState({ inspection_date: "", priority: "routine", weather: "", notes: "", contract_id: "", district_id: "", inspection_method: "", crew_size: "", terrain_type: "" });
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.inspection_date) { setError("تاریخ بازدید الزامی است"); return; }
     setSubmitting(true); setError(null);
-    try { await apiClient.post(API_ENDPOINTS.inspections, { inspection_date: form.inspection_date, priority: form.priority, weather: form.weather || null, notes: form.notes || null, contract_id: form.contract_id ? Number(form.contract_id) : null, district_id: resolveDistrictValue(form.district_id) }); setForm({ inspection_date: "", priority: "routine", weather: "", notes: "", contract_id: "", district_id: currentUserDistrictId() !== null ? String(currentUserDistrictId()) : "" }); onCreated(); } catch (err) { setError(err instanceof Error ? err.message : "خطا"); } finally { setSubmitting(false); }
+    try { await apiClient.post(API_ENDPOINTS.inspections, { inspection_date: form.inspection_date, priority: form.priority, weather: form.weather || null, notes: form.notes || null, contract_id: form.contract_id ? Number(form.contract_id) : null, district_id: resolveDistrictValue(form.district_id), inspection_method: form.inspection_method || null, crew_size: form.crew_size ? Number(form.crew_size) : null, terrain_type: form.terrain_type || null }); setForm({ inspection_date: "", priority: "routine", weather: "", notes: "", contract_id: "", district_id: "", inspection_method: "", crew_size: "", terrain_type: "" }); onCreated(); } catch (err) { setError(err instanceof Error ? err.message : "خطا"); } finally { setSubmitting(false); }
   };
 
   return (
@@ -241,6 +241,11 @@ export function CreateInspectionDialog({ open, onClose, onCreated }: { open: boo
         <Field label="قرارداد"><ContractSelect value={form.contract_id} onChange={v => setForm({ ...form, contract_id: v })} /></Field>
         {/* v4.3.78: امور بهره‌برداری بازدید */}
         <Field label="امور بهره‌برداری"><DistrictSelect autoLock value={form.district_id} onChange={v => setForm({ ...form, district_id: v })} /></Field>
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <Field label="نوع بازدید"><Select value={form.inspection_method || "__none__"} onValueChange={v => setForm({ ...form, inspection_method: v === "__none__" ? "" : v })}><SelectTrigger className="w-full"><SelectValue placeholder="انتخاب نوع بازدید" /></SelectTrigger><SelectContent><SelectItem value="__none__">نامشخص</SelectItem><SelectItem value="patrol">پیمایشی</SelectItem><SelectItem value="climbing">صعودی</SelectItem></SelectContent></Select></Field>
+        <Field label="تعداد نفرات بازدید"><Input value={form.crew_size} onChange={e => setForm({ ...form, crew_size: e.target.value })} type="number" min="1" step="1" dir="ltr" placeholder="مثلاً 2" /></Field>
+        <Field label="شرایط زمین در این بازدید"><Select value={form.terrain_type || "__none__"} onValueChange={v => setForm({ ...form, terrain_type: v === "__none__" ? "" : v })}><SelectTrigger className="w-full"><SelectValue placeholder="از دکل ارث‌بری می‌شود" /></SelectTrigger><SelectContent><SelectItem value="__none__">از دکل ارث‌بری می‌شود</SelectItem><SelectItem value="plain">دشت و تپه‌ماهور</SelectItem><SelectItem value="semi_mountainous">نیمه‌کوهستانی</SelectItem><SelectItem value="mountainous">صعب‌العبور</SelectItem></SelectContent></Select></Field>
       </div>
       <Field label="وضعیت هوا"><Input value={form.weather} onChange={e => setForm({ ...form, weather: e.target.value })} className="text-right" /></Field>
       <Field label="یادداشت"><Textarea value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} rows={3} className="text-right" /></Field>

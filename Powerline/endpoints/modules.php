@@ -30,7 +30,7 @@ function registerModuleRoutes(Router $router): void
     // v4.3.70: نمایش نسخه بک‌اند برای اطمینان از آپلود درست فایل‌ها
     // (بدون نیاز به لاگین — فقط شماره نسخه برمی‌گرداند)
     $router->get('backend-version', function () {
-        Response::success(['version' => 'v4.3.85', 'component' => 'Powerline PHP Backend'], 'نسخه بک‌اند');
+        Response::success(['version' => 'v4.3.86', 'component' => 'Powerline PHP Backend'], 'نسخه بک‌اند');
     });
 
 
@@ -119,9 +119,9 @@ function registerModuleRoutes(Router $router): void
         if ($statusActive) {
             $specific = $table === 'contracts'
                 ? 'قرارداد فعال است و برای جلوگیری از حذف ناخواسته تا زمانی که وضعیت آن را از «فعال» خارج نکنید، حذف نمی‌شود.'
-                : $table === 'contractors'
+                : ($table === 'contractors'
                     ? 'پیمانکار فعال است و برای جلوگیری از حذف ناخواسته تا زمانی که وضعیت آن را به «غیرفعال» تغییر ندهید، حذف نمی‌شود.'
-                    : "$label فعال است — برای امنیت داده، ابتدا وضعیت آن را به «غیرفعال» تغییر دهید؛ رکوردهای غیرفعال قابل حذف هستند.";
+                    : "$label فعال است — برای امنیت داده، ابتدا وضعیت آن را به «غیرفعال» تغییر دهید؛ رکوردهای غیرفعال قابل حذف هستند.");
             Response::error(409, "حذف $label انجام نشد.\n\n$specific");
         }
 
@@ -1668,9 +1668,10 @@ function registerModuleRoutes(Router $router): void
         Auth::requirePermissionSoft('price_lists.view');
         $pdo = Database::getInstance()->getConnection();
         $contractId = Helpers::getContractId();
+        $statusCol = plb_list_status_col($pdo);
         $where = '1=1'; $params = [];
         if ($contractId === 0) { $where .= ' AND pl.contract_id IS NULL'; } elseif ($contractId !== null) { $where .= ' AND pl.contract_id = ?'; $params[] = $contractId; }
-        $stmt = $pdo->prepare("SELECT pl.*, c.title AS contract_title FROM price_lists pl LEFT JOIN contracts c ON c.id = pl.contract_id WHERE $where ORDER BY pl.id DESC");
+        $stmt = $pdo->prepare("SELECT pl.*, c.title AS contract_title, pl.`$statusCol` AS status FROM price_lists pl LEFT JOIN contracts c ON c.id = pl.contract_id WHERE $where ORDER BY pl.id DESC");
         $stmt->execute($params);
         Response::success($stmt->fetchAll());
     });
@@ -1681,8 +1682,10 @@ function registerModuleRoutes(Router $router): void
         $body = Helpers::getJsonBody();
         if (empty($body['name'])) Response::error(400, 'نام فهرست الزامی است');
         $pdo = Database::getInstance()->getConnection();
-        $stmt = $pdo->prepare("INSERT INTO price_lists (name, version, effective_date, contract_id, status, created_at) VALUES (?, ?, ?, ?, 'active', NOW())");
-        $stmt->execute([$body['name'], $body['version'] ?? '1.0', $body['effective_date'] ?? date('Y-m-d'), $body['contract_id'] ?? null]);
+        $statusCol = plb_list_status_col($pdo);
+        $statusValue = $statusCol === 'is_active' ? 1 : 'active';
+        $stmt = $pdo->prepare("INSERT INTO price_lists (name, version, effective_date, contract_id, `$statusCol`, created_at) VALUES (?, ?, ?, ?, ?, NOW())");
+        $stmt->execute([$body['name'], $body['version'] ?? '1.0', $body['effective_date'] ?? date('Y-m-d'), $body['contract_id'] ?? null, $statusValue]);
         Response::success(['id' => (int)$pdo->lastInsertId()], 'فهرست بها ایجاد شد', 201);
     });
 
@@ -1691,9 +1694,15 @@ function registerModuleRoutes(Router $router): void
         Auth::requirePermissionSoft('price_lists.update');
         $body = Helpers::getJsonBody();
         $pdo = Database::getInstance()->getConnection();
-        $fields = ['name','version','effective_date','contract_id','status'];
+        $statusCol = plb_list_status_col($pdo);
         $updates=[]; $params=[];
-        foreach ($fields as $f) { if (array_key_exists($f,$body)) { $updates[] = "`$f` = ?"; $params[] = $body[$f]; } }
+        foreach (['name','version','effective_date','contract_id'] as $f) { if (array_key_exists($f,$body)) { $updates[] = "`$f` = ?"; $params[] = $body[$f]; } }
+        if (array_key_exists('status',$body)) {
+            $updates[] = "`$statusCol` = ?";
+            $params[] = $statusCol === 'is_active'
+                ? (in_array($body['status'], [1,'1',true,'active'], true) ? 1 : 0)
+                : (in_array($body['status'], [1,'1',true,'active'], true) ? 'active' : 'inactive');
+        }
         if (!$updates) Response::error(400, 'هیچ فیلدی برای ویرایش ارسال نشده');
         $params[]=(int)$id;
         $pdo->prepare("UPDATE price_lists SET ".implode(', ',$updates)." WHERE id = ?")->execute($params);
@@ -1705,9 +1714,10 @@ function registerModuleRoutes(Router $router): void
         Auth::requirePermissionSoft('price_lists.view');
         $pdo = Database::getInstance()->getConnection();
         $listId = Helpers::queryInt('list_id');
+        $statusCol = plb_price_status_col($pdo);
         $where = '1=1'; $params = [];
         if ($listId) { $where = 'pli.price_list_id = ?'; $params[] = $listId; }
-        $stmt = $pdo->prepare("SELECT pli.* FROM price_list_items pli WHERE $where ORDER BY pli.id LIMIT 500");
+        $stmt = $pdo->prepare("SELECT pli.*, pli.`$statusCol` AS status FROM price_list_items pli WHERE $where ORDER BY pli.id LIMIT 5000");
         $stmt->execute($params);
         Response::success($stmt->fetchAll());
     });
@@ -1719,8 +1729,11 @@ function registerModuleRoutes(Router $router): void
         if (empty($body['title']) || empty($body['price_list_id'])) Response::error(400, 'عنوان و فهرست الزامی است');
         $pdo = Database::getInstance()->getConnection();
         $code = $body['code'] ?? ('PL-' . str_pad((string)random_int(0, 9999), 4, '0', STR_PAD_LEFT));
-        $stmt = $pdo->prepare("INSERT INTO price_list_items (price_list_id, code, title, unit, unit_price, category, status) VALUES (?, ?, ?, ?, ?, 'active')");
-        $stmt->execute([(int)$body['price_list_id'], $code, $body['title'], $body['unit'] ?? 'عدد', $body['unit_price'] ?? 0, $body['category'] ?? 'عملیات']);
+        $statusCol = plb_price_status_col($pdo); $statusVal = $statusCol === 'is_active' ? 1 : 'active';
+        $cols=['price_list_id','code','title','unit','unit_price','category',$statusCol]; $vals=['?','?','?','?','?','?','?']; $params=[(int)$body['price_list_id'],$code,$body['title'],$body['unit'] ?? 'عدد',$body['unit_price'] ?? 0,$body['category'] ?? 'عملیات',$statusVal];
+        foreach (['item_kind','activity_type','voltage_kv','circuit_count','bundle_count','terrain_type','inspection_method'] as $f) { if (Helpers::columnExists('price_list_items',$f)) { $cols[]=$f; $vals[]='?'; $params[]=$body[$f] ?? null; } }
+        $stmt=$pdo->prepare("INSERT INTO price_list_items (`" . implode('`,`',$cols) . "`) VALUES (" . implode(',',$vals) . ")");
+        $stmt->execute($params);
         Response::success(['id' => (int)$pdo->lastInsertId(), 'code' => $code], 'قلم ایجاد شد', 201);
     });
 
@@ -1730,9 +1743,11 @@ function registerModuleRoutes(Router $router): void
         $body = Helpers::getJsonBody(); $pdo = Database::getInstance()->getConnection();
         // v4.3.81: قفل امور — تغییر امور رکورد فقط برای مدیر
         $body = Helpers::stripDistrictForNonAdmin($body);
-        $fields = ['code','title','unit','unit_price','category','status'];
+        $statusCol = plb_price_status_col($pdo);
+        $fields = ['code','title','unit','unit_price','category','item_kind','activity_type','voltage_kv','circuit_count','bundle_count','terrain_type','inspection_method'];
         $updates = []; $params = [];
         foreach ($fields as $f) { if (array_key_exists($f, $body)) { $updates[] = "`$f` = ?"; $params[] = $body[$f]; } }
+        if (array_key_exists('status',$body)) { $updates[]="`$statusCol` = ?"; $params[]=$statusCol==='is_active'?(in_array($body['status'],[1,'1',true,'active'],true)?1:0):(in_array($body['status'],[1,'1',true,'active'],true)?'active':'inactive'); }
         if (!$updates) Response::error(400, 'هیچ فیلدی ارسال نشده');
         $params[] = (int)$id;
         $pdo->prepare("UPDATE price_list_items SET " . implode(', ', $updates) . " WHERE id = ?")->execute($params);
