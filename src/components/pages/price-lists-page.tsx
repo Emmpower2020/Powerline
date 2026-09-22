@@ -23,124 +23,56 @@ import { DataTable, type DataTableColumn } from "@/components/data-table";
 import { JalaliDatePicker } from "@/components/jalali-date-picker";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, Plus, ListChecks, FileSpreadsheet, Download, Upload, Filter } from "lucide-react";
-import { GenericBulkActions } from "@/components/generic-bulk-actions";
 import { ContractSelect } from "@/components/contract-select";
+import {
+  normalizeFa, parseBaseClassification, detectCoefficientKind, isCoefficientTitle,
+  processStandardBoqRows, parseExcelNumber, chapterOf, type ParsedBoqItem,
+  CHAPTER_LABELS, ACTIVITY_LABELS, METHOD_LABELS, TERRAIN_GROUP_LABELS, COEFFICIENT_KIND_LABELS,
+  circuitLabel, bundleLabel,
+} from "@/lib/boq-parser";
 
 /**
- * صفحه فهرست بها — v4.3.86
+ * صفحه فهرست بها — v4.3.87 (فهرست بهای کشوری)
  *
- * طبقه‌بندی اقلام مطابق فهرست بهای کشوری:
- *   سطح ولتاژ (۶۳/۱۳۲/۲۳۰/۴۰۰) × تعداد مدار (تک/دو/چهار) × تعداد باندل (۱..۴)
- *   × نوع فعالیت (بازدید صعودی / پیمایشی / تعمیرات / عملیات) × نوع سازه دکل
- *   + بهای واحد جداگانه برای دشت / تپه‌ماهور / نیمه‌کوهستانی / صعب‌العبور
- *   + ردیف‌های «ضریب کاهش/افزایش بها» (کد ندارند — دامنه اعمال با فیلدهای طبقه‌بندی)
+ * فرمت استاندارد کشوری: شماره ردیف فصل | شرح | واحد | بهای واحد
+ *   • ردیف‌های اصلی کد ملی دارند (20101، 70103، 80101، 100101 …) و فصل از کد
+ *     استخراج می‌شود (۲ نگهداری / ۷ کشیک و فراخوان / ۸ پهبادی / ۱۰ تعمیرات).
+ *   • ردیف‌های «کاهش/اضافه بها» کد ملی ندارند → کد اختصاصی *<کد والد>-<n>
+ *     می‌گیرند و زیر ردیف اصلی خود نمایش داده می‌شوند.
+ *   • طبقه‌بندی (ولتاژ/مدار/باندل/روش بازدید/نوع زمین) به‌صورت خودکار از متن
+ *     شرح استخراج می‌شود — «وقتی اسمی از باندل نیست یعنی تک‌باندل».
  */
 
 interface PriceList {
-  id: number;
-  contract_id?: number | null;
-  contract_title?: string | null;
-  name: string;
-  version: string | null;
-  effective_date: string;
-  status: number | string;
+  id: number; name: string; version: string | null; effective_date: string;
+  is_active?: number | boolean; status?: string | number; contract_id?: number | null;
+  contract_title?: string | null; created_at?: string;
 }
 
 interface PriceListItem {
-  id: number;
-  price_list_id: number;
-  code: string;
-  title: string;
-  unit: string | null;
-  unit_price: number;
-  category: string | null;
-  status: number | string;
-  contract_title?: string | null;
-  // v4.3.86: طبقه‌بندی + قیمت‌های زمین + ضریب
-  //   item_kind: base = قلم عادی | coefficient = ردیف ضریب
-  //   activity_type: inspection = بازدید | repair = تعمیرات | operation = عملیات
-  //   inspection_method: climbing = صعودی | patrol = پیمایشی
-  item_kind?: string | null;
-  voltage_kv?: number | null;
-  circuit_count?: number | null;
-  bundle_count?: number | null;
-  activity_type?: string | null;
-  inspection_method?: string | null;
-  tower_structure?: string | null;
-  terrain_type?: string | null;
-  unit_price_plain?: number | null;
-  unit_price_hilly?: number | null;
-  unit_price_semi_mountainous?: number | null;
-  unit_price_impassable?: number | null;
-  coefficient_percent?: number | null;
+  id: number; price_list_id: number; code: string; title: string;
+  unit: string | null; unit_price: number; category: string | null;
+  item_kind?: "base" | "coefficient" | string | null;
+  chapter?: number | null; parent_code?: string | null;
+  coefficient_kind?: string | null; sort_order?: number | null;
+  activity_type?: string | null; inspection_method?: string | null;
+  voltage_kv?: number | null; circuit_count?: number | null;
+  bundle_count?: number | null; terrain_type?: string | null;
+  is_active?: number | boolean; status?: string | number;
 }
 
 const asArray = (r: unknown): any[] => (Array.isArray(r) ? r : ((r as any)?.data || []));
-
-/** وضعیت فعال — سازگار با 'active' عددی 1 و رشته '1' (دیتابیس‌های قدیمی/جدید) */
-const isActiveStatus = (v: unknown) => v === "active" || v === 1 || v === "1";
-
-export const ACTIVITY_LABELS: Record<string, string> = {
-  inspection: "بازدید", repair: "تعمیرات", operation: "عملیات",
-};
-export const METHOD_LABELS: Record<string, string> = {
-  climbing: "بازدید صعودی", patrol: "بازدید پیمایشی",
-};
-export const TERRAIN_LABELS: Record<string, string> = {
-  plain: "دشت", hilly: "تپه‌ماهور", semi_mountainous: "نیمه‌کوهستانی", impassable: "صعب‌العبور",
-};
-const STRUCTURES = ["مشبک فلزی", "تیر چوبی", "تلسکوپی فلزی"];
-
 const fmt = (v: unknown) => (v === null || v === undefined || v === "") ? "—" : Number(v).toLocaleString("fa-IR");
-const circuitLabel = (n: number | null | undefined) => n === 1 ? "تک‌مداره" : n === 2 ? "دو مداره" : n === 4 ? "چهارمداره" : n ? `${n} مداره` : null;
 
-/** تبدیل مقدار عددی اکسل (ممیز، ارقام فارسی، ٪) به عدد */
-export function parseExcelNumber(v: unknown): number | null {
-  if (v === null || v === undefined || v === "") return null;
-  if (typeof v === "number") return v;
-  const fa = ["۰", "۱", "۲", "۳", "۴", "۵", "۶", "۷", "۸", "۹"];
-  let s = String(v).trim();
-  for (let i = 0; i < 10; i++) s = s.split(fa[i]).join(String(i));
-  s = s.replace(/[٫,٬\s]/g, "").replace(/[٪%]/g, "");
-  const n = Number(s);
-  return Number.isFinite(n) ? n : null;
-}
+const isCoef = (it: PriceListItem) => it.item_kind === "coefficient";
+const isPrivateCode = (code: string) => code.trim().startsWith("*");
 
-/** نرمال‌سازی نوع فعالیت: فارسی/انگلیسی → کلید (بازدید/تعمیرات/عملیات) */
-export function normalizeActivity(v: unknown): string | null {
-  if (v === null || v === undefined || v === "") return null;
-  const s = String(v).trim();
-  const map: Record<string, string> = {
-    inspection: "inspection", repair: "repair", operation: "operation",
-    "بازدید": "inspection", "تعمیرات": "repair", "عملیات": "operation",
-  };
-  return map[s] ?? map[s.toLowerCase()] ?? null;
-}
-
-/** نرمال‌سازی روش بازدید: صعودی/پیمایشی → climbing/patrol */
-export function normalizeMethod(v: unknown): string | null {
-  if (v === null || v === undefined || v === "") return null;
-  const s = String(v).trim();
-  const map: Record<string, string> = {
-    climbing: "climbing", patrol: "patrol",
-    "صعودی": "climbing", "بازدید صعودی": "climbing",
-    "پیمایشی": "patrol", "بازدید پیمایشی": "patrol",
-  };
-  return map[s] ?? map[s.toLowerCase()] ?? null;
-}
-
-/** نرمال‌سازی نوع زمین: فارسی/انگلیسی → کلید */
-export function normalizeTerrain(v: unknown): string | null {
-  if (v === null || v === undefined || v === "") return null;
-  const s = String(v).trim();
-  const map: Record<string, string> = {
-    plain: "plain", hilly: "hilly", semi_mountainous: "semi_mountainous", impassable: "impassable",
-    "دشت": "plain", "تپه ماهور": "hilly", "تپه‌ماهور": "hilly",
-    "نیمه کوهستانی": "semi_mountainous", "نیمه‌کوهستانی": "semi_mountainous",
-    "صعب العبور": "impassable", "صعب‌العبور": "impassable", "کوهستانی": "impassable",
-  };
-  return map[s] ?? null;
-}
+const CHAPTER_BADGES: Record<string, string> = {
+  "2": "bg-emerald-100 text-emerald-700 hover:bg-emerald-100",
+  "7": "bg-orange-100 text-orange-700 hover:bg-orange-100",
+  "8": "bg-sky-100 text-sky-700 hover:bg-sky-100",
+  "10": "bg-rose-100 text-rose-700 hover:bg-rose-100",
+};
 
 export function PriceListsPage() {
   const { toast } = useToast();
@@ -160,15 +92,17 @@ export function PriceListsPage() {
   const [deleting, setDeleting] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
 
-  // v4.3.86: فیلترهای طبقه‌بندی
+  // فیلترهای نمایش
+  const [fChapter, setFChapter] = useState("all");
+  const [fMode, setFMode] = useState("all"); // all | base | coefficient
   const [fActivity, setFActivity] = useState("all");
   const [fMethod, setFMethod] = useState("all");
   const [fVoltage, setFVoltage] = useState("all");
-  const [fMode, setFMode] = useState("all"); // all | items | coefficients
+  const [fTerrain, setFTerrain] = useState("all");
+  const [fSearch, setFSearch] = useState("");
 
   const selectedList = lists.find(l => String(l.id) === selectedListId) || null;
 
-  // بارگذاری فهرست‌ها
   useEffect(() => {
     const load = async () => {
       setListsLoading(true);
@@ -184,314 +118,366 @@ export function PriceListsPage() {
     load();
   }, [refreshKey]);
 
-  // بارگذاری اقلام فهرست انتخاب‌شده
   useEffect(() => {
     if (!selectedListId) { setItems([]); return; }
     const load = async () => {
       setItemsLoading(true);
       try {
         const r = await apiClient.get<unknown>(API_ENDPOINTS.priceListItems, { list_id: Number(selectedListId), page_size: 5000 });
-        setItems(asArray(r).map(item => ({ ...item, contract_title: selectedList?.contract_title || null })));
+        setItems(asArray(r));
       } catch (err) {
         console.error("خطا در بارگذاری اقلام:", err);
       } finally { setItemsLoading(false); }
     };
     load();
-  }, [selectedListId, refreshKey, selectedList?.contract_title]);
-
-  const isCoef = (it: PriceListItem) =>
-    it.item_kind === "coefficient" || Number((it as any).is_coefficient) === 1;
+  }, [selectedListId, refreshKey]);
 
   // فیلتر سمت کلاینت (علاوه بر فیلتر سروری)
-  const filteredItems = useMemo(() => items.filter(it => {
-    if (fMode === "items" && isCoef(it)) return false;
-    if (fMode === "coefficients" && !isCoef(it)) return false;
-    if (fActivity !== "all") {
-      if (fActivity === "general" ? !!it.activity_type : (it.activity_type || "") !== fActivity) return false;
-    }
-    if (fMethod !== "all") {
-      if (fMethod === "general" ? !!it.inspection_method : (it.inspection_method || "") !== fMethod) return false;
-    }
-    if (fVoltage !== "all") {
-      if (fVoltage === "general" ? it.voltage_kv !== null && it.voltage_kv !== undefined : Number(it.voltage_kv) !== Number(fVoltage)) return false;
-    }
-    return true;
-  }), [items, fActivity, fMethod, fVoltage, fMode]);
+  const filteredItems = useMemo(() => {
+    const q = normalizeFa(fSearch).toLowerCase();
+    return items.filter(it => {
+      if (fMode === "base" && isCoef(it)) return false;
+      if (fMode === "coefficient" && !isCoef(it)) return false;
+      if (fChapter !== "all") {
+        const ch = it.chapter ?? null;
+        if (fChapter === "none" ? ch !== null : String(ch) !== fChapter) return false;
+      }
+      if (fActivity !== "all") {
+        if (fActivity === "general" ? !!it.activity_type : (it.activity_type || "") !== fActivity) return false;
+      }
+      if (fMethod !== "all") {
+        if (fMethod === "general" ? !!it.inspection_method : (it.inspection_method || "") !== fMethod) return false;
+      }
+      if (fVoltage !== "all") {
+        if (fVoltage === "general" ? it.voltage_kv !== null && it.voltage_kv !== undefined : Number(it.voltage_kv) !== Number(fVoltage)) return false;
+      }
+      if (fTerrain !== "all") {
+        if (fTerrain === "general" ? !!it.terrain_type : (it.terrain_type || "") !== fTerrain) return false;
+      }
+      if (q) {
+        const hay = normalizeFa(`${it.code} ${it.title} ${it.parent_code || ""} ${it.category || ""}`).toLowerCase();
+        if (!hay.includes(q)) return false;
+      }
+      return true;
+    });
+  }, [items, fChapter, fMode, fActivity, fMethod, fVoltage, fTerrain, fSearch]);
+
+  const stats = useMemo(() => ({
+    total: items.length,
+    base: items.filter(i => !isCoef(i)).length,
+    coef: items.filter(i => isCoef(i)).length,
+    zeroPrice: items.filter(i => !Number(i.unit_price)).length,
+  }), [items]);
+
+  const requestDelete = async (list: PriceListItem[]) => {
+    setDeleting(true);
+    try {
+      for (const it of list) {
+        await apiClient.delete(`${API_ENDPOINTS.priceListItems}/${it.id}`);
+      }
+      toast({ title: "حذف انجام شد", description: `${list.length.toLocaleString("fa-IR")} ردیف حذف شد${list.some(i => !isCoef(i)) ? " (ضرایب فرزند ردیف‌های اصلی هم حذف شدند)" : ""}.` });
+      setPendingDelete(null);
+      setRefreshKey(k => k + 1);
+    } catch (err: unknown) {
+      toast({ title: "حذف ناموفق", description: (err as Error)?.message || "خطا در حذف ردیف", variant: "destructive" });
+    } finally { setDeleting(false); }
+  };
+
+  // کپی ردیف به‌عنوان پایه رکورد جدید (بدون ذخیره — فرم باز می‌شود)
+  const handleDuplicate = (row: PriceListItem) => {
+    setEditingItem({ ...row, id: -1, code: isCoef(row) ? "" : row.code, title: `${row.title} (کپی)` });
+    setShowCreateItem(true);
+  };
 
   const columns: DataTableColumn<PriceListItem>[] = [
-    { key: "contract_title", header: "قرارداد", sortable: true, filterable: true, wrap: true },
-    { key: "code", header: "کد", sortable: true, filterable: true, align: "left" },
-    { key: "title", header: "شرح", sortable: true, filterable: true, wrap: true },
     {
-      key: "specs", header: "مشخصات", sortable: false, filterable: false, align: "center",
-      render: (row) => isCoef(row) ? <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-100">ضریب</Badge> : (
-        <div className="flex flex-wrap items-center justify-center gap-1">
-          {row.voltage_kv ? <Badge className="nums-fa bg-violet-100 text-violet-700 hover:bg-violet-100">{Number(row.voltage_kv).toLocaleString("fa-IR")}kV</Badge> : null}
-          {row.circuit_count ? <Badge className="bg-blue-100 text-blue-700 hover:bg-blue-100">{circuitLabel(row.circuit_count)}</Badge> : null}
-          {row.bundle_count ? <Badge className="bg-cyan-100 text-cyan-700 hover:bg-cyan-100">{Number(row.bundle_count).toLocaleString("fa-IR")} باندل</Badge> : null}
-          {row.tower_structure ? <Badge className="bg-stone-100 text-stone-700 hover:bg-stone-100">{row.tower_structure}</Badge> : null}
-          {!row.voltage_kv && !row.circuit_count && !row.bundle_count && !row.tower_structure
-            ? <span className="text-xs text-slate-400">عمومی</span> : null}
-        </div>
-      ),
-    },
-    {
-      key: "activity_type", header: "نوع فعالیت", sortable: true, filterable: true, align: "center",
-      render: (row) => isCoef(row) ? <span className="text-xs text-slate-400">—</span> : (row.activity_type
-        ? <Badge className="bg-indigo-100 text-indigo-700 hover:bg-indigo-100">{ACTIVITY_LABELS[row.activity_type] || row.activity_type}</Badge>
-        : <span className="text-xs text-slate-400">عمومی</span>),
-    },
-    {
-      key: "inspection_method", header: "روش بازدید", sortable: true, filterable: true, align: "center",
-      render: (row) => row.inspection_method
-        ? <Badge className={row.inspection_method === "climbing" ? "bg-teal-100 text-teal-700 hover:bg-teal-100" : "bg-cyan-100 text-cyan-700 hover:bg-cyan-100"}>{METHOD_LABELS[row.inspection_method] || row.inspection_method}</Badge>
-        : <span className="text-xs text-slate-400">—</span>,
-    },
-    { key: "unit", header: "واحد", sortable: true, filterable: true, align: "center" },
-    { key: "unit_price", header: "بهای پایه (ریال)", sortable: true, type: "number" },
-    { key: "unit_price_plain", header: "دشت", sortable: true, type: "number" },
-    { key: "unit_price_hilly", header: "تپه‌ماهور", sortable: true, type: "number" },
-    { key: "unit_price_semi_mountainous", header: "نیمه‌کوهستانی", sortable: true, type: "number" },
-    { key: "unit_price_impassable", header: "صعب‌العبور", sortable: true, type: "number" },
-    {
-      key: "coefficient_percent", header: "درصد ضریب", sortable: true, align: "center",
-      render: (row) => !isCoef(row) ? <span className="text-slate-300">—</span> : (
-        <span className={`nums-fa font-bold ${Number(row.coefficient_percent) < 0 ? "text-red-600" : "text-green-700"}`}>
-          {Number(row.coefficient_percent) > 0 ? "+" : ""}{Number(row.coefficient_percent).toLocaleString("fa-IR")}٪
+      key: "code", header: "کد ردیف", width: "8%", sortable: true, align: "left",
+      render: (row) => (
+        <span className="flex items-center gap-1.5" dir="ltr">
+          <span className="nums-fa font-mono text-xs">{row.code}</span>
+          {isPrivateCode(row.code) ? (
+            <Badge className="px-1.5 py-0 text-[10px] bg-amber-100 text-amber-800 hover:bg-amber-100">اختصاصی</Badge>
+          ) : null}
         </span>
       ),
     },
-    { key: "category", header: "دسته", sortable: true, filterable: true },
-    { key: "status", header: "وضعیت", type: "status" },
+    {
+      key: "title", header: "شرح ردیف", sortable: true, wrap: true,
+      render: (row) => isCoef(row) ? (
+        <div className="flex items-start gap-1.5">
+          <span className="mt-0.5 text-slate-400" aria-hidden>↳</span>
+          <span className="text-slate-600 dark:text-slate-300">{row.title}</span>
+          {row.parent_code ? <Badge variant="outline" className="shrink-0 px-1.5 py-0 text-[10px] text-slate-500" dir="ltr">{row.parent_code}</Badge> : null}
+        </div>
+      ) : (
+        <span className="text-slate-800 dark:text-slate-100">{row.title}</span>
+      ),
+    },
+    {
+      key: "chapter", header: "فصل", sortable: true, align: "center", width: "8%",
+      render: (row) => {
+        const ch = row.chapter ?? null;
+        if (!ch) return <span className="text-xs text-slate-400">—</span>;
+        return (
+          <Badge className={`text-[11px] ${CHAPTER_BADGES[String(ch)] || ""}`}>
+            {CHAPTER_LABELS[ch]?.replace("فصل ", "") ?? ch}
+          </Badge>
+        );
+      },
+    },
+    {
+      key: "item_kind", header: "نوع", align: "center", width: "7%",
+      render: (row) => isCoef(row)
+        ? <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-100">ضریب</Badge>
+        : <Badge className="bg-slate-100 text-slate-600 hover:bg-slate-100">اصلی</Badge>,
+    },
+    {
+      key: "specs", header: "مشخصات", sortable: false, align: "center", width: "13%",
+      render: (row) => {
+        if (isCoef(row)) {
+          return row.coefficient_kind ? (
+            <Badge variant="outline" className="text-[11px] text-amber-700 border-amber-300">
+              {COEFFICIENT_KIND_LABELS[row.coefficient_kind] || row.coefficient_kind}
+            </Badge>
+          ) : <span className="text-xs text-slate-400">—</span>;
+        }
+        const parts: React.ReactNode[] = [];
+        if (row.activity_type) parts.push(<Badge key="a" className="bg-teal-50 text-teal-700 hover:bg-teal-50">{ACTIVITY_LABELS[row.activity_type] || row.activity_type}</Badge>);
+        if (row.inspection_method) parts.push(<Badge key="m" className="bg-indigo-50 text-indigo-700 hover:bg-indigo-50">{METHOD_LABELS[row.inspection_method] || row.inspection_method}</Badge>);
+        if (row.voltage_kv) parts.push(<Badge key="v" className="nums-fa bg-violet-100 text-violet-700 hover:bg-violet-100">{Number(row.voltage_kv).toLocaleString("fa-IR")}kV</Badge>);
+        if (row.circuit_count) parts.push(<Badge key="c" className="bg-blue-100 text-blue-700 hover:bg-blue-100">{circuitLabel(row.circuit_count)}</Badge>);
+        if (row.bundle_count) parts.push(<Badge key="b" className="bg-cyan-100 text-cyan-700 hover:bg-cyan-100">{bundleLabel(row.bundle_count)}</Badge>);
+        if (row.terrain_type) parts.push(<Badge key="t" className="bg-lime-50 text-lime-700 hover:bg-lime-50">{TERRAIN_GROUP_LABELS[row.terrain_type] || row.terrain_type}</Badge>);
+        return parts.length
+          ? <div className="flex flex-wrap items-center justify-center gap-1">{parts}</div>
+          : <span className="text-xs text-slate-400">عمومی</span>;
+      },
+    },
+    { key: "unit", header: "واحد", align: "center", width: "7%" },
+    {
+      key: "unit_price", header: "بهای واحد (ریال)", sortable: true, align: "left", width: "12%",
+      render: (row) => {
+        const v = Number(row.unit_price) || 0;
+        const neg = v < 0;
+        const coef = isCoef(row);
+        return (
+          <span className={`nums-fa font-medium tabular-nums ${neg ? "text-red-600 dark:text-red-400" : coef ? "text-amber-700 dark:text-amber-400" : "text-slate-700 dark:text-slate-200"}`}>
+            {neg ? "−" : ""}{Math.abs(v).toLocaleString("fa-IR")}
+          </span>
+        );
+      },
+    },
+    {
+      key: "status", header: "وضعیت", align: "center", width: "7%",
+      render: (row) => {
+        const active = row.is_active === 1 || row.is_active === true || row.status === "active" || row.status === 1 || row.status === "1";
+        return active
+          ? <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100">فعال</Badge>
+          : <Badge className="bg-slate-100 text-slate-500 hover:bg-slate-100">غیرفعال</Badge>;
+      },
+    },
   ];
 
-  const handleDuplicate = async (row: PriceListItem) => {
-    try {
-      await apiClient.post(API_ENDPOINTS.priceListItems, {
-        price_list_id: row.price_list_id, code: `${row.code}-COPY`, title: `${row.title} - کپی`,
-        unit: row.unit, unit_price: row.unit_price, category: row.category,
-        item_kind: isCoef(row) ? "coefficient" : "base",
-        activity_type: row.activity_type ?? null, inspection_method: row.inspection_method ?? null,
-        voltage_kv: row.voltage_kv ?? null, circuit_count: row.circuit_count ?? null, bundle_count: row.bundle_count ?? null,
-        tower_structure: row.tower_structure ?? null, terrain_type: row.terrain_type ?? null,
-        unit_price_plain: row.unit_price_plain ?? null, unit_price_hilly: row.unit_price_hilly ?? null,
-        unit_price_semi_mountainous: row.unit_price_semi_mountainous ?? null, unit_price_impassable: row.unit_price_impassable ?? null,
-        coefficient_percent: row.coefficient_percent ?? null,
-      });
-      setRefreshKey(k => k + 1);
-    } catch (e) { console.error(e); }
-  };
-
-  const handleDelete = async () => {
-    if (!pendingDelete || pendingDelete.length === 0) return;
-    setDeleting(true);
-    try {
-      let ok = 0, fail = 0;
-      for (const item of pendingDelete) {
-        try {
-          await apiClient.delete(`${API_ENDPOINTS.priceListItems}/${item.id}`);
-          ok++;
-        } catch { fail++; }
-      }
-      if (fail === 0) {
-        toast({ title: "حذف انجام شد", description: `${ok.toLocaleString("fa-IR")} قلم از فهرست بها حذف شد` });
-      } else {
-        toast({ title: "حذف ناقص", description: `${ok.toLocaleString("fa-IR")} قلم حذف شد، ${fail.toLocaleString("fa-IR")} قلم خطا خورد`, variant: "destructive" });
-      }
-      setPendingDelete(null);
-      setRefreshKey(k => k + 1);
-    } finally {
-      setDeleting(false);
-    }
-  };
+  if (listsLoading) {
+    return (
+      <div className="flex h-64 items-center justify-center gap-2 text-slate-500">
+        <Loader2 className="h-5 w-5 animate-spin" /> در حال بارگذاری فهرست‌ها…
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4">
-      {/* انتخاب فهرست + دکمه‌ها */}
+      {/* انتخاب فهرست + اکشن‌ها */}
       <Card>
-        <CardContent className="p-4">
-          <div className="flex flex-col lg:flex-row gap-3 lg:items-center lg:justify-between">
-            <div className="flex flex-col sm:flex-row gap-3 sm:items-center flex-1 min-w-0">
-              <div className="w-full sm:w-80">
-                <Select value={selectedListId} onValueChange={v => setSelectedListId(v)}>
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder={listsLoading ? "در حال بارگذاری..." : "انتخاب فهرست بها..."} />
-                  </SelectTrigger>
-                  <SelectContent className="max-h-60">
-                    {lists.map(l => (
-                      <SelectItem key={l.id} value={String(l.id)}>
-                        {l.name} {l.version ? `(${l.version})` : ""}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              {selectedList && (
-                <div className="flex flex-wrap items-center gap-2">
-                  <Badge className="bg-indigo-100 text-indigo-700 hover:bg-indigo-100">نسخه: {selectedList.version || "—"}</Badge>
-                  <Badge className="bg-slate-100 text-slate-600 hover:bg-slate-100 nums-fa">تاریخ اجرا: {new Date(selectedList.effective_date).toLocaleDateString("fa-IR")}</Badge>
-                  <Badge className={isActiveStatus(selectedList.status) ? "bg-green-100 text-green-700 hover:bg-green-100" : "bg-red-100 text-red-700 hover:bg-red-100"}>
-                    {isActiveStatus(selectedList.status) ? "فعال" : "غیرفعال"}
-                  </Badge>
-                  <Badge className="bg-blue-100 text-blue-700 hover:bg-blue-100 nums-fa">{items.length.toLocaleString("fa-IR")} ردیف</Badge>
-                  <Badge className="nums-fa bg-amber-100 text-amber-800 hover:bg-amber-100">
-                    {items.filter(isCoef).length.toLocaleString("fa-IR")} ضریب
-                  </Badge>
-                </div>
-              )}
-            </div>
-            <div className="flex flex-wrap gap-2 shrink-0">
-              <Button variant="outline" onClick={() => setShowCreateList(true)}>
-                <Plus className="w-4 h-4 ml-2" />
-                فهرست جدید
-              </Button>
-              <Button variant="outline" disabled={!selectedListId} onClick={() => { setShowImport(true); }}>
-                <Upload className="w-4 h-4 ml-2" />
-                ورود از اکسل
-              </Button>
-              <Button variant="outline" onClick={downloadTemplate}>
-                <Download className="w-4 h-4 ml-2" />
-                دانلود قالب
-              </Button>
-              <Button className="bg-indigo-600 hover:bg-indigo-700" disabled={!selectedListId} onClick={() => { setEditingItem(null); setShowCreateItem(true); }}>
-                <Plus className="w-4 h-4 ml-2" />
-                قلم جدید
-              </Button>
-            </div>
+        <CardContent className="flex flex-wrap items-center gap-3 pt-6">
+          <ListChecks className="h-5 w-5 text-slate-400" />
+          <div className="min-w-64 flex-1">
+            <Select value={selectedListId} onValueChange={setSelectedListId}>
+              <SelectTrigger><SelectValue placeholder="انتخاب فهرست بها…" /></SelectTrigger>
+              <SelectContent>
+                {lists.map(l => (
+                  <SelectItem key={l.id} value={String(l.id)}>
+                    {l.name}{l.version ? ` — نسخه ${l.version}` : ""}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <Button variant="outline" size="sm" onClick={() => setShowCreateList(true)}>
+            <Plus className="ml-1 h-4 w-4" /> فهرست جدید
+          </Button>
+          <Button variant="outline" size="sm" disabled={!selectedListId} onClick={() => setShowImport(true)}>
+            <Upload className="ml-1 h-4 w-4" /> ایمپورت فهرست کشوری
+          </Button>
+          <Button variant="outline" size="sm" onClick={downloadStandardTemplate}>
+            <Download className="ml-1 h-4 w-4" /> دانلود قالب استاندارد
+          </Button>
+          <Button size="sm" disabled={!selectedListId} onClick={() => { setEditingItem(null); setShowCreateItem(true); }}>
+            <Plus className="ml-1 h-4 w-4" /> ثبت ردیف جدید
+          </Button>
+        </CardContent>
+      </Card>
+
+      {/* آمار + فیلترها */}
+      <Card>
+        <CardContent className="space-y-3 pt-6">
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge variant="secondary" className="nums-fa gap-1">کل: {stats.total.toLocaleString("fa-IR")}</Badge>
+            <Badge className="nums-fa gap-1 bg-slate-100 text-slate-600 hover:bg-slate-100">اصلی: {stats.base.toLocaleString("fa-IR")}</Badge>
+            <Badge className="nums-fa gap-1 bg-amber-100 text-amber-800 hover:bg-amber-100">ضریب: {stats.coef.toLocaleString("fa-IR")}</Badge>
+            {stats.zeroPrice > 0 ? (
+              <Badge className="nums-fa gap-1 bg-red-50 text-red-600 hover:bg-red-50">بدون قیمت: {stats.zeroPrice.toLocaleString("fa-IR")}</Badge>
+            ) : null}
+            {selectedList?.contract_title ? (
+              <Badge variant="outline" className="text-slate-500">قرارداد: {selectedList.contract_title}</Badge>
+            ) : null}
+          </div>
+          <div className="flex flex-wrap items-center gap-2 border-t border-slate-100 pt-3 dark:border-slate-800">
+            <Filter className="h-4 w-4 text-slate-400" />
+            <Select value={fChapter} onValueChange={setFChapter}>
+              <SelectTrigger className="h-8 w-32 text-xs"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">همه فصل‌ها</SelectItem>
+                <SelectItem value="2">فصل ۲ — نگهداری</SelectItem>
+                <SelectItem value="7">فصل ۷ — کشیک</SelectItem>
+                <SelectItem value="8">فصل ۸ — پهبادی</SelectItem>
+                <SelectItem value="10">فصل ۱۰ — تعمیرات</SelectItem>
+                <SelectItem value="none">بدون فصل</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={fMode} onValueChange={setFMode}>
+              <SelectTrigger className="h-8 w-28 text-xs"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">همه ردیف‌ها</SelectItem>
+                <SelectItem value="base">فقط اصلی</SelectItem>
+                <SelectItem value="coefficient">فقط ضرایب</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={fActivity} onValueChange={setFActivity}>
+              <SelectTrigger className="h-8 w-32 text-xs"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">همه فعالیت‌ها</SelectItem>
+                <SelectItem value="inspection">بازدید</SelectItem>
+                <SelectItem value="repair">تعمیرات</SelectItem>
+                <SelectItem value="operation">عملیات</SelectItem>
+                <SelectItem value="service">خدمات فنی</SelectItem>
+                <SelectItem value="general">عمومی</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={fMethod} onValueChange={setFMethod}>
+              <SelectTrigger className="h-8 w-36 text-xs"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">همه روش‌ها</SelectItem>
+                <SelectItem value="climbing">صعودی</SelectItem>
+                <SelectItem value="patrol">پیمایشی</SelectItem>
+                <SelectItem value="drone">پهبادی</SelectItem>
+                <SelectItem value="general">عمومی</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={fVoltage} onValueChange={setFVoltage}>
+              <SelectTrigger className="h-8 w-28 text-xs"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">همه ولتاژها</SelectItem>
+                <SelectItem value="63">۶۳kV</SelectItem>
+                <SelectItem value="132">۱۳۲kV</SelectItem>
+                <SelectItem value="230">۲۳۰kV</SelectItem>
+                <SelectItem value="400">۴۰۰kV</SelectItem>
+                <SelectItem value="general">عمومی</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={fTerrain} onValueChange={setFTerrain}>
+              <SelectTrigger className="h-8 w-36 text-xs"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">همه زمین‌ها</SelectItem>
+                <SelectItem value="plain_hilly">دشت و تپه‌ماهور</SelectItem>
+                <SelectItem value="semi_mountainous">نیمه‌کوهستانی</SelectItem>
+                <SelectItem value="impassable">صعب‌العبور</SelectItem>
+                <SelectItem value="general">عمومی</SelectItem>
+              </SelectContent>
+            </Select>
+            <Input
+              value={fSearch} onChange={e => setFSearch(e.target.value)}
+              placeholder="جستجو در کد/شرح…"
+              className="h-8 w-52 text-xs"
+            />
           </div>
         </CardContent>
       </Card>
 
-      {/* فیلترهای طبقه‌بندی */}
-      {selectedListId ? (
-        <Card>
-          <CardContent className="p-3">
-            <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
-              <span className="flex items-center gap-1 text-xs text-slate-500 shrink-0"><Filter className="w-3.5 h-3.5" />نمایش:</span>
-              <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 flex-1">
-                <Select value={fMode} onValueChange={setFMode}>
-                  <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">همه ردیف‌ها</SelectItem>
-                    <SelectItem value="items">فقط اقلام</SelectItem>
-                    <SelectItem value="coefficients">فقط ضرایب</SelectItem>
-                  </SelectContent>
-                </Select>
-                <Select value={fActivity} onValueChange={setFActivity}>
-                  <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">همه فعالیت‌ها</SelectItem>
-                    <SelectItem value="inspection">بازدید</SelectItem>
-                    <SelectItem value="repair">تعمیرات</SelectItem>
-                    <SelectItem value="operation">عملیات</SelectItem>
-                    <SelectItem value="general">عمومی (بدون نوع)</SelectItem>
-                  </SelectContent>
-                </Select>
-                <Select value={fMethod} onValueChange={setFMethod}>
-                  <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">همه روش‌ها</SelectItem>
-                    <SelectItem value="climbing">بازدید صعودی</SelectItem>
-                    <SelectItem value="patrol">بازدید پیمایشی</SelectItem>
-                    <SelectItem value="general">بدون روش</SelectItem>
-                  </SelectContent>
-                </Select>
-                <Select value={fVoltage} onValueChange={setFVoltage}>
-                  <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">همه ولتاژها</SelectItem>
-                    <SelectItem value="63">۶۳ kV</SelectItem>
-                    <SelectItem value="132">۱۳۲ kV</SelectItem>
-                    <SelectItem value="230">۲۳۰ kV</SelectItem>
-                    <SelectItem value="400">۴۰۰ kV</SelectItem>
-                    <SelectItem value="general">عمومی (بدون ولتاژ)</SelectItem>
-                  </SelectContent>
-                </Select>
-                <div className="flex items-center justify-end text-xs text-slate-500 nums-fa">
-                  {filteredItems.length.toLocaleString("fa-IR")} از {items.length.toLocaleString("fa-IR")} ردیف
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      ) : null}
-
       {/* جدول اقلام */}
-      {listsLoading ? (
-        <Card><CardContent className="p-0">
-          <div className="flex items-center justify-center h-64">
-            <Loader2 className="w-8 h-8 text-indigo-600 animate-spin" />
-          </div>
-        </CardContent></Card>
-      ) : lists.length === 0 ? (
-        <Card><CardContent className="p-0">
-          <div className="flex flex-col items-center justify-center h-64 text-slate-400">
-            <ListChecks className="w-12 h-12 mb-3 opacity-50" />
-            <p>هنوز فهرست بهایی ثبت نشده — با دکمه «فهرست جدید» شروع کنید</p>
-          </div>
-        </CardContent></Card>
-      ) : (
-        <DataTable
-          accessKey="price-lists"
-          data={filteredItems}
-          columns={columns}
-          loading={itemsLoading}
-          searchKeys={["contract_title", "code", "title", "category"]}
-          title="اقلام فهرست بها"
-          layoutKey="price-list-items"
-          onAdd={() => { setEditingItem(null); setShowCreateItem(true); }}
-          onRefresh={() => setRefreshKey(k => k + 1)}
-          onDelete={(rows) => setPendingDelete(rows)}
-          onEdit={(row) => { setEditingItem(row); setShowCreateItem(true); }}
-          onDuplicate={handleDuplicate}
-          onCopy={() => {}}
-          onImport={() => setShowImport(true)}
-          onLoadAllRows={async () => filteredItems}
-          toolbarExtra={(rows) => <GenericBulkActions rows={rows} endpoint={API_ENDPOINTS.priceListItems} entityName="قلم" onApplied={() => setRefreshKey(k => k + 1)} canToggleStatus />}
-        />
-      )}
+      <Card>
+        <CardContent className="pt-6">
+          <DataTable
+            accessKey="price-lists"
+            data={filteredItems}
+            columns={columns}
+            loading={itemsLoading}
+            searchKeys={["code", "title", "category", "parent_code"]}
+            title={`اقلام ${selectedList?.name ?? "فهرست بها"}`}
+            layoutKey="price-list-items"
+            onAdd={() => { setEditingItem(null); setShowCreateItem(true); }}
+            onRefresh={() => setRefreshKey(k => k + 1)}
+            onDelete={(rows) => setPendingDelete(rows)}
+            onEdit={(row) => { setEditingItem(row); setShowCreateItem(true); }}
+            onDuplicate={handleDuplicate}
+            onCopy={() => {}}
+            onImport={() => setShowImport(true)}
+            pageSize={25}
+          />
+        </CardContent>
+      </Card>
 
       <CreatePriceListDialog
         open={showCreateList}
         onClose={() => setShowCreateList(false)}
-        onCreated={() => { setShowCreateList(false); setRefreshKey(k => k + 1); }}
+        onCreated={() => setRefreshKey(k => k + 1)}
       />
-
       <PriceListItemDialog
         open={showCreateItem}
         priceListId={selectedListId ? Number(selectedListId) : null}
+        items={items}
         editing={editingItem}
         onClose={() => { setShowCreateItem(false); setEditingItem(null); }}
-        onSaved={() => { setShowCreateItem(false); setEditingItem(null); setRefreshKey(k => k + 1); }}
+        onSaved={() => setRefreshKey(k => k + 1)}
       />
-
       <ImportPriceListDialog
         open={showImport}
         priceListId={selectedListId ? Number(selectedListId) : null}
         existingCount={items.length}
         onClose={() => setShowImport(false)}
-        onImported={() => { setShowImport(false); setRefreshKey(k => k + 1); }}
+        onImported={() => setRefreshKey(k => k + 1)}
       />
-
-      {/* تأیید حذف اقلام */}
-      <AlertDialog open={!!pendingDelete} onOpenChange={(o) => !o && setPendingDelete(null)}>
+      <AlertDialog open={!!pendingDelete} onOpenChange={v => !v && setPendingDelete(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle className="text-right">حذف قلم(های) فهرست بها</AlertDialogTitle>
-            <AlertDialogDescription className="text-right">
-              {pendingDelete && pendingDelete.length === 1
-                ? `قلم «${pendingDelete[0].title}» به‌طور کامل حذف می‌شود. این عمل قابل بازگشت نیست.`
-                : `${(pendingDelete?.length ?? 0).toLocaleString("fa-IR")} قلم انتخاب‌شده به‌طور کامل حذف می‌شوند. این عمل قابل بازگشت نیست.`}
+            <AlertDialogTitle>حذف {pendingDelete?.length.toLocaleString("fa-IR")} ردیف</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-2 text-right">
+                <p>
+                  {pendingDelete?.some(i => !isCoef(i))
+                    ? "با حذف ردیف اصلی، ضرایب فرزند آن هم حذف می‌شوند. این عمل بازگشت‌پذیر نیست."
+                    : "این عمل بازگشت‌پذیر نیست."}
+                </p>
+                <ul className="max-h-40 space-y-1 overflow-auto text-xs">
+                  {pendingDelete?.slice(0, 8).map(i => (
+                    <li key={i.id} className="truncate" dir="auto">
+                      <span className="font-mono text-[11px] text-slate-500" dir="ltr">{i.code}</span> — {i.title}
+                    </li>
+                  ))}
+                  {(pendingDelete?.length ?? 0) > 8 ? <li className="text-slate-400">… و {(pendingDelete!.length - 8).toLocaleString("fa-IR")} ردیف دیگر</li> : null}
+                </ul>
+              </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <AlertDialogFooter className="flex-row-reverse sm:flex-row-reverse">
+          <AlertDialogFooter>
             <AlertDialogCancel disabled={deleting}>انصراف</AlertDialogCancel>
             <AlertDialogAction
-              className="bg-red-600 hover:bg-red-700"
               disabled={deleting}
-              onClick={(e) => { e.preventDefault(); handleDelete(); }}
+              onClick={e => { e.preventDefault(); requestDelete(pendingDelete!); }}
+              className="bg-red-600 hover:bg-red-700"
             >
-              {deleting ? <><Loader2 className="w-4 h-4 ml-2 animate-spin" />در حال حذف...</> : "حذف"}
+              {deleting ? <Loader2 className="ml-1 h-4 w-4 animate-spin" /> : null} حذف قطعی
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -500,260 +486,329 @@ export function PriceListsPage() {
   );
 }
 
-// ─── دیالوگ ایجاد فهرست بها ───
+// ═══════════════════════════════════════════════════════════════
+// دیالوگ ایجاد فهرست
+// ═══════════════════════════════════════════════════════════════
 function CreatePriceListDialog({ open, onClose, onCreated }: { open: boolean; onClose: () => void; onCreated: () => void }) {
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const { toast } = useToast();
   const [form, setForm] = useState({ name: "", version: "", effective_date: "", contract_id: "" });
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const submit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  useEffect(() => {
+    if (open) { setForm({ name: "", version: "", effective_date: "", contract_id: "" }); setError(null); }
+  }, [open]);
+
+  const submit = async () => {
     if (!form.name.trim()) { setError("نام فهرست الزامی است"); return; }
-    setSubmitting(true); setError(null);
+    setSaving(true); setError(null);
     try {
       await apiClient.post(API_ENDPOINTS.priceLists, {
         name: form.name.trim(),
-        version: form.version.trim() || null,
-        effective_date: form.effective_date || undefined,
+        version: form.version.trim() || "1.0",
+        effective_date: form.effective_date || new Date().toISOString().slice(0, 10),
         contract_id: form.contract_id ? Number(form.contract_id) : null,
       });
-      setForm({ name: "", version: "", effective_date: "", contract_id: "" });
-      onCreated();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "خطا در ایجاد فهرست");
-    } finally { setSubmitting(false); }
+      toast({ title: "فهرست ایجاد شد", description: form.name.trim() });
+      onCreated(); onClose();
+    } catch (err: unknown) {
+      setError((err as Error)?.message || "خطا در ایجاد فهرست");
+    } finally { setSaving(false); }
   };
 
   return (
-    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-w-lg">
-        <DialogHeader>
-          <DialogTitle className="text-right">ثبت فهرست بها جدید</DialogTitle>
-        </DialogHeader>
-        <form onSubmit={submit} className="space-y-4">
-          {error && <div className="bg-red-50 dark:bg-red-950 text-red-600 text-sm p-3 rounded-lg text-right">{error}</div>}
-          <div className="space-y-2">
-            <Label className="text-right block">نام فهرست (اجباری)</Label>
-            <Input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder="مثلاً: فهرست بها ۱۴۰۵" className="text-right" autoFocus />
+    <Dialog open={open} onOpenChange={v => !v && onClose()}>
+      <DialogContent className="max-w-md">
+        <DialogHeader><DialogTitle>ثبت فهرست جدید</DialogTitle></DialogHeader>
+        <div className="space-y-3">
+          <div className="space-y-1.5">
+            <Label className="text-xs font-medium text-slate-600 dark:text-slate-300">نام فهرست *</Label>
+            <Input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder="مثلاً: فهرست بهای کشوری ۱۴۰۵" />
           </div>
-          <div className="space-y-2">
-            <Label className="text-right block">قرارداد</Label>
-            <ContractSelect value={form.contract_id} onChange={v => setForm({ ...form, contract_id: v })} />
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div className="space-y-2">
-              <Label className="text-right block">نسخه</Label>
-              <Input value={form.version} onChange={e => setForm({ ...form, version: e.target.value })} placeholder="1405.1" className="text-right" />
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label className="text-xs font-medium text-slate-600 dark:text-slate-300">نسخه</Label>
+              <Input value={form.version} onChange={e => setForm({ ...form, version: e.target.value })} placeholder="1405.1" dir="ltr" />
             </div>
-            <div className="space-y-2">
-              <Label className="text-right block">تاریخ اجرا</Label>
-              <JalaliDatePicker value={form.effective_date} onChange={v => setForm({ ...form, effective_date: v })} />
+            <div className="space-y-1.5">
+              <Label className="text-xs font-medium text-slate-600 dark:text-slate-300">تاریخ اعتبار</Label>
+              <JalaliDatePicker value={form.effective_date} onChange={v => setForm({ ...form, effective_date: v ?? "" })} />
             </div>
           </div>
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={onClose}>انصراف</Button>
-            <Button type="submit" disabled={submitting} className="bg-indigo-600 hover:bg-indigo-700">
-              {submitting ? <><Loader2 className="w-4 h-4 ml-2 animate-spin" />در حال ثبت...</> : "ایجاد فهرست"}
-            </Button>
-          </DialogFooter>
-        </form>
+          <div className="space-y-1.5">
+            <Label className="text-xs font-medium text-slate-600 dark:text-slate-300">قرارداد (اختیاری)</Label>
+            <ContractSelect value={form.contract_id} onChange={v => setForm({ ...form, contract_id: v ?? "" })} />
+          </div>
+          {error ? <p className="text-xs text-red-600">{error}</p> : null}
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose} disabled={saving}>انصراف</Button>
+          <Button onClick={submit} disabled={saving}>
+            {saving ? <Loader2 className="ml-1 h-4 w-4 animate-spin" /> : null} ثبت فهرست
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );
 }
 
-// ─── دیالوگ ثبت/ویرایش قلم فهرست بها (v4.3.86 — طبقه‌بندی کامل) ───
+// ═══════════════════════════════════════════════════════════════
+// دیالوگ ثبت/ویرایش ردیف (اصلی یا ضریب)
+// ═══════════════════════════════════════════════════════════════
 const emptyItemForm = {
-  code: "", title: "", unit: "دکل", category: "بازدید", unit_price: "",
-  voltage: "general", circuits: "general", bundles: "general",
-  activity: "general", method: "general", structure: "general",
-  p_plain: "", p_hilly: "", p_semi: "", p_impassable: "",
-  isCoefficient: false, coefPercent: "",
+  mode: "base" as "base" | "coefficient",
+  code: "", title: "", unit: "", unit_price: "", category: "",
+  chapter: "none", parent_code: "", coefficient_kind: "other",
+  activity_type: "none", inspection_method: "none",
+  voltage_kv: "", circuit_count: "none", bundle_count: "none", terrain_type: "none",
 };
 
-function PriceListItemDialog({ open, priceListId, editing, onClose, onSaved }: {
-  open: boolean; priceListId: number | null; editing: PriceListItem | null;
-  onClose: () => void; onSaved: () => void;
+function PriceListItemDialog({ open, priceListId, items, editing, onClose, onSaved }: {
+  open: boolean;
+  priceListId: number | null;
+  items: PriceListItem[];
+  editing: PriceListItem | null;
+  onClose: () => void;
+  onSaved: () => void;
 }) {
-  const [submitting, setSubmitting] = useState(false);
+  const { toast } = useToast();
+  const [form, setForm] = useState(emptyItemForm);
+  const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [form, setForm] = useState({ ...emptyItemForm });
+
+  const baseItems = useMemo(() => items.filter(i => !isCoef(i)), [items]);
 
   useEffect(() => {
     if (!open) return;
-    if (editing) {
+    setError(null);
+    if (editing && editing.id > 0) {
+      const coef = isCoef(editing);
       setForm({
-        code: editing.code || "",
-        title: editing.title || "",
-        unit: editing.unit || "",
-        category: editing.category || "",
-        unit_price: editing.unit_price != null ? String(editing.unit_price) : "",
-        voltage: editing.voltage_kv != null ? String(editing.voltage_kv) : "general",
-        circuits: editing.circuit_count != null ? String(editing.circuit_count) : "general",
-        bundles: editing.bundle_count != null ? String(editing.bundle_count) : "general",
-        activity: editing.activity_type || "general",
-        method: editing.inspection_method || "general",
-        structure: editing.tower_structure || "general",
-        p_plain: editing.unit_price_plain != null ? String(editing.unit_price_plain) : "",
-        p_hilly: editing.unit_price_hilly != null ? String(editing.unit_price_hilly) : "",
-        p_semi: editing.unit_price_semi_mountainous != null ? String(editing.unit_price_semi_mountainous) : "",
-        p_impassable: editing.unit_price_impassable != null ? String(editing.unit_price_impassable) : "",
-        isCoefficient: editing.item_kind === "coefficient" || Number((editing as any).is_coefficient) === 1,
-        coefPercent: editing.coefficient_percent != null ? String(editing.coefficient_percent) : "",
+        mode: coef ? "coefficient" : "base",
+        code: editing.code ?? "",
+        title: editing.title ?? "",
+        unit: editing.unit ?? "",
+        unit_price: String(editing.unit_price ?? ""),
+        category: editing.category ?? "",
+        chapter: editing.chapter !== null && editing.chapter !== undefined ? String(editing.chapter) : "none",
+        parent_code: editing.parent_code ?? "",
+        coefficient_kind: editing.coefficient_kind ?? "other",
+        activity_type: editing.activity_type ?? "none",
+        inspection_method: editing.inspection_method ?? "none",
+        voltage_kv: editing.voltage_kv !== null && editing.voltage_kv !== undefined ? String(editing.voltage_kv) : "",
+        circuit_count: editing.circuit_count !== null && editing.circuit_count !== undefined ? String(editing.circuit_count) : "none",
+        bundle_count: editing.bundle_count !== null && editing.bundle_count !== undefined ? String(editing.bundle_count) : "none",
+        terrain_type: editing.terrain_type ?? "none",
       });
     } else {
-      setForm({ ...emptyItemForm });
+      setForm(emptyItemForm);
     }
   }, [open, editing]);
 
-  const isCoef = form.isCoefficient;
+  // کد اختصاصی پیشنهادی برای ضریب جدید: *<والد>-<n>
+  const suggestedCoefCode = useMemo(() => {
+    if (form.mode !== "coefficient" || !form.parent_code) return "";
+    const n = items.filter(i => isCoef(i) && i.parent_code === form.parent_code).length + 1;
+    return `*${form.parent_code}-${n}`;
+  }, [form.mode, form.parent_code, items]);
 
-  const submit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!form.title.trim()) { setError("شرح قلم الزامی است"); return; }
-    if (!priceListId) { setError("ابتدا یک فهرست بها انتخاب کنید"); return; }
-    if (isCoef && !form.coefPercent.trim()) { setError("درصد ضریب را وارد کنید (مثبت = افزایش، منفی = کاهش)"); return; }
-    setSubmitting(true); setError(null);
-    const payload: Record<string, unknown> = {
-      price_list_id: priceListId,
-      code: form.code.trim() || undefined,
-      title: form.title.trim(),
-      unit: form.unit.trim() || (isCoef ? "ضریب" : "دکل"),
-      unit_price: parseExcelNumber(form.unit_price) ?? (isCoef ? 0 : 0),
-      category: form.category.trim() || (isCoef ? "ضریب" : "عملیات"),
-      item_kind: isCoef ? "coefficient" : "base",
-      activity_type: form.activity === "general" ? null : form.activity,
-      inspection_method: form.method === "general" ? null : form.method,
-      voltage_kv: form.voltage === "general" ? null : Number(form.voltage),
-      circuit_count: form.circuits === "general" ? null : Number(form.circuits),
-      bundle_count: form.bundles === "general" ? null : Number(form.bundles),
-      tower_structure: form.structure === "general" ? null : form.structure,
-      terrain_type: null,
-      unit_price_plain: parseExcelNumber(form.p_plain),
-      unit_price_hilly: parseExcelNumber(form.p_hilly),
-      unit_price_semi_mountainous: parseExcelNumber(form.p_semi),
-      unit_price_impassable: parseExcelNumber(form.p_impassable),
-      coefficient_percent: isCoef ? (parseExcelNumber(form.coefPercent) ?? 0) : null,
-    };
+  const setF = (k: string, v: string) => setForm(f => ({ ...f, [k]: v }));
+
+  const submit = async () => {
+    if (!priceListId) { setError("ابتدا یک فهرست انتخاب کنید"); return; }
+    if (!form.title.trim()) { setError("شرح ردیف الزامی است"); return; }
+    if (form.mode === "coefficient" && !form.parent_code) { setError("انتخاب ردیف والد برای ضریب الزامی است"); return; }
+    setSaving(true); setError(null);
     try {
-      if (editing) {
+      const price = form.unit_price.trim() === "" ? 0 : Number(form.unit_price.replace(/[^\d.\-]/g, ""));
+      const payload: Record<string, unknown> = {
+        price_list_id: priceListId,
+        title: form.title.trim(),
+        unit: form.unit.trim() || (form.mode === "coefficient" ? "ضریب" : "برج"),
+        unit_price: isFinite(price) ? price : 0,
+        item_kind: form.mode,
+        chapter: form.mode === "base" && form.chapter !== "none" ? Number(form.chapter) : null,
+        category: form.category.trim() || (form.chapter !== "none" ? CHAPTER_LABELS[Number(form.chapter)] : ""),
+        activity_type: form.mode === "base" && form.activity_type !== "none" ? form.activity_type : null,
+        inspection_method: form.mode === "base" && form.inspection_method !== "none" ? form.inspection_method : null,
+        voltage_kv: form.mode === "base" && form.voltage_kv.trim() !== "" ? Number(form.voltage_kv) || null : null,
+        circuit_count: form.mode === "base" && form.circuit_count !== "none" ? Number(form.circuit_count) : null,
+        bundle_count: form.mode === "base" && form.bundle_count !== "none" ? Number(form.bundle_count) : null,
+        terrain_type: form.mode === "base" && form.terrain_type !== "none" ? form.terrain_type : null,
+      };
+      if (form.mode === "coefficient") {
+        payload.parent_code = form.parent_code;
+        payload.coefficient_kind = form.coefficient_kind;
+        payload.code = form.code.trim() || suggestedCoefCode;
+      } else if (form.code.trim()) {
+        payload.code = form.code.trim();
+      }
+      if (editing && editing.id > 0) {
         await apiClient.put(`${API_ENDPOINTS.priceListItems}/${editing.id}`, payload);
+        toast({ title: "ردیف ویرایش شد", description: payload.title as string });
       } else {
         await apiClient.post(API_ENDPOINTS.priceListItems, payload);
+        toast({ title: "ردیف ثبت شد", description: payload.title as string });
       }
-      onSaved();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "خطا در ذخیره قلم");
-    } finally { setSubmitting(false); }
+      onSaved(); onClose();
+    } catch (err: unknown) {
+      setError((err as Error)?.message || "خطا در ذخیره ردیف");
+    } finally { setSaving(false); }
   };
 
-  const priceField = (key: "p_plain" | "p_hilly" | "p_semi" | "p_impassable", label: string) => (
-    <div className="space-y-1.5">
-      <Label className="text-xs font-medium text-slate-600 dark:text-slate-300 text-right block">{label}</Label>
-      <Input value={form[key]} onChange={e => setForm({ ...form, [key]: e.target.value.replace(/[^0-9.\-]/g, "") })} dir="ltr" className="text-left" placeholder="—" />
-    </div>
-  );
-
   return (
-    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+    <Dialog open={open} onOpenChange={v => !v && onClose()}>
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="text-right flex items-center gap-2">
-            <FileSpreadsheet className="w-5 h-5 text-indigo-600" />
-            {editing ? `ویرایش قلم فهرست بها: ${editing.code}` : "ثبت قلم جدید فهرست بها"}
+          <DialogTitle>
+            {editing && editing.id > 0
+              ? `ویرایش ردیف: ${editing.code}`
+              : form.mode === "coefficient" ? "ثبت ردیف ضریب جدید" : "ثبت ردیف اصلی جدید"}
           </DialogTitle>
         </DialogHeader>
-        <form onSubmit={submit} className="space-y-4">
-          {error && <div className="bg-red-50 dark:bg-red-950 text-red-600 text-sm p-3 rounded-lg text-right">{error}</div>}
-
-          {/* ردیف ضریب */}
-          <div className="flex items-center justify-between rounded-lg border border-amber-200 dark:border-amber-900 bg-amber-50/60 dark:bg-amber-950/20 p-3">
-            <div>
-              <Label className="text-sm font-medium text-amber-900 dark:text-amber-200">این ردیف «ضریب کاهش/افزایش بها» است</Label>
-              <p className="text-xs text-amber-700 dark:text-amber-300 mt-0.5">ضرایب در فهرست رسمی کد ندارند؛ دامنه اعمال با فیلدهای زیر مشخص می‌شود (تیر چوبی، نوع فعالیت و...)</p>
-            </div>
-            <Switch checked={isCoef} onCheckedChange={v => setForm({ ...form, isCoefficient: v })} />
+        <div className="space-y-4">
+          {/* نوع ردیف */}
+          <div className="flex items-center gap-4 rounded-lg border border-slate-200 p-3 dark:border-slate-700">
+            <label className="flex cursor-pointer items-center gap-2 text-sm">
+              <input type="radio" name="plitem-mode" checked={form.mode === "base"} onChange={() => setF("mode", "base")} className="accent-slate-700" />
+              ردیف اصلی (کد ملی)
+            </label>
+            <label className="flex cursor-pointer items-center gap-2 text-sm">
+              <input type="radio" name="plitem-mode" checked={form.mode === "coefficient"} onChange={() => setF("mode", "coefficient")} className="accent-amber-600" />
+              ردیف ضریب کاهش/افزایش بها
+            </label>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div className="space-y-1.5 sm:col-span-2">
-              <Label className="text-xs font-medium text-slate-600 dark:text-slate-300 text-right block">شرح قلم (اجباری)</Label>
-              <Input value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} placeholder={isCoef ? "مثلاً: کاهش بها — دکل تیر چوبی" : "مثلاً: بازدید صعودی دکل ۶۳ کیلوولت — تک‌مداره تک‌باندل"} className="text-right" autoFocus />
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs font-medium text-slate-600 dark:text-slate-300 text-right block">کد (خالی = خودکار)</Label>
-              <Input value={form.code} onChange={e => setForm({ ...form, code: e.target.value })} placeholder="SZ-63-2C-1B" dir="ltr" className="text-left" disabled={isCoef && !!editing ? false : false} />
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs font-medium text-slate-600 dark:text-slate-300 text-right block">{isCoef ? "درصد ضریب (−کاهش / +افزایش)" : "واحد"}</Label>
-              {isCoef ? (
-                <Input value={form.coefPercent} onChange={e => setForm({ ...form, coefPercent: e.target.value.replace(/[^0-9.\-+]/g, "") })} dir="ltr" className="text-left" placeholder="-15" />
-              ) : (
-                <Input value={form.unit} onChange={e => setForm({ ...form, unit: e.target.value })} className="text-right" />
-              )}
-            </div>
-          </div>
-
-          {isCoef ? (
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <div className="space-y-1.5">
-                <Label className="text-xs font-medium text-slate-600 dark:text-slate-300 text-right block">دامنه: نوع فعالیت</Label>
-                <Select value={form.activity} onValueChange={v => setForm({ ...form, activity: v })}>
-                  <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="general">همه فعالیت‌ها</SelectItem>
-                    <SelectItem value="inspection">بازدید</SelectItem>
-                    <SelectItem value="repair">تعمیرات</SelectItem>
-                    <SelectItem value="operation">عملیات</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs font-medium text-slate-600 dark:text-slate-300 text-right block">دامنه: نوع سازه دکل</Label>
-                <Select value={form.structure} onValueChange={v => setForm({ ...form, structure: v })}>
-                  <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="general">همه سازه‌ها</SelectItem>
-                    {STRUCTURES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs font-medium text-slate-600 dark:text-slate-300 text-right block">دامنه: سطح ولتاژ</Label>
-                <Select value={form.voltage} onValueChange={v => setForm({ ...form, voltage: v })}>
-                  <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="general">همه سطوح</SelectItem>
-                    <SelectItem value="63">۶۳ kV</SelectItem>
-                    <SelectItem value="132">۱۳۲ kV</SelectItem>
-                    <SelectItem value="230">۲۳۰ kV</SelectItem>
-                    <SelectItem value="400">۴۰۰ kV</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-          ) : (
+          {form.mode === "coefficient" ? (
             <>
-              <div className="grid grid-cols-2 sm:grid-cols-6 gap-3">
+              <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
-                  <Label className="text-xs font-medium text-slate-600 dark:text-slate-300 text-right block">سطح ولتاژ</Label>
-                  <Select value={form.voltage} onValueChange={v => setForm({ ...form, voltage: v })}>
-                    <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+                  <Label className="text-xs font-medium text-slate-600 dark:text-slate-300">ردیف والد *</Label>
+                  <Select value={form.parent_code} onValueChange={v => setF("parent_code", v)}>
+                    <SelectTrigger><SelectValue placeholder="انتخاب ردیف اصلی…" /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="general">عمومی</SelectItem>
-                      <SelectItem value="63">۶۳ kV</SelectItem>
-                      <SelectItem value="132">۱۳۲ kV</SelectItem>
-                      <SelectItem value="230">۲۳۰ kV</SelectItem>
-                      <SelectItem value="400">۴۰۰ kV</SelectItem>
+                      {baseItems.slice(0, 400).map(b => (
+                        <SelectItem key={b.id} value={b.code}>
+                          <span dir="ltr" className="font-mono text-xs">{b.code}</span> — {b.title.slice(0, 50)}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
                 <div className="space-y-1.5">
-                  <Label className="text-xs font-medium text-slate-600 dark:text-slate-300 text-right block">تعداد مدار</Label>
-                  <Select value={form.circuits} onValueChange={v => setForm({ ...form, circuits: v })}>
-                    <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+                  <Label className="text-xs font-medium text-slate-600 dark:text-slate-300">نوع ضریب</Label>
+                  <Select value={form.coefficient_kind} onValueChange={v => setF("coefficient_kind", v)}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="general">عمومی</SelectItem>
+                      {Object.entries(COEFFICIENT_KIND_LABELS).map(([k, v]) => (
+                        <SelectItem key={k} value={k}>{v}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs font-medium text-slate-600 dark:text-slate-300">
+                  کد اختصاصی {editing ? "" : "(خالی = پیشنهاد خودکار)"}
+                </Label>
+                <Input value={form.code} onChange={e => setF("code", e.target.value)} dir="ltr"
+                  placeholder={suggestedCoefCode || "*20101-1"} className="font-mono text-sm" />
+                {!editing && suggestedCoefCode ? (
+                  <p className="text-[11px] text-slate-400">پیشنهاد: <span className="font-mono" dir="ltr">{suggestedCoefCode}</span></p>
+                ) : null}
+              </div>
+            </>
+          ) : null}
+
+          <div className="space-y-1.5">
+            <Label className="text-xs font-medium text-slate-600 dark:text-slate-300">شرح ردیف *</Label>
+            <Input value={form.title} onChange={e => setF("title", e.target.value)}
+              placeholder={form.mode === "coefficient" ? "کاهش بها بابت بازدید تیر چوبی و بتنی، طبق بند ۸ مقدمه فصل" : "بازدید پیمایشی خط ۶۳ کیلوولت دشت و تپه ماهور تک مداره."} />
+            {form.mode === "base" && form.title.trim() ? <ClassificationPreview title={form.title} code={form.code} /> : null}
+          </div>
+
+          <div className="grid grid-cols-3 gap-3">
+            {form.mode === "base" ? (
+              <div className="space-y-1.5">
+                <Label className="text-xs font-medium text-slate-600 dark:text-slate-300">کد ملی (اختیاری)</Label>
+                <Input value={form.code} onChange={e => setF("code", e.target.value)} dir="ltr" placeholder="20101" className="font-mono text-sm" />
+              </div>
+            ) : null}
+            <div className="space-y-1.5">
+              <Label className="text-xs font-medium text-slate-600 dark:text-slate-300">واحد</Label>
+              <Input value={form.unit} onChange={e => setF("unit", e.target.value)} placeholder="برج / زنجیره / مورد / عدد" />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs font-medium text-slate-600 dark:text-slate-300">
+                بهای واحد (ریال) {form.mode === "coefficient" ? "— منفی = کاهش بها" : ""}
+              </Label>
+              <Input value={form.unit_price} onChange={e => setF("unit_price", e.target.value)} dir="ltr"
+                placeholder={form.mode === "coefficient" ? "-382000" : "955000"} className="nums-fa" />
+            </div>
+          </div>
+
+          {form.mode === "base" ? (
+            <>
+              <div className="grid grid-cols-3 gap-3">
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-medium text-slate-600 dark:text-slate-300">فصل فهرست</Label>
+                  <Select value={form.chapter} onValueChange={v => setF("chapter", v)}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">نامشخص</SelectItem>
+                      <SelectItem value="2">فصل ۲ — نگهداری</SelectItem>
+                      <SelectItem value="7">فصل ۷ — کشیک و فراخوان</SelectItem>
+                      <SelectItem value="8">فصل ۸ — بازدید پهبادی</SelectItem>
+                      <SelectItem value="10">فصل ۱۰ — تعمیرات</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-medium text-slate-600 dark:text-slate-300">نوع فعالیت</Label>
+                  <Select value={form.activity_type} onValueChange={v => setF("activity_type", v)}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">عمومی</SelectItem>
+                      <SelectItem value="inspection">بازدید</SelectItem>
+                      <SelectItem value="repair">تعمیرات</SelectItem>
+                      <SelectItem value="operation">عملیات</SelectItem>
+                      <SelectItem value="service">خدمات فنی</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-medium text-slate-600 dark:text-slate-300">روش بازدید</Label>
+                  <Select value={form.inspection_method} onValueChange={v => setF("inspection_method", v)}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">عمومی</SelectItem>
+                      <SelectItem value="climbing">صعودی</SelectItem>
+                      <SelectItem value="patrol">پیمایشی</SelectItem>
+                      <SelectItem value="drone">پهبادی</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="grid grid-cols-4 gap-3">
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-medium text-slate-600 dark:text-slate-300">ولتاژ (kV)</Label>
+                  <Select value={form.voltage_kv || "none"} onValueChange={v => setF("voltage_kv", v === "none" ? "" : v)}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">عمومی</SelectItem>
+                      <SelectItem value="63">۶۳</SelectItem>
+                      <SelectItem value="132">۱۳۲</SelectItem>
+                      <SelectItem value="230">۲۳۰</SelectItem>
+                      <SelectItem value="400">۴۰۰</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-medium text-slate-600 dark:text-slate-300">تعداد مدار</Label>
+                  <Select value={form.circuit_count} onValueChange={v => setF("circuit_count", v)}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">عمومی</SelectItem>
                       <SelectItem value="1">تک‌مداره</SelectItem>
                       <SelectItem value="2">دو مداره</SelectItem>
                       <SelectItem value="4">چهارمداره</SelectItem>
@@ -761,363 +816,329 @@ function PriceListItemDialog({ open, priceListId, editing, onClose, onSaved }: {
                   </Select>
                 </div>
                 <div className="space-y-1.5">
-                  <Label className="text-xs font-medium text-slate-600 dark:text-slate-300 text-right block">تعداد باندل</Label>
-                  <Select value={form.bundles} onValueChange={v => setForm({ ...form, bundles: v })}>
-                    <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+                  <Label className="text-xs font-medium text-slate-600 dark:text-slate-300">تعداد باندل</Label>
+                  <Select value={form.bundle_count} onValueChange={v => setF("bundle_count", v)}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="general">عمومی</SelectItem>
+                      <SelectItem value="none">عمومی</SelectItem>
                       <SelectItem value="1">تک‌باندل</SelectItem>
                       <SelectItem value="2">دو باندل</SelectItem>
-                      <SelectItem value="3">سه‌باندل</SelectItem>
+                      <SelectItem value="3">سه باندل</SelectItem>
                       <SelectItem value="4">چهار باندل</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
                 <div className="space-y-1.5">
-                  <Label className="text-xs font-medium text-slate-600 dark:text-slate-300 text-right block">نوع فعالیت</Label>
-                  <Select value={form.activity} onValueChange={v => setForm({ ...form, activity: v, ...(v !== "inspection" ? { method: "general" } : {}) })}>
-                    <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+                  <Label className="text-xs font-medium text-slate-600 dark:text-slate-300">نوع زمین</Label>
+                  <Select value={form.terrain_type} onValueChange={v => setF("terrain_type", v)}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="general">عمومی</SelectItem>
-                      <SelectItem value="inspection">بازدید</SelectItem>
-                      <SelectItem value="repair">تعمیرات</SelectItem>
-                      <SelectItem value="operation">عملیات</SelectItem>
+                      <SelectItem value="none">همه زمین‌ها</SelectItem>
+                      <SelectItem value="plain_hilly">دشت و تپه‌ماهور</SelectItem>
+                      <SelectItem value="semi_mountainous">نیمه‌کوهستانی</SelectItem>
+                      <SelectItem value="impassable">صعب‌العبور</SelectItem>
                     </SelectContent>
                   </Select>
-                </div>
-                <div className="space-y-1.5">
-                  <Label className="text-xs font-medium text-slate-600 dark:text-slate-300 text-right block">روش بازدید</Label>
-                  <Select value={form.method} onValueChange={v => setForm({ ...form, method: v })} disabled={form.activity !== "inspection"}>
-                    <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="general">هر روش</SelectItem>
-                      <SelectItem value="climbing">صعودی</SelectItem>
-                      <SelectItem value="patrol">پیمایشی</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-1.5">
-                  <Label className="text-xs font-medium text-slate-600 dark:text-slate-300 text-right block">نوع سازه دکل</Label>
-                  <Select value={form.structure} onValueChange={v => setForm({ ...form, structure: v })}>
-                    <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="general">همه سازه‌ها</SelectItem>
-                      {STRUCTURES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div className="space-y-1.5">
-                  <Label className="text-xs font-medium text-slate-600 dark:text-slate-300 text-right block">دسته</Label>
-                  <Select value={form.category} onValueChange={v => setForm({ ...form, category: v })}>
-                    <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      {["بازدید", "تعمیرات", "عملیات", "مواد", "حمل‌ونقل"].map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-1.5">
-                  <Label className="text-xs font-medium text-slate-600 dark:text-slate-300 text-right block">واحد</Label>
-                  <Input value={form.unit} onChange={e => setForm({ ...form, unit: e.target.value })} className="text-right" />
-                </div>
-              </div>
-
-              <div className="rounded-lg border border-slate-200 dark:border-slate-700 p-3 space-y-3">
-                <p className="text-xs text-slate-500 text-right">
-                  بهای واحد (ریال) — بهای پایه برای حالت عمومی؛ چهار قیمت زمین هنگام صدور صورت‌وضعیت به‌طور خودکار بر اساس نوع زمین هر دکل انتخاب می‌شود (خالی = استفاده از بهای پایه)
-                </p>
-                <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-                  <div className="space-y-1.5">
-                    <Label className="text-xs font-medium text-slate-600 dark:text-slate-300 text-right block">بهای پایه</Label>
-                    <Input value={form.unit_price} onChange={e => setForm({ ...form, unit_price: e.target.value.replace(/[^0-9.\-]/g, "") })} dir="ltr" className="text-left" />
-                  </div>
-                  {priceField("p_plain", "دشت")}
-                  {priceField("p_hilly", "تپه‌ماهور")}
-                  {priceField("p_semi", "نیمه‌کوهستانی")}
-                  {priceField("p_impassable", "صعب‌العبور")}
                 </div>
               </div>
             </>
-          )}
+          ) : null}
 
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={onClose}>انصراف</Button>
-            <Button type="submit" disabled={submitting} className="bg-indigo-600 hover:bg-indigo-700">
-              {submitting ? <><Loader2 className="w-4 h-4 ml-2 animate-spin" />در حال ذخیره...</> : (editing ? "اعمال ویرایش" : "افزودن قلم")}
-            </Button>
-          </DialogFooter>
-        </form>
+          {error ? <p className="text-xs text-red-600">{error}</p> : null}
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose} disabled={saving}>انصراف</Button>
+          <Button onClick={submit} disabled={saving}>
+            {saving ? <Loader2 className="ml-1 h-4 w-4 animate-spin" /> : null}
+            {editing ? "اعمال ویرایش" : "ثبت ردیف"}
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );
 }
 
-// ─── ایمپورت اکسل (شیت اقلام + شیت ضرایب) ───
-const H = (row: Record<string, unknown>, ...keys: string[]): unknown => {
-  for (const k of keys) {
-    // تطبیق دقیق
-    if (row[k] !== undefined && row[k] !== "") return row[k];
-    // تطبیق با فاصله‌های نرمال‌شده (نیم‌فاصله → فاصله)
-    const nk = k.replace(/[‌\u200c]/g, " ").replace(/\s+/g, " ").trim();
-    for (const rk of Object.keys(row)) {
-      if (rk.replace(/[‌\u200c]/g, " ").replace(/\s+/g, " ").trim() === nk && row[rk] !== "" && row[rk] !== undefined) return row[rk];
-    }
-  }
-  return undefined;
-};
-
-async function parseWorkbook(file: File): Promise<{ items: any[]; coefficients: any[] }> {
-  const XLSX = await import("xlsx");
-  const wb = XLSX.read(await file.arrayBuffer(), { type: "array" });
-  const items: any[] = [];
-  const coefficients: any[] = [];
-
-  for (const sheetName of wb.SheetNames) {
-    // «ضرایب» (جمع) شامل «ضریب» (مفرد) به‌عنوان زیررشته نیست — هر دو بررسی می‌شوند
-    const isCoefSheet = sheetName.includes("ضرایب") || sheetName.includes("ضریب") || sheetName.toLowerCase().includes("coef");
-    const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(wb.Sheets[sheetName], { defval: "" });
-    for (const row of rows) {
-      if (isCoefSheet) {
-        const title = H(row, "عنوان ضریب", "عنوان", "title");
-        const percent = parseExcelNumber(H(row, "درصد (− کاهش / + افزایش)", "درصد", "percent", "coefficient_percent"));
-        if (!title || percent === null) continue;
-        coefficients.push({
-          title: String(title),
-          unit_price: 0,
-          category: String(H(row, "دسته", "category") || "ضریب"),
-          unit: "ضریب",
-          item_kind: "coefficient",
-          voltage_kv: parseExcelNumber(H(row, "سطح ولتاژ (اختیاری)", "سطح ولتاژ", "voltage_kv")),
-          activity_type: normalizeActivity(H(row, "نوع فعالیت (اختیاری)", "نوع فعالیت", "activity_type")),
-          inspection_method: normalizeMethod(H(row, "روش بازدید (اختیاری)", "روش بازدید", "inspection_method")),
-          tower_structure: (H(row, "نوع سازه دکل (اختیاری)", "نوع سازه دکل", "tower_structure") || null),
-          coefficient_percent: percent,
-        });
-      } else {
-        const title = H(row, "شرح", "title", "شرح کار", "شرح فعالیت");
-        const hasAnyPrice = [H(row, "بهای پایه (ریال)", "بهای واحد (ریال)", "بهای واحد", "unit_price"),
-          H(row, "بهای دشت (ریال)", "دشت", "unit_price_plain"),
-          H(row, "بهای تپه‌ماهور (ریال)", "تپه‌ماهور", "unit_price_hilly"),
-          H(row, "بهای نیمه‌کوهستانی (ریال)", "نیمه‌کوهستانی", "unit_price_semi_mountainous"),
-          H(row, "بهای صعب‌العبور (ریال)", "صعب‌العبور", "unit_price_impassable")].some(v => parseExcelNumber(v) !== null);
-        if (!title || (!hasAnyPrice && !String(title).includes("ضریب"))) continue;
-        const isCoefRow = String(H(row, "نوع فعالیت", "activity_type") || "").includes("ضریب") || String(title).startsWith("ضریب") || String(H(row, "دسته", "category") || "").includes("ضریب");
-        if (isCoefRow) {
-          const percent = parseExcelNumber(H(row, "درصد", "درصد ضریب", "coefficient_percent"));
-          if (percent !== null) {
-            coefficients.push({
-              title: String(title), unit_price: 0, category: "ضریب", unit: "ضریب", item_kind: "coefficient",
-              voltage_kv: parseExcelNumber(H(row, "سطح ولتاژ (kV)", "سطح ولتاژ", "voltage_kv")),
-              activity_type: normalizeActivity(H(row, "نوع فعالیت", "activity_type")),
-              inspection_method: normalizeMethod(H(row, "روش بازدید", "inspection_method")),
-              tower_structure: (H(row, "نوع سازه دکل", "tower_structure") || null),
-              coefficient_percent: percent,
-            });
-            continue;
-          }
-        }
-        // سازگاری: اگر «نوع فعالیت» صعودی/پیمایشی بود (قالب قدیمی)، به بازدید+روش تبدیل می‌شود
-        const rawActivity = H(row, "نوع فعالیت", "activity_type");
-        let activity = normalizeActivity(rawActivity);
-        let method = normalizeMethod(H(row, "روش بازدید", "inspection_method"));
-        if (!activity) {
-          const legacy = normalizeMethod(rawActivity);
-          if (legacy) { activity = "inspection"; method = method ?? legacy; }
-        }
-        if (activity && activity !== "inspection") method = null;
-        items.push({
-          code: String(H(row, "کد", "code") || "") || undefined,
-          title: String(title),
-          unit: String(H(row, "واحد", "unit") || "دکل"),
-          category: String(H(row, "دسته", "category") || "عملیات"),
-          unit_price: parseExcelNumber(H(row, "بهای پایه (ریال)", "بهای واحد (ریال)", "بهای واحد", "unit_price")) ?? 0,
-          item_kind: "base",
-          activity_type: activity,
-          inspection_method: method,
-          voltage_kv: parseExcelNumber(H(row, "سطح ولتاژ (kV)", "سطح ولتاژ", "ولتاژ", "voltage_kv")),
-          circuit_count: parseExcelNumber(H(row, "تعداد مدار", "circuit_count")),
-          bundle_count: parseExcelNumber(H(row, "تعداد باندل", "bundle_count")),
-          tower_structure: (H(row, "نوع سازه دکل", "سازه دکل", "tower_structure") || null),
-          terrain_type: normalizeTerrain(H(row, "نوع زمین", "terrain_type")),
-          unit_price_plain: parseExcelNumber(H(row, "بهای دشت (ریال)", "دشت", "unit_price_plain")),
-          unit_price_hilly: parseExcelNumber(H(row, "بهای تپه‌ماهور (ریال)", "تپه‌ماهور", "unit_price_hilly")),
-          unit_price_semi_mountainous: parseExcelNumber(H(row, "بهای نیمه‌کوهستانی (ریال)", "نیمه‌کوهستانی", "unit_price_semi_mountainous")),
-          unit_price_impassable: parseExcelNumber(H(row, "بهای صعب‌العبور (ریال)", "صعب‌العبور", "unit_price_impassable")),
-          coefficient_percent: null,
-        });
-      }
-    }
-  }
-  return { items, coefficients };
+/** پیش‌نمایش طبقه‌بندی استخراج‌شده از شرح — کمک کاربر برای فرم دستی */
+function ClassificationPreview({ title, code }: { title: string; code: string }) {
+  const cls = useMemo(() => parseBaseClassification(code || "00000", title), [title, code]);
+  return (
+    <div className="flex flex-wrap items-center gap-1 rounded-md bg-slate-50 px-2 py-1.5 text-[11px] dark:bg-slate-800/60">
+      <span className="text-slate-400">استخراج خودکار از شرح:</span>
+      {cls.inspection_method ? <Badge className="bg-indigo-50 text-indigo-700 hover:bg-indigo-50">{METHOD_LABELS[cls.inspection_method]}</Badge> : null}
+      {cls.activity_type ? <Badge className="bg-teal-50 text-teal-700 hover:bg-teal-50">{ACTIVITY_LABELS[cls.activity_type]}</Badge> : null}
+      {cls.voltage_kv ? <Badge className="nums-fa bg-violet-100 text-violet-700 hover:bg-violet-100">{cls.voltage_kv}kV</Badge> : null}
+      {cls.circuit_count ? <Badge className="bg-blue-100 text-blue-700 hover:bg-blue-100">{circuitLabel(cls.circuit_count)}</Badge> : null}
+      {cls.bundle_count ? <Badge className="bg-cyan-100 text-cyan-700 hover:bg-cyan-100">{bundleLabel(cls.bundle_count)}</Badge> : null}
+      {cls.terrain_type ? <Badge className="bg-lime-50 text-lime-700 hover:bg-lime-50">{TERRAIN_GROUP_LABELS[cls.terrain_type]}</Badge> : null}
+      {!cls.inspection_method && !cls.activity_type && !cls.voltage_kv && !cls.circuit_count && !cls.terrain_type ? (
+        <span className="text-slate-400">عمومی — طبقه‌بندی‌ای از شرح استخراج نشد</span>
+      ) : null}
+    </div>
+  );
 }
 
+// ═══════════════════════════════════════════════════════════════
+// دیالوگ ایمپورت فهرست بهای کشوری (فرمت استاندارد ۴ ستونه)
+//   شماره ردیف فصل | شرح ردیف فصل | واحد | بهای واحد
+// ═══════════════════════════════════════════════════════════════
 function ImportPriceListDialog({ open, priceListId, existingCount, onClose, onImported }: {
-  open: boolean; priceListId: number | null; existingCount: number; onClose: () => void; onImported: () => void;
+  open: boolean;
+  priceListId: number | null;
+  existingCount: number;
+  onClose: () => void;
+  onImported: () => void;
 }) {
   const { toast } = useToast();
-  const [parsing, setParsing] = useState(false);
-  const [importing, setImporting] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [parsed, setParsed] = useState<{ items: any[]; coefficients: any[] } | null>(null);
   const [fileName, setFileName] = useState("");
+  const [parsed, setParsed] = useState<{ items: ParsedBoqItem[]; warnings: string[] } | null>(null);
   const [replace, setReplace] = useState(false);
-  const inputRef = useRef<HTMLInputElement | null>(null);
+  const [importing, setImporting] = useState(false);
 
-  useEffect(() => { if (!open) { setParsed(null); setFileName(""); setError(null); setReplace(false); } }, [open]);
+  useEffect(() => {
+    if (open) { reset(); }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
+
+  const reset = () => {
+    setError(null); setFileName(""); setParsed(null); setReplace(false); setBusy(false);
+    if (inputRef.current) inputRef.current.value = "";
+  };
 
   const pickFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    e.target.value = "";
     if (!file) return;
-    setParsing(true); setError(null); setParsed(null);
+    setBusy(true); setError(null); setParsed(null);
     try {
-      const result = await parseWorkbook(file);
-      if (result.items.length === 0 && result.coefficients.length === 0) {
-        setError("هیچ ردیف معتبری در فایل پیدا نشد.\n\nشیت‌ها باید «اقلام» و «ضرایب» نام داشته باشند یا عنوان ستون‌ها مطابق قالب استاندارد باشد. از دکمه «دانلود قالب» نمونه بگیرید.");
-      } else {
-        setParsed(result);
-        setFileName(file.name);
+      const XLSX = await import("xlsx");
+      const wb = XLSX.read(await file.arrayBuffer(), { type: "array" });
+      const sheetName = wb.SheetNames.find(n => normalizeFa(n).includes("main") || normalizeFa(n).includes("اقلام") || normalizeFa(n).includes("فهرست")) || wb.SheetNames[0];
+      const ws = wb.Sheets[sheetName];
+      const rows = XLSX.utils.sheet_to_json<unknown[]>(ws, { header: 1, blankrows: false, defval: "" });
+
+      // یافتن سطر سرستون‌ها (در ۵ سطر اول): شماره ردیف فصل | شرح | واحد | بهای واحد
+      let headerIdx = -1;
+      let colMap = { code: -1, title: -1, unit: -1, price: -1 };
+      for (let i = 0; i < Math.min(5, rows.length); i++) {
+        const hdr = (rows[i] || []).map(c => normalizeFa(c));
+        const cCode = hdr.findIndex(h => /شماره\s*ردیف\s*فصل|کد\s*ردیف/.test(h));
+        const cTitle = hdr.findIndex(h => /شرح\s*ردیف|شرح/.test(h));
+        const cUnit = hdr.findIndex(h => /^واحد$/.test(h));
+        const cPrice = hdr.findIndex(h => /بهای\s*واحد|بهای\s*یگانه/.test(h));
+        if (cTitle >= 0 && cPrice >= 0) {
+          headerIdx = i;
+          colMap = { code: cCode, title: cTitle, unit: cUnit >= 0 ? cUnit : 2, price: cPrice };
+          break;
+        }
       }
-    } catch (err) {
-      console.error(err);
-      setError("خواندن فایل اکسل ناموفق بود — فقط فایل xlsx / xls / csv پذیرفته می‌شود");
-    } finally { setParsing(false); }
+      if (headerIdx < 0) {
+        throw new Error("فرمت فایل شناسایی نشد — فهرست بهای کشوری باید ستون‌های «شماره ردیف فصل / شرح ردیف فصل / واحد / بهای واحد» را داشته باشد. برای نمونه از «دانلود قالب استاندارد» استفاده کنید.");
+      }
+
+      const raw = rows.slice(headerIdx + 1).map(r => {
+        const cell = (idx: number) => (idx >= 0 && idx < (r?.length ?? 0) ? r[idx] : "");
+        const code = String(cell(colMap.code) ?? "").trim();
+        const title = String(cell(colMap.title) ?? "").trim();
+        return {
+          code,
+          title,
+          unit: String(cell(colMap.unit) ?? "").trim() || null,
+          unit_price: parseExcelNumber(cell(colMap.price)),
+        };
+      }).filter(r => r.title);
+
+      const result = processStandardBoqRows(raw);
+      if (!result.items.length) throw new Error("هیچ ردیف معتبری در فایل یافت نشد");
+      setFileName(file.name);
+      setParsed(result);
+      if (result.warnings.length) {
+        toast({
+          title: "فایل پارس شد — با هشدار",
+          description: `${result.warnings.length.toLocaleString("fa-IR")} هشدار (مثل قیمت خالی) — پیش‌نمایش را ببینید.`,
+        });
+      }
+    } catch (err: unknown) {
+      setError((err as Error)?.message || "خواندن فایل ناموفق بود — فقط xlsx / xls / csv");
+    } finally { setBusy(false); }
   };
 
   const doImport = async () => {
     if (!parsed || !priceListId) return;
     setImporting(true); setError(null);
     try {
-      const all = [...parsed.items, ...parsed.coefficients];
-      const r = await apiClient.post<any>(API_ENDPOINTS.priceListImport, { price_list_id: priceListId, items: all, replace });
-      const d = (r as any)?.data || r || {};
-      const nItems = Number(d.imported_items ?? parsed.items.length);
-      const nCoefs = Number(d.imported_coefficients ?? parsed.coefficients.length);
-      onImported();
-      setTimeout(() => {
-        toast({ title: "ایمپورت فهرست بها انجام شد", description: `${nItems.toLocaleString("fa-IR")} قلم و ${nCoefs.toLocaleString("fa-IR")} ضریب ثبت شد${replace ? " (اقلام قبلی حذف شدند)" : ""}` });
-      }, 100);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "خطا در ایمپورت");
+      const r = await apiClient.post<{ imported_items?: number; imported_coefficients?: number } | unknown>(
+        API_ENDPOINTS.priceListImport,
+        { price_list_id: priceListId, items: parsed.items, replace },
+      );
+      const d = (r as any)?.data ?? r ?? {};
+      toast({
+        title: "ایمپورت فهرست کشوری انجام شد",
+        description: `${Number(d.imported_items ?? 0).toLocaleString("fa-IR")} ردیف اصلی و ${Number(d.imported_coefficients ?? 0).toLocaleString("fa-IR")} ردیف ضریب ثبت شد${replace ? " (ردیف‌های قبلی حذف شدند)" : ""}.`,
+      });
+      onImported(); onClose();
+    } catch (err: unknown) {
+      setError((err as Error)?.message || "خطا در ایمپورت");
     } finally { setImporting(false); }
   };
 
-  // توجه: toast داخل همین کامپوننت گرفته می‌شود تا پیام نتیجهٔ ایمپورت نمایش داده شود
-  return (
-    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-w-xl">
-        <DialogHeader>
-          <DialogTitle className="text-right flex items-center gap-2">
-            <Upload className="w-5 h-5 text-indigo-600" />
-            ورود فهرست بها از اکسل
-          </DialogTitle>
-        </DialogHeader>
-        <input ref={inputRef} type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={pickFile} />
-        <div className="space-y-4">
-          {error && <div className="bg-red-50 dark:bg-red-950 text-red-600 text-sm p-3 rounded-lg text-right whitespace-pre-line">{error}</div>}
+  const stat = useMemo(() => {
+    if (!parsed) return null;
+    const base = parsed.items.filter(i => i.item_kind === "base");
+    const coef = parsed.items.filter(i => i.item_kind === "coefficient");
+    const byChapter: Record<number, number> = {};
+    for (const i of base) byChapter[i.chapter ?? 0] = (byChapter[i.chapter ?? 0] ?? 0) + 1;
+    return { base, coef, byChapter, zero: parsed.items.filter(i => !i.unit_price).length };
+  }, [parsed]);
 
-          {!parsed ? (
-            <div className="border-2 border-dashed border-slate-300 dark:border-slate-600 rounded-xl p-8 text-center">
-              {parsing ? <Loader2 className="w-8 h-8 text-indigo-600 animate-spin mx-auto" /> : (
-                <>
-                  <FileSpreadsheet className="w-10 h-10 text-slate-300 mx-auto mb-3" />
-                  <p className="text-sm text-slate-500 mb-3">فایل اکسل فهرست بها را انتخاب کنید</p>
-                  <p className="text-xs text-slate-400 mb-4">
-                    هر دو شیت «اقلام» و «ضرایب» به‌صورت خودکار خوانده می‌شود — عنوان ستون‌ها می‌تواند فارسی (قالب استاندارد) یا انگلیسی باشد
-                  </p>
-                  <Button variant="outline" onClick={() => inputRef.current?.click()} disabled={parsing}>
-                    <Upload className="w-4 h-4 ml-2" />
-                    انتخاب فایل اکسل
-                  </Button>
-                </>
-              )}
-            </div>
-          ) : (
+  return (
+    <Dialog open={open} onOpenChange={v => { if (!v) { onClose(); } }}>
+      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>ایمپورت فهرست بهای کشوری</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-3">
+          <p className="rounded-lg bg-slate-50 p-3 text-xs leading-6 text-slate-600 dark:bg-slate-800/60 dark:text-slate-300">
+            فایل اکسل فهرست بهای کشوری را <b>بدون تغییر فرمت</b> آپلود کنید — همان فایلی که کارفرما تحویل می‌دهد
+            (ستون‌ها: شماره ردیف فصل / شرح ردیف فصل / واحد / بهای واحد).
+            طبقه‌بندی‌ها (فصل، ولتاژ، تعداد مدار و باندل، روش بازدید، نوع زمین) <b>خودکار از متن شرح</b> استخراج می‌شوند؛
+            ردیف‌های «کاهش/اضافه بها» که کد ملی ندارند، <b>کد اختصاصی</b> به شکل <span className="font-mono" dir="ltr">*کد-ردیفِ-والد-n</span> می‌گیرند و به ردیف بالایی خود وصل می‌شوند.
+          </p>
+
+          <div className="flex items-center gap-2">
+            <input ref={inputRef} type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={pickFile} />
+            <Button variant="outline" size="sm" disabled={busy} onClick={() => inputRef.current?.click()}>
+              {busy ? <Loader2 className="ml-1 h-4 w-4 animate-spin" /> : <FileSpreadsheet className="ml-1 h-4 w-4" />}
+              انتخاب فایل اکسل
+            </Button>
+            {fileName ? <span className="text-xs text-slate-500">{fileName}</span> : null}
+          </div>
+
+          {error ? <p className="whitespace-pre-line rounded-md bg-red-50 p-2 text-xs text-red-600 dark:bg-red-900/20">{error}</p> : null}
+
+          {stat ? (
             <>
-              <div className="rounded-lg border border-slate-200 dark:border-slate-700 p-4 space-y-2">
-                <p className="text-sm text-slate-700 dark:text-slate-200 text-right"><span className="font-medium">فایل:</span> {fileName}</p>
-                <div className="flex flex-wrap gap-2">
-                  <Badge className="bg-green-100 text-green-700 hover:bg-green-100 nums-fa">{parsed.items.length.toLocaleString("fa-IR")} قلم</Badge>
-                  <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-100 nums-fa">{parsed.coefficients.length.toLocaleString("fa-IR")} ضریب</Badge>
-                  <Badge className="bg-slate-100 text-slate-600 hover:bg-slate-100 nums-fa">{existingCount.toLocaleString("fa-IR")} ردیف موجود در فهرست</Badge>
-                </div>
-                {parsed.items.length > 0 ? (
-                  <div className="max-h-40 overflow-y-auto rounded border border-slate-100 dark:border-slate-800 mt-1">
-                    <table className="w-full text-xs">
-                      <tbody>
-                        {parsed.items.slice(0, 8).map((it, i) => (
-                          <tr key={i} className="border-b border-slate-50 dark:border-slate-800/50 last:border-0">
-                            <td className="px-2 py-1.5 text-left nums-fa text-slate-400" dir="ltr">{it.code || "—"}</td>
-                            <td className="px-2 py-1.5 text-right">{it.title}</td>
-                            <td className="px-2 py-1.5 text-left nums-fa text-slate-500 whitespace-nowrap" dir="ltr">{(it.unit_price ?? 0).toLocaleString("fa-IR")}</td>
-                          </tr>
-                        ))}
-                        {parsed.items.length > 8 ? <tr><td colSpan={3} className="px-2 py-1.5 text-center text-slate-400 nums-fa">و {(parsed.items.length - 8).toLocaleString("fa-IR")} ردیف دیگر...</td></tr> : null}
-                      </tbody>
-                    </table>
-                  </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge variant="secondary" className="nums-fa">کل: {parsed!.items.length.toLocaleString("fa-IR")}</Badge>
+                <Badge className="nums-fa bg-slate-100 text-slate-600 hover:bg-slate-100">اصلی: {stat.base.length.toLocaleString("fa-IR")}</Badge>
+                <Badge className="nums-fa bg-amber-100 text-amber-800 hover:bg-amber-100">ضریب: {stat.coef.length.toLocaleString("fa-IR")}</Badge>
+                {[2, 7, 8, 10].filter(c => stat.byChapter[c]).map(c => (
+                  <Badge key={c} className={`nums-fa ${CHAPTER_BADGES[String(c)]}`}>
+                    {CHAPTER_LABELS[c]}: {stat.byChapter[c].toLocaleString("fa-IR")}
+                  </Badge>
+                ))}
+                {stat.zero > 0 ? (
+                  <Badge className="nums-fa bg-red-50 text-red-600 hover:bg-red-50">بدون قیمت: {stat.zero.toLocaleString("fa-IR")}</Badge>
                 ) : null}
               </div>
-              <label className="flex items-center gap-2 text-sm cursor-pointer rounded-lg border border-red-200 dark:border-red-900 bg-red-50/50 dark:bg-red-950/20 p-3">
-                <input type="checkbox" checked={replace} onChange={e => setReplace(e.target.checked)} className="w-4 h-4" />
-                <span className="text-red-700 dark:text-red-300">پاک کردن ردیف‌های موجود این فهرست قبل از ورود ({existingCount.toLocaleString("fa-IR")} ردیف)</span>
+
+              {parsed!.warnings.length ? (
+                <div className="max-h-24 space-y-0.5 overflow-y-auto rounded-md bg-amber-50 p-2 text-[11px] text-amber-700 dark:bg-amber-900/20">
+                  {parsed!.warnings.slice(0, 12).map((w, i) => <p key={i}>• {w}</p>)}
+                  {parsed!.warnings.length > 12 ? <p>… و {(parsed!.warnings.length - 12).toLocaleString("fa-IR")} هشدار دیگر</p> : null}
+                </div>
+              ) : null}
+
+              {/* پیش‌نمایش ۲۵ ردیف اول */}
+              <div className="overflow-hidden rounded-md border border-slate-200 dark:border-slate-700">
+                <div className="max-h-64 overflow-auto">
+                  <table className="w-full text-right text-[11px]">
+                    <thead className="sticky top-0 bg-slate-50 text-slate-500 dark:bg-slate-800">
+                      <tr>
+                        <th className="px-2 py-1.5 font-medium">کد</th>
+                        <th className="px-2 py-1.5 font-medium">شرح</th>
+                        <th className="px-2 py-1.5 font-medium">طبقه‌بندی</th>
+                        <th className="px-2 py-1.5 font-medium">بها</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {parsed!.items.slice(0, 25).map(it => (
+                        <tr key={it.code} className={`border-t border-slate-100 dark:border-slate-800 ${it.item_kind === "coefficient" ? "bg-amber-50/40 dark:bg-amber-900/10" : ""}`}>
+                          <td className="px-2 py-1 font-mono text-[10px] text-slate-500" dir="ltr">{it.code}</td>
+                          <td className="max-w-72 truncate px-2 py-1">{it.item_kind === "coefficient" ? "↳ " : ""}{it.title}</td>
+                          <td className="px-2 py-1 text-slate-500">
+                            {it.item_kind === "coefficient"
+                              ? COEFFICIENT_KIND_LABELS[it.coefficient_kind ?? "other"]
+                              : [it.inspection_method && METHOD_LABELS[it.inspection_method],
+                                 it.voltage_kv && `${it.voltage_kv}kV`,
+                                 circuitLabel(it.circuit_count),
+                                 bundleLabel(it.bundle_count),
+                                 it.terrain_type && TERRAIN_GROUP_LABELS[it.terrain_type],
+                                 it.chapter && `فصل ${it.chapter}`]
+                                  .filter(Boolean).join(" · ")}
+                          </td>
+                          <td className={`nums-fa px-2 py-1 tabular-nums ${it.unit_price < 0 ? "text-red-600" : ""}`} dir="ltr">
+                            {it.unit_price < 0 ? "−" : ""}{Math.abs(it.unit_price).toLocaleString("fa-IR")}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <p className="border-t border-slate-100 bg-slate-50 px-2 py-1 text-[10px] text-slate-400 dark:border-slate-800 dark:bg-slate-800">
+                  پیش‌نمایش {Math.min(25, parsed!.items.length).toLocaleString("fa-IR")} ردیف از {parsed!.items.length.toLocaleString("fa-IR")}
+                </p>
+              </div>
+
+              <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-slate-200 p-3 text-sm dark:border-slate-700">
+                <Switch checked={replace} onCheckedChange={setReplace} />
+                <span>
+                  جایگزینی کامل — {existingCount.toLocaleString("fa-IR")} ردیف موجود این فهرست حذف و فایل جدید جایگزین شود
+                  {existingCount === 0 ? <span className="text-slate-400"> (فعلاً فهرست خالی است)</span> : null}
+                </span>
               </label>
-              <DialogFooter>
-                <Button type="button" variant="outline" onClick={() => { setParsed(null); setFileName(""); }}>فایل دیگر</Button>
-                <Button type="button" onClick={doImport} disabled={importing} className="bg-indigo-600 hover:bg-indigo-700">
-                  {importing ? <><Loader2 className="w-4 h-4 ml-2 animate-spin" />در حال ورود...</> : `ورود ${(parsed.items.length + parsed.coefficients.length).toLocaleString("fa-IR")} ردیف`}
-                </Button>
-              </DialogFooter>
             </>
-          )}
+          ) : null}
         </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose} disabled={importing}>انصراف</Button>
+          <Button onClick={doImport} disabled={!parsed || importing || !priceListId}>
+            {importing ? <Loader2 className="ml-1 h-4 w-4 animate-spin" /> : <Upload className="ml-1 h-4 w-4" />}
+            ایمپورت {parsed ? `${parsed.items.length.toLocaleString("fa-IR")} ردیف` : ""}
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );
 }
 
-// ─── دانلود قالب استاندارد (سمت کلاینت — دو شیت + راهنما) ───
-async function downloadTemplate() {
+// ═══════════════════════════════════════════════════════════════
+// دانلود قالب استاندارد (فرمت کشوری + چند ردیف نمونه واقعی)
+// ═══════════════════════════════════════════════════════════════
+async function downloadStandardTemplate() {
   const XLSX = await import("xlsx");
-  const itemHeaders = ["ردیف", "کد", "شرح", "واحد", "دسته", "سطح ولتاژ (kV)", "تعداد مدار", "تعداد باندل", "نوع فعالیت", "روش بازدید", "نوع سازه دکل", "بهای پایه (ریال)", "بهای دشت (ریال)", "بهای تپه‌ماهور (ریال)", "بهای نیمه‌کوهستانی (ریال)", "بهای صعب‌العبور (ریال)"];
-  const itemRows = [
-    [1, "SZ-63-2C-1B", "بازدید صعودی دکل ۶۳ کیلوولت — دو مداره تک‌باندل", "دکل", "بازدید", 63, 2, 1, "بازدید", "صعودی", "", 2700000, 2700000, 3100500, 3645000, 4320000],
-    [2, "PM-230-2C-1B", "بازدید پیمایشی دکل ۲۳۰ کیلوولت — دو مداره تک‌باندل", "دکل", "بازدید", 230, 2, 1, "بازدید", "پیمایشی", "", 1606500, 1606500, 1847475, 2168775, 2570400],
-    [3, "OP-001", "تعویض مقره پلیمری روی دکل", "عدد", "تعمیرات", "", "", "", "تعمیرات", "", "", 2500000, "", "", "", ""],
-    [4, "SZ-400-2C-3B", "بازدید صعودی دکل ۴۰۰ کیلوولت — دو مداره سه‌باندل", "دکل", "بازدید", 400, 2, 3, "بازدید", "صعودی", "مشبک فلزی", 8429400, 8429400, 9693810, 11379690, 13487040],
+  const sample: (string | number)[][] = [
+    ["شماره ردیف فصل", "شرح ردیف فصل", "واحد", "بهای واحد"],
+    [20101, "بازديد پيمايشي خط 63 کيلوولت دشت و تپه ماهور تک مداره.", "برج", 955000],
+    ["", "کاهش بها بابت بازید تیر چوبی و بتنی،طبق بند 8 مقدمه فصل", "برج", -382000],
+    ["", "اضافه بها بابت انجام بازدید دو نفره ،طبق بند 9 مقدمه فصل", "برج", 859500],
+    ["", "اضافه بها بابت انجام بازدید خطوط دو باندل،طبق بند 11 مقدمه فصل", "برج", 95500],
+    [20102, "بازديد صعودي خط 63 کيلوولت دشت و تپه ماهور تک مداره.", "برج", 1432000],
+    [70103, "کشيک گروه تعميرات خطوط به ازاء هر ساعت.", "ساعت", 3709000],
+    [80101, "بازديد پهپادي خط 63 کيلوولت دشت و تپه ماهور تک‌مداره", "برج", 1607000],
+    [100101, "تعويض مقره کششي سرد 400 کيلوولت در دشت و تپه ماهور از يک تا همه مقره ها در هر زنجيره.", "زنجیره", 15847000],
+    ["", "اضافه بها بابت انجام فعالیت در مسیر نیمه کوهستانی،طبق بند 12 مقدمه فصل", "زنجیره", 7131150],
   ];
-  const coefHeaders = ["عنوان ضریب", "درصد (− کاهش / + افزایش)", "دسته", "نوع فعالیت (اختیاری)", "روش بازدید (اختیاری)", "نوع سازه دکل (اختیاری)", "سطح ولتاژ (اختیاری)", "توضیح"];
-  const coefRows = [
-    ["کاهش بها — دکل تیر چوبی", -15, "ضریب", "", "", "تیر چوبی", "", "روی همه اقلام بازدید/تعمیرات دکل تیر چوبی اعمال می‌شود"],
-    ["کاهش بها — حجم کار بیش از ۵۰ دکل", -5, "ضریب", "بازدید", "صعودی", "", "", "فقط روی بازدید صعودی اعمال می‌شود"],
-    ["افزایش بها — شرایط جوی نامساعد", 10, "ضریب", "", "", "", "", "نمونه ضریب افزایش"],
-  ];
-  const guideRows = [
-    ["راهنمای قالب استاندارد فهرست بها — Powerline Web نسخه ۴.۳.۸۶"],
+  const guide: (string | number)[][] = [
+    ["راهنمای قالب فهرست بهای کشوری"],
     [""],
-    ["۱) شیت «اقلام»: ستون الزامی فقط «شرح» و حداقل یکی از ستون‌های قیمت است؛ کدِ خالی به‌صورت خودکار ساخته می‌شود."],
-    ["۲) طبقه‌بندی: سطح ولتاژ (63/132/230/400)، تعداد مدار (1/2/4)، تعداد باندل (1 تا 4)، نوع فعالیت (بازدید/تعمیرات/عملیات)، روش بازدید (صعودی/پیمایشی — فقط برای اقلام بازدید)، نوع سازه دکل (مشبک فلزی/تیر چوبی/تلسکوپی فلزی). خالی = عمومی (همه موارد)."],
-    ["۳) قیمت‌ها: اگر ستون‌های چهارگانه زمین خالی باشند «بهای پایه» استفاده می‌شود؛ هنگام صدور صورت‌وضعیت قیمت بر اساس نوع زمین هر دکل انتخاب می‌شود."],
-    ["۴) شیت «ضرایب»: درصد مثبت = افزایش بها، منفی = کاهش بها. دامنه اعمال با ستون‌های اختیاری (نوع فعالیت/نوع سازه/ولتاژ) محدود می‌شود؛ خالی = همه اقلام."],
-    ["۵) نمونه: ضریب «تیر چوبی» فقط با پر کردن ستون «نوع سازه دکل (اختیاری)» با «تیر چوبی» روی دکل‌های چوبی اعمال می‌شود."],
-    ["۶) در برنامه: فهرست ها ← انتخاب فهرست ← «ورود از اکسل» ← همین فایل. هر دو شیت خودکار خوانده می‌شود."],
+    ["۱. فرمت فایل دقیقاً همان فهرست بهای رسمی است — نیازی به تغییر آن نیست."],
+    ["۲. ستون «شماره ردیف فصل» برای ردیف‌های اصلی پر می‌شود (مثل 20101 یا 100101)."],
+    ["۳. ردیف‌های کاهش/اضافه بها کد ندارند — سلوله خالی بماند؛ برنامه کد اختصاصی *<کد والد>-<n> می‌سازد."],
+    ["۴. طبقه‌بندی‌ها (فصل/ولتاژ/مدار/باندل/روش بازدید/نوع زمین) خودکار از متن «شرح» استخراج می‌شوند."],
+    ["۵. اگر در شرح از باندل نامی برده نشود یعنی تک‌باندل (قاعده فهرست کشوری)."],
+    ["۶. ردیف ضریب همیشه باید بلافاصله زیر ردیف اصلی خودش باشد (مثل فایل رسمی)."],
+    ["۷. قیمت‌های منفی = کاهش بها، مثبت = اضافه بها."],
   ];
-
   const wb = XLSX.utils.book_new();
-  const wsItems = XLSX.utils.aoa_to_sheet([itemHeaders, ...itemRows]);
-  const wsCoefs = XLSX.utils.aoa_to_sheet([coefHeaders, ...coefRows]);
-  const wsGuide = XLSX.utils.aoa_to_sheet(guideRows);
-  // ستون‌ها RTL نمی‌شوند در xlsx community — عرض ستون‌ها را مناسب می‌گذاریم
-  wsItems["!cols"] = [{ wch: 5 }, { wch: 14 }, { wch: 48 }, { wch: 9 }, { wch: 10 }, { wch: 14 }, { wch: 10 }, { wch: 10 }, { wch: 11 }, { wch: 11 }, { wch: 14 }, { wch: 15 }, { wch: 15 }, { wch: 16 }, { wch: 18 }, { wch: 17 }];
-  wsCoefs["!cols"] = [{ wch: 44 }, { wch: 20 }, { wch: 10 }, { wch: 18 }, { wch: 16 }, { wch: 20 }, { wch: 16 }, { wch: 46 }];
-  wsGuide["!cols"] = [{ wch: 118 }];
-  XLSX.utils.book_append_sheet(wb, wsItems, "اقلام");
-  XLSX.utils.book_append_sheet(wb, wsCoefs, "ضرایب");
-  XLSX.utils.book_append_sheet(wb, wsGuide, "راهنما");
-  XLSX.writeFile(wb, "فهرست_بها_قالب_استاندارد.xlsx");
+  const ws = XLSX.utils.aoa_to_sheet(sample);
+  ws["!cols"] = [{ wch: 16 }, { wch: 80 }, { wch: 10 }, { wch: 14 }];
+  ws["!rtl"] = true;
+  XLSX.utils.book_append_sheet(wb, ws, "Main");
+  const wg = XLSX.utils.aoa_to_sheet(guide);
+  wg["!cols"] = [{ wch: 100 }];
+  wg["!rtl"] = true;
+  XLSX.utils.book_append_sheet(wb, wg, "راهنما");
+  XLSX.writeFile(wb, "فهرست_بها_کشوری_قالب_استاندارد.xlsx");
 }
-
-export { fmt as formatPrice };
-

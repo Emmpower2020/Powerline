@@ -111,7 +111,7 @@ function invalidateAllCache(): void {
 // و هرگز به هاست نمی‌رسند. با آپلود بک‌اند جدید، شبیه‌ساز خودش غیرفعال می‌شود.
 // v4.3.86: نسخهٔ بستهٔ فعلی ۴.۳.۸۶ است؛ شبیه‌ساز کاربران/نقش‌ها به نسخهٔ
 // اختصاصی خودش (۴.۳.۸۵) گره خورد تا با هاست ۴.۳.۸۵ خاموش بماند.
-const SIM_VERSION = [4, 3, 86];
+const SIM_VERSION = [4, 3, 87];
 const SIM_USERS_VERSION = [4, 3, 85];
 let upstreamVersionCache: number[] | null = null;
 
@@ -472,6 +472,9 @@ const simPriceItemDeleted = new Set<number>();
 let simPriceItemNextId = 900001;
 const simInspectionsCreated: any[] = [];
 let simInspectionNextId = 910001;
+const simPriceListsCreated: any[] = [];
+const simPriceListPatches = new Map<number, Record<string, any>>();
+let simPriceListNextId = 930001;
 const simInvoicesCreated: any[] = [];
 const simInvoiceItemsStore = new Map<number, any[]>();
 let simInvoiceNextId = 920001;
@@ -510,7 +513,77 @@ function simIsActive(it: any): boolean {
   return st === "active" || st === "1" || st === 1 || Number(it?.is_active) === 1;
 }
 
-/** منطق تطبیق قلم فهرست بها — قرینهٔ PHP pl_match_price_item */
+// ─── مدل فهرست بهای کشوری v4.3.87 — قرینهٔ PHP ───
+const SIM_TERRAIN_LABELS: Record<string, string> = {
+  plain: "دشت", hilly: "تپه‌ماهور", semi_mountainous: "نیمه‌کوهستانی", impassable: "صعب‌العبور",
+};
+const SIM_TERRAIN_GROUP_LABELS: Record<string, string> = {
+  plain_hilly: "دشت و تپه‌ماهور", semi_mountainous: "نیمه‌کوهستانی (جنگل)", impassable: "صعب‌العبور (باتلاقی/شالیزار)",
+};
+const SIM_METHOD_LABELS: Record<string, string> = {
+  climbing: "بازدید صعودی", patrol: "بازدید پیمایشی", drone: "بازدید پهبادی",
+};
+const SIM_COEF_KIND_LABELS: Record<string, string> = {
+  two_person: "بازدید دو نفره",
+  bundle_2: "اضافه بها خطوط دو باندل", bundle_3: "اضافه بها خطوط سه باندل", bundle_4: "اضافه بها خطوط چهار باندل",
+  double_insulator: "مقره دوبل",
+  terrain_semi_mountainous: "اضافه بها مسیر نیمه‌کوهستانی", terrain_impassable: "اضافه بها مسیر صعب‌العبور و باتلاقی",
+  tower_wooden_concrete: "کاهش بها تیر چوبی و بتنی", tower_telescopic: "کاهش بها دکل تلسکوپی", tower_h_pole: "کاهش بها پایه H",
+};
+
+/** گروه زمین کشوری از زمین دکل: plain| hilly → plain_hilly */
+function simTerrainGroup(t: any): string | null {
+  if (!t) return null;
+  if (t === "plain" || t === "hilly" || t === "plain_hilly") return "plain_hilly";
+  if (t === "semi_mountainous") return "semi_mountainous";
+  if (t === "impassable") return "impassable";
+  return null;
+}
+
+/** آیا ضریبِ سازه برای این نوع دکل صدق می‌کند؟ (قرینهٔ PHP) */
+function simStructureMatches(kind: string, structure: string | null | undefined): boolean {
+  if (!structure) return false;
+  const s = String(structure).trim();
+  if (kind === "tower_wooden_concrete") return s.includes("چوبی") || s.includes("بتنی");
+  if (kind === "tower_telescopic") return s.includes("تلسکوپی");
+  if (kind === "tower_h_pole") return s === "H" || s === "h" || s.includes("پایه H") || s.includes("پایه h");
+  return false;
+}
+
+/** اعمال ضرایب فرزندِ ردیف پایه بر اساس زمینه (قرینهٔ PHP pl_apply_coefficients) */
+function simApplyCoefficients(items: any[], item: any, ctx: any) {
+  const bundles = ctx.bundle_count != null ? Number(ctx.bundle_count) : null;
+  const crewSize = Math.max(1, Number(ctx.crew_size ?? 1));
+  const structure = ctx.tower_structure || null;
+  const terrainGroup = simTerrainGroup(ctx.terrain_type);
+  const itemTerrain = simTerrainGroup(item.terrain_type);
+  const itemBundle = item.bundle_count != null ? Number(item.bundle_count) : null;
+  const coefs: any[] = [];
+  let sum = 0;
+  for (const c of items) {
+    if (String(c.item_kind) !== "coefficient" || !simIsActive(c)) continue;
+    if (String(c.parent_code ?? "") !== String(item.code)) continue;
+    const kind = String(c.coefficient_kind ?? "");
+    let apply = false;
+    if (kind === "bundle_2") apply = bundles === 2 && itemBundle !== 2;
+    else if (kind === "bundle_3") apply = bundles === 3 && itemBundle !== 3;
+    else if (kind === "bundle_4") apply = bundles === 4 && itemBundle !== 4;
+    else if (kind === "two_person") apply = crewSize >= 2;
+    else if (["tower_wooden_concrete", "tower_telescopic", "tower_h_pole"].includes(kind)) apply = simStructureMatches(kind, structure);
+    else if (kind === "terrain_semi_mountainous") apply = terrainGroup === "semi_mountainous" && itemTerrain !== "semi_mountainous";
+    else if (kind === "terrain_impassable") apply = terrainGroup === "impassable" && itemTerrain !== "impassable";
+    if (!apply) continue;
+    const amount = Number(c.unit_price ?? 0);
+    sum += amount;
+    coefs.push({
+      id: Number(c.id), code: String(c.code), title: String(c.title), kind,
+      kind_label: SIM_COEF_KIND_LABELS[kind] || "ضریب", amount,
+    });
+  }
+  return { coefficients: coefs, coefficient_amount: Math.round(sum * 100) / 100 };
+}
+
+/** منطق تطبیق ردیف پایه فهرست بهای کشوری — قرینهٔ PHP pl_match_price_item */
 function simMatchPriceItem(items: any[], ctx: any) {
   const num = (v: any) => (v == null || v === "" ? null : Number(v));
   const voltage = num(ctx.voltage_kv);
@@ -518,102 +591,152 @@ function simMatchPriceItem(items: any[], ctx: any) {
   const bundles = num(ctx.bundle_count);
   const activity = ctx.activity_type ?? null;
   const method = ctx.inspection_method ?? null;
-  const structure = ctx.tower_structure || null;
-  const terrain = ctx.terrain_type || null;
+  const chapter = ctx.chapter != null ? Number(ctx.chapter) : null;
+  const terrainGroup = simTerrainGroup(ctx.terrain_type);
   const isBase = (it: any) => it.item_kind !== "coefficient" && Number(it.is_coefficient) !== 1;
-  const isCoef = (it: any) => it.item_kind === "coefficient" || Number(it.is_coefficient) === 1;
+
+  // فیلترهای سخت: فقط ردیف‌های سازگار (NULL = عمومی)
   const cands = items.filter(it =>
     isBase(it) && simIsActive(it) &&
-    (activity == null || !it.activity_type || it.activity_type === activity) &&
     (method == null || !it.inspection_method || it.inspection_method === method) &&
+    (activity == null || !it.activity_type || it.activity_type === activity) &&
     (voltage == null || it.voltage_kv == null || Number(it.voltage_kv) === voltage) &&
     (circuits == null || it.circuit_count == null || Number(it.circuit_count) === circuits) &&
-    (bundles == null || it.bundle_count == null || Number(it.bundle_count) === bundles) &&
-    (structure == null || !it.tower_structure || it.tower_structure === structure) &&
-    (terrain == null || !it.terrain_type || it.terrain_type === terrain));
+    (chapter == null || it.chapter == null || Number(it.chapter) === chapter));
   if (!cands.length) return null;
-  const score = (it: any) => (it.voltage_kv != null ? 32 : 0) + (it.circuit_count != null ? 16 : 0) +
-    (it.bundle_count != null ? 8 : 0) + (it.tower_structure ? 4 : 0) + (it.activity_type ? 2 : 0) +
-    (it.inspection_method ? 1.5 : 0) + (it.terrain_type ? 1 : 0);
-  cands.sort((a, b) => score(b) - score(a) || Number(a.id) - Number(b.id));
+
+  // امتیازدهی — دقیق‌ترین تطابق اول (قرینهٔ ORDER BY در PHP)
+  const terrainScore = (it: any) => {
+    const tg = simTerrainGroup(it.terrain_type);
+    if (tg && tg === terrainGroup) return 3;
+    if (!it.terrain_type) return 2;
+    return 1; // ردیف گروه دیگر → پایه + ضریب زمین
+  };
+  const bundleScore = (it: any) => {
+    if (it.bundle_count != null && bundles != null && Number(it.bundle_count) === bundles) return 3;
+    if (it.bundle_count != null && Number(it.bundle_count) === 1) return 2;
+    if (it.bundle_count == null) return 1;
+    return 0;
+  };
+  const score = (it: any) =>
+    (it.inspection_method && it.inspection_method === method ? 1000 : 0) +
+    (it.activity_type && it.activity_type === activity ? 300 : 0) +
+    (it.voltage_kv != null && Number(it.voltage_kv) === voltage ? 100 : 0) +
+    (it.circuit_count != null && Number(it.circuit_count) === circuits ? 40 : 0) +
+    terrainScore(it) * 8 + bundleScore(it) * 2 +
+    (it.inspection_method ? 4 : 0) + (it.activity_type ? 2 : 0) +
+    (it.voltage_kv != null ? 1.5 : 0) + (it.circuit_count != null ? 1 : 0) + (it.terrain_type ? 0.5 : 0);
+  cands.sort((a, b) => score(b) - score(a) || Number(a.sort_order ?? a.id) - Number(b.sort_order ?? b.id) || Number(a.id) - Number(b.id));
   const item = cands[0];
-  const terrainCol = terrain ? TERRAIN_PRICE_COLS[terrain] : undefined;
-  let base: number | null = null;
-  if (item.terrain_type && item.terrain_type === terrain && Number(item.unit_price) > 0) base = Number(item.unit_price);
-  else if (terrainCol && item[terrainCol] != null && Number(item[terrainCol]) > 0) base = Number(item[terrainCol]);
-  else if (Number(item.unit_price) > 0) base = Number(item.unit_price);
-  const coefs = items.filter(it => isCoef(it) && simIsActive(it) &&
-    (it.voltage_kv == null || voltage == null || Number(it.voltage_kv) === voltage) &&
-    (!it.activity_type || activity == null || it.activity_type === activity) &&
-    (!it.inspection_method || method == null || it.inspection_method === method) &&
-    (!it.tower_structure || structure == null || it.tower_structure === structure) &&
-    (!it.terrain_type || terrain == null || it.terrain_type === terrain));
-  const percent = coefs.reduce((s, c) => s + Number(c.coefficient_percent || 0), 0);
+
+  const base = Number(item.unit_price ?? 0);
+  const applied = simApplyCoefficients(items, item, ctx);
+  const final = Math.round((base + applied.coefficient_amount) * 100) / 100;
   return {
     item,
     base_unit_price: base,
-    coefficients: coefs.map(c => ({ id: Number(c.id), title: c.title, percent: Number(c.coefficient_percent || 0) })),
-    coefficient_percent: percent,
-    unit_price: base == null ? null : Math.round(base * (1 + percent / 100) * 100) / 100,
+    coefficients: applied.coefficients,
+    coefficient_amount: applied.coefficient_amount,
+    coefficient_percent: base > 0 && applied.coefficient_amount !== 0 ? Math.round(applied.coefficient_amount * 100 / base * 100) / 100 : 0,
+    unit_price: final,
+    terrain_group: terrainGroup,
+    terrain_label: SIM_TERRAIN_GROUP_LABELS[terrainGroup ?? ""] || "همه زمین‌ها",
   };
 }
 
-const SIM_TERRAIN_LABELS: Record<string, string> = {
-  plain: "دشت", hilly: "تپه‌ماهور", semi_mountainous: "نیمه‌کوهستانی", impassable: "صعب‌العبور",
-};
-const TERRAIN_PRICE_COLS: Record<string, string> = {
-  plain: "unit_price_plain", hilly: "unit_price_hilly",
-  semi_mountainous: "unit_price_semi_mountainous", impassable: "unit_price_impassable",
-};
-const SIM_ACTIVITY_LABELS: Record<string, string> = {
-  inspection: "بازدید", repair: "تعمیرات", operation: "عملیات",
-};
-const SIM_METHOD_LABELS: Record<string, string> = {
-  climbing: "بازدید صعودی", patrol: "بازدید پیمایشی",
-};
+/** شبیه‌ساز فهرست‌ها: ساخت/ویرایش محلی + merge در لیست (تا آپلود بک‌اند 4.3.87) */
+async function simulatePriceListsRequest(method: string, path: string, search: string, bodyText: string, authHeader: string): Promise<Response | null> {
+  const body: any = (() => { try { return bodyText ? JSON.parse(bodyText) : {}; } catch { return {}; } })();
+  // GET — merge هاست + محلی
+  if (method === "GET" && path === "/price-lists") {
+    const host = await simFetchHost(`${path}${search}`, authHeader);
+    const hostRows: any[] = Array.isArray(host?.data) ? host.data : [];
+    const merged = [...simPriceListsCreated, ...hostRows.map((l: any) => ({ ...l, ...(simPriceListPatches.get(Number(l.id)) ?? {}) }))];
+    return simJson({ success: true, data: merged });
+  }
+  // POST — ساخت محلی
+  if (method === "POST" && path === "/price-lists") {
+    if (!body.name) return simJson({ success: false, error: { code: 400, message: "نام فهرست الزامی است" } }, 400);
+    const id = simPriceListNextId++;
+    simPriceListsCreated.unshift({
+      id, name: String(body.name), version: body.version ?? "1.0",
+      effective_date: body.effective_date || new Date().toISOString().slice(0, 10),
+      contract_id: body.contract_id ? Number(body.contract_id) : null,
+      is_active: 1, status: "active",
+      created_at: new Date().toISOString().slice(0, 19).replace("T", " "),
+    });
+    console.log(`[DEV SIM] فهرست بها محلی ساخته شد #${id} ${body.name}`);
+    return simJson({ success: true, message: "فهرست بها ایجاد شد (شبیه‌ساز توسعه)", data: { id } }, 201);
+  }
+  // PUT — پچ محلی یا هاست
+  const putM = /^\/price-lists\/(\d+)$/.exec(path);
+  if (method === "PUT" && putM) {
+    const id = Number(putM[1]);
+    const idx = simPriceListsCreated.findIndex(l => Number(l.id) === id);
+    if (idx >= 0) simPriceListsCreated[idx] = { ...simPriceListsCreated[idx], ...body, id };
+    else simPriceListPatches.set(id, { ...(simPriceListPatches.get(id) ?? {}), ...body });
+    return simJson({ success: true, message: "فهرست بها ویرایش شد (شبیه‌ساز توسعه)", data: null });
+  }
+  return null; // DELETE و سایر متدها → هاست
+}
 
 async function simulatePriceListRequest(method: string, path: string, search: string, bodyText: string, authHeader: string): Promise<Response> {
   const body: any = (() => { try { return bodyText ? JSON.parse(bodyText) : {}; } catch { return {}; } })();
   const params = new URLSearchParams(search);
 
-  // GET — لیست اقلام (merge هاست + محلی) با فیلترهای طبقه‌بندی
+  // GET — لیست اقلام (merge هاست + محلی) با فیلترهای طبقه‌بندی کشوری
   if (method === "GET" && path === "/price-list-items") {
     const all = await simMergedPriceItems(authHeader);
     const listId = Number(params.get("list_id") || 0);
-    const fActivity = params.get("activity_type");
-    const fMethod = params.get("inspection_method");
-    const fKind = params.get("item_kind");
-    const fCoef = params.get("coefficient");
-    const fVoltage = params.get("voltage_kv");
     const isCoefRow = (i: any) => i.item_kind === "coefficient" || Number(i.is_coefficient) === 1;
     let rows = listId ? all.filter(i => Number(i.price_list_id) === listId) : all;
+    const fActivity = params.get("activity_type");
     if (fActivity) rows = rows.filter(i => (i.activity_type || "") === fActivity);
+    const fMethod = params.get("inspection_method");
     if (fMethod) rows = rows.filter(i => (i.inspection_method || "") === fMethod);
-    if (fKind === "coefficient" || fKind === "base") rows = rows.filter(i => (fKind === "coefficient") === isCoefRow(i));
+    const fKind = params.get("item_kind");
+    if (fKind === "coefficient") rows = rows.filter(isCoefRow);
+    else if (fKind === "base") rows = rows.filter(i => !isCoefRow(i));
+    const fCoef = params.get("coefficient");
     if (fCoef === "1") rows = rows.filter(isCoefRow);
     else if (fCoef === "0") rows = rows.filter(i => !isCoefRow(i));
+    const fVoltage = params.get("voltage_kv");
     if (fVoltage) rows = fVoltage === "general" ? rows.filter(i => i.voltage_kv == null) : rows.filter(i => Number(i.voltage_kv) === Number(fVoltage));
-    rows.sort((a, b) => (Number(isCoefRow(a)) - Number(isCoefRow(b))) || (Number(a.id) - Number(b.id)));
+    const fChapter = params.get("chapter");
+    if (fChapter) rows = rows.filter(i => Number(i.chapter) === Number(fChapter));
+    const fCoefKind = params.get("coefficient_kind");
+    if (fCoefKind) rows = rows.filter(i => (i.coefficient_kind || "") === fCoefKind);
+    const fParent = params.get("parent_code");
+    if (fParent) rows = rows.filter(i => String(i.parent_code ?? "") === fParent);
+    const fTerrain = params.get("terrain_type");
+    if (fTerrain) rows = fTerrain === "general" ? rows.filter(i => i.terrain_type == null) : rows.filter(i => i.terrain_type === fTerrain);
+    const q = params.get("search");
+    if (q) {
+      const needle = q.toLowerCase();
+      rows = rows.filter(i => `${i.code} ${i.title} ${i.category ?? ""} ${i.parent_code ?? ""}`.toLowerCase().includes(needle));
+    }
+    // ترتیب فایل رسمی: ردیف اصلی و بعد ضرایبش
+    rows.sort((a, b) => Number(a.sort_order ?? a.id) - Number(b.sort_order ?? b.id) || Number(a.id) - Number(b.id));
     return simJson({ success: true, data: rows });
   }
 
-  // POST — قلم جدید (با فیلدهای طبقه‌بندی)
+  // POST — ردیف جدید (با فیلدهای طبقه‌بندی کشوری)
   if (method === "POST" && path === "/price-list-items") {
     const id = simPriceItemNextId++;
     const code = body.code || ("PL-" + String(id % 10000).padStart(4, "0"));
     simPriceItemsCreated.push({
       id, price_list_id: Number(body.price_list_id), code, title: body.title,
-      unit: body.unit || "دکل", unit_price: Number(body.unit_price || 0), category: body.category || "عملیات",
+      unit: body.unit || (body.item_kind === "coefficient" ? "ضریب" : "برج"),
+      unit_price: Number(body.unit_price || 0), category: body.category || "",
       item_kind: body.item_kind === "coefficient" ? "coefficient" : "base",
+      chapter: body.chapter ?? null, parent_code: body.parent_code ?? null,
+      coefficient_kind: body.coefficient_kind ?? null, sort_order: body.sort_order ?? null,
       activity_type: body.activity_type ?? null, inspection_method: body.inspection_method ?? null,
       voltage_kv: body.voltage_kv ?? null, circuit_count: body.circuit_count ?? null, bundle_count: body.bundle_count ?? null,
-      tower_structure: body.tower_structure ?? null, terrain_type: body.terrain_type ?? null,
-      unit_price_plain: body.unit_price_plain ?? null, unit_price_hilly: body.unit_price_hilly ?? null,
-      unit_price_semi_mountainous: body.unit_price_semi_mountainous ?? null, unit_price_impassable: body.unit_price_impassable ?? null,
-      coefficient_percent: body.coefficient_percent ?? null,
+      terrain_type: body.terrain_type ?? null, tower_structure: body.tower_structure ?? null,
       status: "active",
     });
-    console.log(`[DEV SIM] قلم فهرست ساخته شد #${id} ${code}`);
+    console.log(`[DEV SIM] ردیف فهرست ساخته شد #${id} ${code}`);
     return simJson({ success: true, message: "قلم ایجاد شد (شبیه‌ساز توسعه)", data: { id, code } }, 201);
   }
 
@@ -628,10 +751,17 @@ async function simulatePriceListRequest(method: string, path: string, search: st
     return simJson({ success: true, message: "قلم فهرست بها ویرایش شد (شبیه‌ساز توسعه)", data: null });
   }
 
-  // DELETE
+  // DELETE — حذف ردیف + ضرایب فرزندش
   const delMatch = /^\/price-list-items\/(\d+)$/.exec(path);
   if (method === "DELETE" && delMatch) {
     const id = Number(delMatch[1]);
+    const all = await simMergedPriceItems(authHeader);
+    const row = all.find(i => Number(i.id) === id);
+    if (row?.code) {
+      for (const c of all) {
+        if (String(c.parent_code ?? "") === String(row.code)) simPriceItemDeleted.add(Number(c.id));
+      }
+    }
     simPriceItemDeleted.add(id);
     simPriceItemPatches.delete(id);
     const idx = simPriceItemsCreated.findIndex(i => Number(i.id) === id);
@@ -639,7 +769,7 @@ async function simulatePriceListRequest(method: string, path: string, search: st
     return simJson({ success: true, message: "قلم حذف شد (شبیه‌ساز توسعه)", data: null });
   }
 
-  // POST import — ایمپورت گروهی
+  // POST import — ایمپورت گروهی فهرست کشوری (اقلام پارس‌شده از فرمت استاندارد)
   if (method === "POST" && path === "/price-list-items/import") {
     const items: any[] = Array.isArray(body.items) ? body.items : [];
     if (!body.price_list_id || !items.length) return simJson({ success: false, error: { code: 400, message: "فهرست و اقلام الزامی است" } }, 400);
@@ -653,38 +783,41 @@ async function simulatePriceListRequest(method: string, path: string, search: st
       const id = simPriceItemNextId++;
       const isCoefIt = it.item_kind === "coefficient" || !!it.is_coefficient;
       simPriceItemsCreated.push({
-        id, price_list_id: Number(body.price_list_id), code: it.code || ("PL-" + String(id % 10000).padStart(4, "0")),
-        title: it.title, unit: it.unit || "دکل", unit_price: Number(it.unit_price || 0), category: it.category || "عملیات",
+        id, price_list_id: Number(body.price_list_id),
+        code: it.code || ("PL-" + String(id % 10000).padStart(4, "0")),
+        title: it.title,
+        unit: it.unit || (isCoefIt ? "ضریب" : "برج"),
+        unit_price: Number(it.unit_price || 0), category: it.category || "",
         item_kind: isCoefIt ? "coefficient" : "base",
+        chapter: it.chapter ?? null, parent_code: it.parent_code ?? null,
+        coefficient_kind: it.coefficient_kind ?? null, sort_order: it.sort_order ?? null,
         activity_type: it.activity_type ?? null, inspection_method: it.inspection_method ?? null,
         voltage_kv: it.voltage_kv ?? null, circuit_count: it.circuit_count ?? null, bundle_count: it.bundle_count ?? null,
-        tower_structure: it.tower_structure ?? null, terrain_type: it.terrain_type ?? null,
-        unit_price_plain: it.unit_price_plain ?? null, unit_price_hilly: it.unit_price_hilly ?? null,
-        unit_price_semi_mountainous: it.unit_price_semi_mountainous ?? null, unit_price_impassable: it.unit_price_impassable ?? null,
-        coefficient_percent: it.coefficient_percent ?? null,
+        terrain_type: it.terrain_type ?? null, tower_structure: it.tower_structure ?? null,
         status: "active",
       });
       if (isCoefIt) coefs++; else normal++;
     }
-    console.log(`[DEV SIM] ایمپورت فهرست بها: ${normal} قلم + ${coefs} ضریب`);
-    return simJson({ success: true, message: `ایمپورت انجام شد (شبیه‌ساز توسعه) — ${normal} قلم و ${coefs} ضریب`, data: { imported_items: normal, imported_coefficients: coefs } }, 201);
+    console.log(`[DEV SIM] ایمپورت فهرست کشوری: ${normal} ردیف اصلی + ${coefs} ضریب`);
+    return simJson({ success: true, message: `ایمپورت انجام شد (شبیه‌ساز توسعه) — ${normal} ردیف اصلی و ${coefs} ضریب`, data: { imported_items: normal, imported_coefficients: coefs } }, 201);
   }
 
-  // GET match — تطبیق قلم با خط/دکل/نوع بازدید
+  // GET match — تطبیق ردیف با خط/دکل/روش بازدید (زمین از دکل)
   if (method === "GET" && path === "/price-list-items/match") {
     const lineId = Number(params.get("line_id") || 0);
     const towerId = Number(params.get("tower_id") || 0);
     const methodRaw = params.get("inspection_method") || params.get("inspection_type") || "climbing";
-    const methodMap: Record<string, string> = { "صعودی": "climbing", "پیمایشی": "patrol", climbing: "climbing", patrol: "patrol" };
+    const methodMap: Record<string, string> = { "صعودی": "climbing", "پیمایشی": "patrol", "پهبادی": "drone", "پهپادی": "drone", climbing: "climbing", patrol: "patrol", drone: "drone" };
     const method = methodMap[methodRaw] || methodRaw;
     const terrainOverride = params.get("terrain_type") || null;
+    const crewSize = Number(params.get("crew_size") || 1);
     let priceListId = Number(params.get("price_list_id") || 0);
     const items = await simMergedPriceItems(authHeader);
     if (!priceListId) {
       const lists = await simFetchHost("/price-lists", authHeader);
       const arr: any[] = Array.isArray(lists?.data) ? lists.data : [];
       const active = arr.filter(l => simIsActive(l));
-      priceListId = active.length ? Number(active[0].id) : (arr.length ? Number(arr[0].id) : 0);
+      priceListId = active.length ? Number(active[active.length - 1].id) : (arr.length ? Number(arr[0].id) : 0);
     }
     const scoped = items.filter(i => Number(i.price_list_id) === priceListId);
     let line: any = null, tower: any = null;
@@ -697,17 +830,19 @@ async function simulatePriceListRequest(method: string, path: string, search: st
       const tArr: any[] = Array.isArray(towers?.data) ? towers.data : (towers?.data?.data || []);
       tower = tArr.find(t => Number(t.id) === towerId) || null;
       if (!tower && !lineId) {
-        // جستجو در همه دکل‌ها به‌صورت صفحه‌ای محدود — کافی برای تست
         const all = await simFetchHost(`/towers?page=1&page_size=2000`, authHeader);
         tower = (Array.isArray(all?.data) ? all.data : (all?.data?.data || [])).find((t: any) => Number(t.id) === towerId) || null;
       }
     }
     const structure = tower?.tower_structure || line?.tower_structure || null;
-    const terrain = terrainOverride || tower?.terrain_type || "plain";
+    // v4.3.87: زمین از موقعیت دکل (اولویت)
+    const terrain = tower?.terrain_type || terrainOverride || "plain";
+    const chapter = method === "drone" ? 8 : 2;
     const match = simMatchPriceItem(scoped, {
       price_list_id: priceListId,
       voltage_kv: line?.voltage_kv ?? null, circuit_count: line?.circuit_count ?? null, bundle_count: line?.bundle_count ?? null,
-      activity_type: "inspection", inspection_method: method, tower_structure: structure, terrain_type: terrain,
+      activity_type: "inspection", inspection_method: method, tower_structure: structure,
+      terrain_type: terrain, crew_size: crewSize, chapter,
     });
     return simJson({
       success: true,
@@ -716,8 +851,10 @@ async function simulatePriceListRequest(method: string, path: string, search: st
         terrain_label: SIM_TERRAIN_LABELS[terrain] || terrain, tower_structure: structure,
         matched: match ? {
           item_id: Number(match.item.id), code: match.item.code, title: match.item.title, unit: match.item.unit,
+          chapter: match.item.chapter ?? null,
           base_unit_price: match.base_unit_price, coefficients: match.coefficients,
-          coefficient_percent: match.coefficient_percent, unit_price: match.unit_price,
+          coefficient_amount: match.coefficient_amount, unit_price: match.unit_price,
+          terrain_label: match.terrain_label,
         } : null,
       },
     });
@@ -726,7 +863,7 @@ async function simulatePriceListRequest(method: string, path: string, search: st
   return simJson({ success: false, error: { code: 404, message: `مسیر شبیه‌ساز پشتیبانی نمی‌شود: ${method} ${path}` } }, 404);
 }
 
-/** شبیه‌ساز بازدیدها: ساخت محلی (با نوع بازدید/خط/دکل/زمین) + merge در لیست */
+/** شبیه‌ساز بازدیدها: ساخت محلی (با نوع بازدید/خط/دکل/زمین/نفرات) + merge در لیست */
 async function simulateInspectionsRequest(method: string, path: string, bodyText: string, authHeader: string): Promise<Response | null> {
   if (method === "POST" && path === "/inspections") {
     const body: any = (() => { try { return JSON.parse(bodyText || "{}"); } catch { return {}; } })();
@@ -757,6 +894,7 @@ async function simulateInspectionsRequest(method: string, path: string, bodyText
       contract_title: contractTitle, inspector_name: "کاربر آزمایشی",
       inspection_date: body.inspection_date || new Date().toISOString().slice(0, 10),
       inspection_method: body.inspection_method || body.inspection_type || "climbing", terrain_type: body.terrain_type || null,
+      crew_size: Math.max(1, Number(body.crew_size ?? 1)),
       status: "submitted", priority: body.priority || "routine", weather: body.weather || null, notes: body.notes || null,
       activity_status: "active", district_id: body.district_id ? Number(body.district_id) : null, district_name: null,
       created_at: new Date().toISOString().slice(0, 19).replace("T", " "),
@@ -768,12 +906,12 @@ async function simulateInspectionsRequest(method: string, path: string, bodyText
   return null;
 }
 
-/** شبیه‌ساز صورت‌وضعیت: کاندیدها + صدور + اقلام */
+/** شبیه‌ساز صورت‌وضعیت: کاندیدها + صدور (با ردیف‌های ضریب مجزا) + اقلام */
 async function simulateInvoicesRequest(method: string, path: string, search: string, bodyText: string, authHeader: string): Promise<Response | null> {
   const body: any = (() => { try { return bodyText ? JSON.parse(bodyText) : {}; } catch { return {}; } })();
   const params = new URLSearchParams(search);
 
-  // کاندیدهای دوره — بازدیدهای submitted/approved هاست + محلی
+  // کاندیدهای دوره — بازدیدهای submitted/approved هاست + محلی (زمین از دکل)
   if (method === "GET" && path === "/invoices/candidates") {
     const contractId = Number(params.get("contract_id") || 0);
     const periodStart = params.get("period_start") || "";
@@ -785,19 +923,16 @@ async function simulateInvoicesRequest(method: string, path: string, search: str
       const lists = await simFetchHost("/price-lists", authHeader);
       const arr: any[] = Array.isArray(lists?.data) ? lists.data : [];
       const active = arr.filter(l => simIsActive(l));
-      priceListId = active.length ? Number(active[0].id) : (arr.length ? Number(arr[0].id) : 0);
+      priceListId = active.length ? Number(active[active.length - 1].id) : (arr.length ? Number(arr[0].id) : 0);
     }
     const scoped = items.filter(i => Number(i.price_list_id) === priceListId);
 
-    // خطوط و قرارداد از هاست
     const linesJson = await simFetchHost(`/lines?page=1&page_size=500`, authHeader);
     const lines: any[] = Array.isArray(linesJson?.data) ? linesJson.data : (linesJson?.data?.data || []);
-    // بازدیدها: هاست + محلی
     const inspJson = await simFetchHost(`/inspections?page=1&page_size=1000`, authHeader);
     let hostInsp: any[] = Array.isArray(inspJson?.data) ? inspJson.data : (inspJson?.data?.data || []);
     const allInsp = [...hostInsp.filter(i => !simInspectionsCreated.some(s => Number(s.id) === Number(i.id))), ...simInspectionsCreated];
 
-    // دکل‌ها برای زمین/سازه — فقط خطوطِ بازدیدهای کاندید
     const towerCache = new Map<number, any[]>();
     const loadTowers = async (lineId: number) => {
       if (!towerCache.has(lineId)) {
@@ -817,32 +952,38 @@ async function simulateInvoicesRequest(method: string, path: string, search: str
       const towers = ins.line_id ? await loadTowers(Number(ins.line_id)) : [];
       const tower = towers.find(t => Number(t.id) === Number(ins.tower_id)) || null;
       const method = ins.inspection_method || ins.inspection_type || "climbing";
-      const terrain = ins.terrain_type || tower?.terrain_type || "plain";
+      // v4.3.87: زمین از دکل (اولویت) — سپس بازدید
+      const terrain = tower?.terrain_type || ins.terrain_type || "plain";
       const structure = tower?.tower_structure || line?.tower_structure || null;
+      const crewSize = Math.max(1, Number(ins.crew_size ?? 1));
+      const chapter = method === "drone" ? 8 : 2;
       const match = simMatchPriceItem(scoped, {
         price_list_id: priceListId,
         voltage_kv: line?.voltage_kv ?? null, circuit_count: line?.circuit_count ?? null, bundle_count: line?.bundle_count ?? null,
-        activity_type: "inspection", inspection_method: method, tower_structure: structure, terrain_type: terrain,
+        activity_type: "inspection", inspection_method: method, tower_structure: structure,
+        terrain_type: terrain, crew_size: crewSize, chapter,
       });
       out.push({
         inspection_id: Number(ins.id), inspection_code: ins.inspection_code, inspection_date: ins.inspection_date,
         line_code: ins.line_code || line?.line_code || null, line_name: line?.name || null,
         tower_code: ins.tower_code || tower?.tower_code || null,
-        activity_type: "inspection", inspection_method: method,
+        activity_type: "inspection", inspection_method: method, chapter,
         terrain_type: terrain, terrain_label: SIM_TERRAIN_LABELS[terrain] || terrain,
-        tower_structure: structure,
+        tower_structure: structure, crew_size: crewSize,
         voltage_kv: line?.voltage_kv ?? null, circuit_count: line?.circuit_count ?? null, bundle_count: line?.bundle_count ?? null,
         matched: match ? {
           item_id: Number(match.item.id), code: match.item.code, title: match.item.title, unit: match.item.unit,
+          chapter: match.item.chapter ?? null,
           base_unit_price: match.base_unit_price, coefficients: match.coefficients,
-          coefficient_percent: match.coefficient_percent, unit_price: match.unit_price,
+          coefficient_amount: match.coefficient_amount, unit_price: match.unit_price,
+          terrain_label: match.terrain_label,
         } : null,
       });
     }
     return simJson({ success: true, data: { price_list_id: priceListId, items: out } });
   }
 
-  // صدور صورت‌وضعیت — محاسبهٔ محلی (قرینهٔ PHP)
+  // صدور صورت‌وضعیت — محاسبهٔ محلی (قرینهٔ PHP؛ ضرایب ردیف مستقل می‌گیرند)
   if (method === "POST" && path === "/invoices/generate") {
     const contractId = Number(body.contract_id || 0);
     const itemsBody: any[] = Array.isArray(body.items) ? body.items : [];
@@ -853,7 +994,7 @@ async function simulateInvoicesRequest(method: string, path: string, search: str
       const lists = await simFetchHost("/price-lists", authHeader);
       const arr: any[] = Array.isArray(lists?.data) ? lists.data : [];
       const active = arr.filter(l => simIsActive(l));
-      priceListId = active.length ? Number(active[0].id) : (arr.length ? Number(arr[0].id) : 0);
+      priceListId = active.length ? Number(active[active.length - 1].id) : (arr.length ? Number(arr[0].id) : 0);
     }
     const scoped = items.filter(i => Number(i.price_list_id) === priceListId);
     const linesJson = await simFetchHost(`/lines?page=1&page_size=500`, authHeader);
@@ -874,61 +1015,99 @@ async function simulateInvoicesRequest(method: string, path: string, search: str
       return towerCache.get(lineId) || [];
     };
 
+    /** افزودن ردیف پایه + ردیف‌های ضریب (هر ضریب یک ردیف مستقل — مثل فهرست کشوری) */
+    const pushEntry = (match: any, quantity: number, inspectionId: any, workOrderId: any, context: string, terrain: any, structure: any) => {
+      const item = match.item;
+      const base = Number(match.base_unit_price ?? 0);
+      const unit = item.unit || "عدد";
+      const desc = `${item.title}${context ? ` — ${context}` : ""} [${item.code}]`;
+      const lineBase = Math.round(base * quantity * 100) / 100;
+      sumBase += lineBase; sumNet += lineBase;
+      linesOut.push({
+        inspection_id: inspectionId, work_order_id: workOrderId, price_list_item_id: Number(item.id), pli_code: item.code,
+        description: desc, unit, quantity, unit_price: base, total_price: lineBase,
+        base_amount: lineBase, coefficient_percent: null, coefficient_amount: 0,
+        terrain_type: terrain, tower_structure: structure,
+      });
+      for (const coef of match.coefficients) {
+        const amount = Number(coef.amount);
+        const lineCoef = Math.round(amount * quantity * 100) / 100;
+        sumCoef += lineCoef; sumNet += lineCoef;
+        linesOut.push({
+          inspection_id: inspectionId, work_order_id: workOrderId, price_list_item_id: Number(coef.id), pli_code: coef.code,
+          description: `${coef.title}${context ? ` — ${context}` : ""} [${coef.code}]`,
+          unit, quantity, unit_price: amount, total_price: lineCoef,
+          base_amount: 0, coefficient_percent: null, coefficient_amount: lineCoef,
+          terrain_type: terrain, tower_structure: structure,
+        });
+      }
+    };
+
     const linesOut: any[] = [];
     let sumBase = 0, sumCoef = 0, sumNet = 0;
     for (const it of itemsBody) {
+      if (!it || typeof it !== "object") continue;
       const quantity = Math.max(0.001, Number(it.quantity ?? 1));
-      let base = 0, pct = 0, desc = "", unit = "دکل", pliCode: string | null = null, inspectionId: any = null, workOrderId: any = null, pliId: any = null, terrain: any = null, structure: any = null;
+      let workOrderId: any = it.work_order_id ? Number(it.work_order_id) : null;
       if (it.inspection_id) {
-        inspectionId = Number(it.inspection_id);
+        const inspectionId = Number(it.inspection_id);
         const ins = allInsp.find(x => Number(x.id) === inspectionId);
         if (!ins) return simJson({ success: false, error: { code: 404, message: `بازدید #${inspectionId} پیدا نشد` } }, 404);
         const line = lines.find(l => Number(l.id) === Number(ins.line_id)) || null;
         const towers = ins.line_id ? await loadTowers(Number(ins.line_id)) : [];
         const tower = towers.find(t => Number(t.id) === Number(ins.tower_id)) || null;
         const method = ins.inspection_method || ins.inspection_type || "climbing";
-        terrain = ins.terrain_type || tower?.terrain_type || "plain";
-        structure = tower?.tower_structure || line?.tower_structure || null;
+        const terrain = tower?.terrain_type || ins.terrain_type || "plain";
+        const structure = tower?.tower_structure || line?.tower_structure || null;
+        const crewSize = Math.max(1, Number(ins.crew_size ?? 1));
+        const chapter = method === "drone" ? 8 : 2;
         const match = simMatchPriceItem(scoped, {
           price_list_id: priceListId, voltage_kv: line?.voltage_kv ?? null, circuit_count: line?.circuit_count ?? null,
           bundle_count: line?.bundle_count ?? null, activity_type: "inspection", inspection_method: method,
-          tower_structure: structure, terrain_type: terrain,
+          tower_structure: structure, terrain_type: terrain, crew_size: crewSize, chapter,
         });
-        if (!match || match.unit_price == null) return simJson({ success: false, error: { code: 422, message: `برای بازدید ${ins.inspection_code} قلم مناسبی در فهرست بها یافت نشد` } }, 422);
-        base = match.base_unit_price ?? 0; pct = match.coefficient_percent; pliId = Number(match.item.id); pliCode = match.item.code;
-        unit = match.item.unit || "دکل";
-        const actLabel = SIM_METHOD_LABELS[method] || "بازدید";
-        desc = `${actLabel} دکل ${ins.tower_code || "—"} — خط ${ins.line_code || line?.line_code || "—"} — ${SIM_TERRAIN_LABELS[terrain] || terrain}${structure ? ` — ${structure}` : ""} [${pliCode}]`;
+        if (!match || match.unit_price == null) return simJson({ success: false, error: { code: 422, message: `برای بازدید ${ins.inspection_code} ردیف مناسبی در فهرست بها یافت نشد (${SIM_METHOD_LABELS[method] || method} / ${SIM_TERRAIN_LABELS[terrain] || terrain})` } }, 422);
+        const context = `دکل ${ins.tower_code || "—"} — خط ${ins.line_code || line?.line_code || "—"} — ${SIM_TERRAIN_LABELS[terrain] || terrain}${structure ? ` — ${structure}` : ""}`;
+        pushEntry(match, quantity, inspectionId, workOrderId, context, terrain, structure);
       } else if (it.price_list_item_id) {
         const pli = scoped.find(p => Number(p.id) === Number(it.price_list_item_id));
         if (!pli) return simJson({ success: false, error: { code: 404, message: "قلم فهرست بها پیدا نشد" } }, 404);
-        pliId = Number(pli.id); pliCode = pli.code; unit = pli.unit || "عدد";
-        terrain = it.terrain_type || null; structure = it.tower_structure || null;
-        const terrainCol = terrain ? TERRAIN_PRICE_COLS[terrain] : undefined;
-        if (terrainCol && pli[terrainCol] != null && Number(pli[terrainCol]) > 0) base = Number(pli[terrainCol]);
-        else base = Number(pli.unit_price || 0);
-        const coefs = scoped.filter(c => (c.item_kind === "coefficient" || Number(c.is_coefficient) === 1) && simIsActive(c) &&
-          (c.voltage_kv == null || pli.voltage_kv == null || Number(c.voltage_kv) === Number(pli.voltage_kv)) &&
-          (!c.activity_type || c.activity_type === pli.activity_type) &&
-          (!c.inspection_method || c.inspection_method === pli.inspection_method) &&
-          (!c.tower_structure || c.tower_structure === structure) &&
-          (!c.terrain_type || c.terrain_type === terrain));
-        pct = coefs.reduce((s, c) => s + Number(c.coefficient_percent || 0), 0);
-        desc = `${pli.title}${it.work_order_id ? ` — دستورکار #${it.work_order_id}` : ""} [${pli.code}]`;
-        if (it.work_order_id) workOrderId = Number(it.work_order_id);
+        if (String(pli.item_kind) === "coefficient") return simJson({ success: false, error: { code: 400, message: `ردیف‌های ضریب به‌تنهایی قابل انتخاب نیستند (${pli.code})` } }, 400);
+        // زمینه: دکل → خط؛ یا خط مستقیم؛ یا مقدار صریح
+        let line: any = null, tower: any = null, structure: any = null, terrain: any = null, crewSize = Math.max(1, Number(it.crew_size ?? 1));
+        if (it.tower_id) {
+          const allT = await simFetchHost(`/towers?page=1&page_size=2000`, authHeader);
+          tower = (Array.isArray(allT?.data) ? allT.data : (allT?.data?.data || [])).find((x: any) => Number(x.id) === Number(it.tower_id)) || null;
+          if (tower?.line_id) line = lines.find(l => Number(l.id) === Number(tower.line_id)) || null;
+          structure = tower?.tower_structure || null;
+          terrain = tower?.terrain_type || null;
+        } else if (it.line_id) {
+          line = lines.find(l => Number(l.id) === Number(it.line_id)) || null;
+          structure = line?.tower_structure || null;
+        }
+        if (it.terrain_type) terrain = it.terrain_type || terrain;
+        if (it.tower_structure) structure = it.tower_structure || structure;
+        const match = {
+          item: pli,
+          base_unit_price: Number(pli.unit_price ?? 0),
+          coefficients: [] as any[],
+          coefficient_amount: 0,
+        };
+        const applied = simApplyCoefficients(scoped, pli, {
+          bundle_count: line?.bundle_count ?? null, crew_size: crewSize,
+          tower_structure: structure, terrain_type: terrain,
+        });
+        match.coefficients = applied.coefficients;
+        match.coefficient_amount = applied.coefficient_amount;
+        let context = "";
+        if (line) context += `خط ${line.line_code || "—"}`;
+        if (tower) context += `${context ? " — " : ""}دکل ${tower.tower_code || "—"}`;
+        if (terrain) context += `${context ? " — " : ""}${SIM_TERRAIN_LABELS[terrain] || ""}`;
+        if (workOrderId) context += `${context ? " — " : ""}دستورکار #${workOrderId}`;
+        pushEntry(match, quantity, null, workOrderId, context, terrain, structure);
       } else {
         continue;
       }
-      const lineBase = Math.round(base * quantity * 100) / 100;
-      const lineCoef = Math.round(lineBase * pct / 100 * 100) / 100;
-      const lineTotal = lineBase + lineCoef;
-      sumBase += lineBase; sumCoef += lineCoef; sumNet += lineTotal;
-      linesOut.push({
-        inspection_id: inspectionId, work_order_id: workOrderId, price_list_item_id: pliId, pli_code: pliCode,
-        description: desc, unit, quantity, unit_price: base, total_price: lineTotal,
-        base_amount: lineBase, coefficient_percent: pct, coefficient_amount: lineCoef,
-        terrain_type: terrain, tower_structure: structure,
-      });
     }
     if (!linesOut.length) return simJson({ success: false, error: { code: 400, message: "هیچ قلم معتبری یافت نشد" } }, 400);
     const taxPercent = Number(body.tax_percent ?? 10);
@@ -953,7 +1132,7 @@ async function simulateInvoicesRequest(method: string, path: string, search: str
     };
     simInvoicesCreated.unshift(invoice);
     simInvoiceItemsStore.set(invoiceId, linesOut);
-    console.log(`[DEV SIM] صورت‌وضعیت محلی صادر شد #${invoiceId} ${code} — ${linesOut.length} قلم`);
+    console.log(`[DEV SIM] صورت‌وضعیت محلی صادر شد #${invoiceId} ${code} — ${linesOut.length} ردیف (پایه + ضرایب)`);
     return simJson({
       success: true, message: "صورت‌وضعیت صادر شد (شبیه‌ساز توسعه)",
       data: {
@@ -1047,11 +1226,11 @@ async function handleRequest(request: NextRequest) {
   if (DEV_MODE && isGet && path === "/backend-version") {
     const upstream = await upstreamBackendVersion();
     if (!upstream.length || !versionAtLeast(upstream, SIM_VERSION)) {
-      console.log(`[DEV SIM] backend-version هاست ${upstream.join(".") || "?"} قدیمی است — نسخهٔ بستهٔ 4.3.86 گزارش شد`);
+      console.log(`[DEV SIM] backend-version هاست ${upstream.join(".") || "?"} قدیمی است — نسخهٔ بستهٔ 4.3.87 گزارش شد`);
       return NextResponse.json({
         success: true,
         message: "نسخه بک‌اند",
-        data: { version: "v4.3.86", component: "Powerline PHP Backend (dev-sim)" },
+        data: { version: "v4.3.87", component: "Powerline PHP Backend (dev-sim)" },
       });
     }
   }
@@ -1073,17 +1252,18 @@ async function handleRequest(request: NextRequest) {
     }
   }
 
-  // v4.3.86 (فقط توسعه): شبیه‌ساز فهرست بها + بازدید + صورت‌وضعیت — تا آپلود
-  // بک‌اند ۴.۳.۸۶ روی هاست و اجرای SQL جدید، این مسیرها محلی پاسخ داده می‌شوند.
-  // گیت: قابلیت price-list-import در backend-version هاست اعلام نشده باشد
+  // v4.3.87 (فقط توسعه): شبیه‌ساز فهرست بهای کشوری + بازدید + صورت‌وضعیت — تا آپلود
+  // بک‌اند ۴.۳.۸۷ روی هاست و اجرای SQL جدید، این مسیرها محلی پاسخ داده می‌شوند.
+  // گیت: قابلیت boq-standard-import در backend-version هاست اعلام نشده باشد
   // (هاست ممکن است شماره نسخهٔ مشابه را خودش گزارش داده باشد — قابلیت‌ها معیارند)
   if (DEV_MODE && (
     path.startsWith("/price-list-items") ||
+    path.startsWith("/price-lists") ||
     path === "/invoices/candidates" || path === "/invoices/generate" ||
     /^\/invoices\/\d+\/items$/.test(path) ||
     path === "/inspections" || path === "/invoices"
   )) {
-    const hasFeature = await hostHasFeature("price-list-import");
+    const hasFeature = await hostHasFeature("boq-standard-import");
     if (!hasFeature) {
       const simAuth = request.headers.get("authorization") || "";
       // بازدیدها: GET = پاسخ هاست + بازدیدهای محلی / POST = ساخت محلی
@@ -1110,6 +1290,11 @@ async function handleRequest(request: NextRequest) {
           ? { ...host.pagination, total: (Number(host.pagination.total) || 0) + simInvoicesCreated.length }
           : { page: 1, page_size: 500, total: merged.length, total_pages: 1, has_next: false, has_prev: false };
         return simJson({ success: true, data: merged, pagination: pag });
+      }
+      // فهرست‌ها: نوشتن محلی + merge در خواندن (بک‌اند هاست در نوشتن status می‌نویسد که نیست)
+      if (path.startsWith("/price-lists")) {
+        const plSim = await simulatePriceListsRequest(request.method, path, search, bodyText ?? "", simAuth);
+        if (plSim) return plSim;
       }
       // اقلام فهرست بها — کامل محلی (overlay روی اقلام هاست)
       if (path.startsWith("/price-list-items")) {

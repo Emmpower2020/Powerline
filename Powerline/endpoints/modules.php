@@ -5,15 +5,27 @@
  */
 
 // ═══════════════════════════════════════════════════════════════
-// v4.3.86 — فهرست بها: توابع مشترک طبقه‌بندی، قیمت زمین و ضرایب
+// v4.3.87 — فهرست بهای کشوری (فرمت استاندارد) — توابع مشترک
 //   مورد استفاده: price-list-items (CRUD/ایمپورت/تطبیق) و
-//   invoices (کاندیدهای دوره / تولید صورت‌وضعیت)
+//   invoices (کاندیدهای دوره / صدور صورت‌وضعیت)
 //
-//   واژگان کلیدی (هم‌نام با ستون‌های موجود دیتابیس):
-//     item_kind         : base = قلم عادی | coefficient = ردیف ضریب
-//     activity_type     : inspection = بازدید | repair = تعمیرات | operation = عملیات
-//     inspection_method : climbing = صعودی | patrol = پیمایشی
-//     terrain_type      : plain / hilly / semi_mountainous / impassable
+//   واژگان کلیدی (هم‌نام با ستون‌های دیتابیس):
+//     item_kind         : base = ردیف اصلی | coefficient = ردیف ضریب کاهش/افزایش بها
+//     code              : کد ملی؛ ردیف‌های ضریب کد ملی ندارند و «کد اختصاصی»
+//                         به شکل *<کد والد>-<n> می‌گیرند (مثل *20101-1)
+//     parent_code       : کد ردیف والد (برای ضرایب)
+//     chapter           : 2 نگهداری | 7 کشیک و فراخوان | 8 بازدید پهبادی | 10 تعمیرات
+//     activity_type     : inspection = بازدید | repair = تعمیرات | operation = عملیات | service = خدمات فنی
+//     inspection_method : climbing = صعودی | patrol = پیمایشی | drone = پهبادی
+//     terrain_type (اقلام) : plain_hilly = دشت و تپه‌ماهور | semi_mountainous = نیمه‌کوهستانی/جنگل
+//                           | impassable = صعب‌العبور/باتلاقی/شالیزار
+//     terrain_type (دکل)   : plain | hilly | semi_mountainous | impassable
+//                            (plain و hilly هنگام تطبیق به گروه plain_hilly می‌روند)
+//     coefficient_kind  : two_person | bundle_2 | bundle_3 | bundle_4 |
+//                         double_insulator | terrain_semi_mountainous |
+//                         terrain_impassable | tower_wooden_concrete |
+//                         tower_telescopic | tower_h_pole
+//     ضرایب «مبلغی» هستند (unit_price منفی = کاهش بها، مثبت = اضافه بها)
 // ═══════════════════════════════════════════════════════════════
 
 /** نگاشت عنوان فارسی/انگلیسی نوع فعالیت به کلید استاندارد (خالی = عمومی) */
@@ -21,44 +33,76 @@ function pl_normalize_activity_type($v): ?string
 {
     if ($v === null || $v === '') return null;
     $map = [
-        'inspection' => 'inspection', 'repair' => 'repair', 'operation' => 'operation',
-        'بازدید' => 'inspection', 'بازديدي' => 'inspection',
+        'inspection' => 'inspection', 'repair' => 'repair', 'operation' => 'operation', 'service' => 'service',
+        'بازدید' => 'inspection', 'بازديدي' => 'inspection', 'بازدیدی' => 'inspection',
         'تعمیرات' => 'repair', 'تعميرات' => 'repair',
         'عملیات' => 'operation', 'عمليات' => 'operation',
+        'خدمات' => 'service', 'خدمات فنی' => 'service',
     ];
     $k = trim(mb_strtolower((string)$v, 'UTF-8'));
     return $map[$k] ?? $map[trim((string)$v)] ?? null;
 }
 
-/** نگاشت روش بازدید: climbing = صعودی | patrol = پیمایشی (خالی = عمومی) */
+/** نگاشت روش بازدید: climbing = صعودی | patrol = پیمایشی | drone = پهبادی (خالی = عمومی) */
 function pl_normalize_inspection_method($v): ?string
 {
     if ($v === null || $v === '') return null;
     $map = [
-        'climbing' => 'climbing', 'patrol' => 'patrol',
-        'صعودی' => 'climbing', 'بازدید صعودی' => 'climbing', 'بازدیدصعودی' => 'climbing',
-        'پیمایشی' => 'patrol', 'بازدید پیمایشی' => 'patrol', 'بازدیدپیمایشی' => 'patrol',
+        'climbing' => 'climbing', 'patrol' => 'patrol', 'drone' => 'drone',
+        'صعودی' => 'climbing', 'بازدید صعودی' => 'climbing', 'بازدیدصعودی' => 'climbing', 'صعودي' => 'climbing',
+        'پیمایشی' => 'patrol', 'بازدید پیمایشی' => 'patrol', 'بازدیدپیمایشی' => 'patrol', 'پيمايشي' => 'patrol',
+        'پهبادی' => 'drone', 'بازدید پهبادی' => 'drone', 'پهپادی' => 'drone', 'پهپاد' => 'drone',
     ];
     $k = trim(mb_strtolower((string)$v, 'UTF-8'));
     return $map[$k] ?? $map[trim((string)$v)] ?? null;
 }
 
-/** نگاشت عنوان فارسی/انگلیسی نوع زمین به کلید استاندارد (خالی = نامشخص) */
+/** نگاشت نوع زمین دکل: plain / hilly / semi_mountainous / impassable */
 function pl_normalize_terrain($v): ?string
 {
     if ($v === null || $v === '') return null;
     $map = [
         'plain' => 'plain', 'hilly' => 'hilly', 'semi_mountainous' => 'semi_mountainous', 'impassable' => 'impassable',
         'دشت' => 'plain',
-        'تپه ماهور' => 'hilly', 'تپه‌ماهور' => 'hilly',
-        'نیمه کوهستانی' => 'semi_mountainous', 'نیمه‌کوهستانی' => 'semi_mountainous',
-        'صعب العبور' => 'impassable', 'صعب‌العبور' => 'impassable',
+        'تپه ماهور' => 'hilly', 'تپه‌ماهور' => 'hilly', 'تپه‌ماور' => 'hilly',
+        'نیمه کوهستانی' => 'semi_mountainous', 'نیمه‌کوهستانی' => 'semi_mountainous', 'نیمه كوهستانی' => 'semi_mountainous',
+        'صعب العبور' => 'impassable', 'صعب‌العبور' => 'impassable', 'صعب العبور و باتلاقی' => 'impassable',
         'کوهستانی' => 'impassable',
     ];
     return $map[trim((string)$v)] ?? null;
 }
 
-/** عنوان فارسی نوع زمین */
+/**
+ * نگاشت نوع زمین «اقلام فهرست بها» — گروه‌بندی کشوری سه‌گانه:
+ *   plain_hilly = دشت و تپه‌ماهور | semi_mountainous = نیمه‌کوهستانی/جنگل | impassable = صعب‌العبور/باتلاقی
+ * (مقادیر قدیمی plain/hilly دکل به plain_hilly نگاشت می‌شوند)
+ */
+function pl_normalize_item_terrain($v): ?string
+{
+    if ($v === null || $v === '') return null;
+    $map = [
+        'plain_hilly' => 'plain_hilly', 'semi_mountainous' => 'semi_mountainous', 'impassable' => 'impassable',
+        'دشت و تپه ماهور' => 'plain_hilly', 'دشت و تپه‌ماهور' => 'plain_hilly', 'دشت و تپه ماور' => 'plain_hilly',
+        'دشت' => 'plain_hilly', 'تپه‌ماهور' => 'plain_hilly', 'تپه ماهور' => 'plain_hilly',
+        'plain' => 'plain_hilly', 'hilly' => 'plain_hilly',
+        'نیمه کوهستانی' => 'semi_mountainous', 'نیمه‌کوهستانی' => 'semi_mountainous', 'نیمه‌كوهستانی' => 'semi_mountainous',
+        'نیمه کوهستانی یا جنگل' => 'semi_mountainous',
+        'صعب العبور' => 'impassable', 'صعب‌العبور' => 'impassable',
+        'صعب العبور، باتلاقی یا شالیزار' => 'impassable', 'باتلاقی' => 'impassable', 'شالیزار' => 'impassable',
+    ];
+    return $map[trim((string)$v)] ?? null;
+}
+
+/** گروه زمین کشوری از زمین دکل: plain| hilly → plain_hilly */
+function pl_terrain_group($towerTerrain): ?string
+{
+    $t = pl_normalize_terrain($towerTerrain);
+    if ($t === null) return pl_normalize_item_terrain($towerTerrain); // قبول مستقیم گروه کشوری
+    if ($t === 'plain' || $t === 'hilly') return 'plain_hilly';
+    return $t;
+}
+
+/** عنوان فارسی نوع زمین دکل */
 function pl_terrain_label(?string $t): string
 {
     switch ($t) {
@@ -70,16 +114,84 @@ function pl_terrain_label(?string $t): string
     return 'نامشخص';
 }
 
-/** نام ستون قیمت بر اساس نوع زمین */
-function pl_terrain_price_column(?string $terrain): ?string
+/** عنوان فارسی گروه زمین کشوری (اقلام فهرست بها) */
+function pl_terrain_group_label(?string $g): string
 {
-    switch ($terrain) {
-        case 'plain': return 'unit_price_plain';
-        case 'hilly': return 'unit_price_hilly';
-        case 'semi_mountainous': return 'unit_price_semi_mountainous';
-        case 'impassable': return 'unit_price_impassable';
+    switch ($g) {
+        case 'plain_hilly': return 'دشت و تپه‌ماهور';
+        case 'semi_mountainous': return 'نیمه‌کوهستانی (جنگل)';
+        case 'impassable': return 'صعب‌العبور (باتلاقی/شالیزار)';
     }
+    return 'همه زمین‌ها';
+}
+
+/** عنوان فارسی فصل فهرست بها */
+function pl_chapter_label($c): string
+{
+    switch ((int)$c) {
+        case 2: return 'فصل ۲ — نگهداری';
+        case 7: return 'فصل ۷ — کشیک و فراخوان';
+        case 8: return 'فصل ۸ — بازدید پهبادی';
+        case 10: return 'فصل ۱۰ — تعمیرات';
+    }
+    return '—';
+}
+
+/** فصل فهرست از کد ملی: 20101→2 | 70103→7 | 80101→8 | 100101/101001→10 | *1010001→10 */
+function pl_chapter_from_code($code): ?int
+{
+    $c = ltrim(trim((string)$code), '*');
+    if ($c === '') return null;
+    if (preg_match('/^10\d{4,}$/', $c)) return 10;
+    if (preg_match('/^2\d{4}$/', $c)) return 2;
+    if (preg_match('/^7\d{4}$/', $c)) return 7;
+    if (preg_match('/^8\d{4}$/', $c)) return 8;
     return null;
+}
+
+/** نگاشت/نرمال‌سازی نوع ضریب */
+function pl_coefficient_kind_normalize($v): ?string
+{
+    if ($v === null || $v === '') return null;
+    $map = [
+        'two_person' => 'two_person', 'بازدید دو نفره' => 'two_person', 'دو نفره' => 'two_person',
+        'bundle_2' => 'bundle_2', 'دو باندل' => 'bundle_2', 'خطوط دو باندل' => 'bundle_2',
+        'bundle_3' => 'bundle_3', 'سه باندل' => 'bundle_3', 'خطوط سه باندل' => 'bundle_3',
+        'bundle_4' => 'bundle_4', 'چهار باندل' => 'bundle_4',
+        'double_insulator' => 'double_insulator', 'مقره دوبل' => 'double_insulator',
+        'terrain_semi_mountainous' => 'terrain_semi_mountainous', 'مسیر نیمه کوهستانی' => 'terrain_semi_mountainous',
+        'terrain_impassable' => 'terrain_impassable', 'مسیر صعب العبور' => 'terrain_impassable',
+        'tower_wooden_concrete' => 'tower_wooden_concrete', 'تیر چوبی و بتنی' => 'tower_wooden_concrete', 'تیر چوبی' => 'tower_wooden_concrete',
+        'tower_telescopic' => 'tower_telescopic', 'دکل تلسکوپی' => 'tower_telescopic', 'تلسکوپی' => 'tower_telescopic',
+        'tower_h_pole' => 'tower_h_pole', 'پایه H' => 'tower_h_pole', 'پایه h' => 'tower_h_pole',
+    ];
+    $k = trim(mb_strtolower((string)$v, 'UTF-8'));
+    return $map[$k] ?? $map[trim((string)$v)] ?? null;
+}
+
+/** عنوان فارسی نوع ضریب */
+function pl_coefficient_kind_label($k): string
+{
+    $map = [
+        'two_person' => 'بازدید دو نفره',
+        'bundle_2' => 'اضافه بها خطوط دو باندل',
+        'bundle_3' => 'اضافه بها خطوط سه باندل',
+        'bundle_4' => 'اضافه بها خطوط چهار باندل',
+        'double_insulator' => 'مقره دوبل',
+        'terrain_semi_mountainous' => 'اضافه بها مسیر نیمه‌کوهستانی',
+        'terrain_impassable' => 'اضافه بها مسیر صعب‌العبور و باتلاقی',
+        'tower_wooden_concrete' => 'کاهش بها تیر چوبی و بتنی',
+        'tower_telescopic' => 'کاهش بها دکل تلسکوپی',
+        'tower_h_pole' => 'کاهش بها پایه H',
+    ];
+    return $map[$k] ?? 'ضریب';
+}
+
+/** پاک‌سازی کد قلم (حفظ * ابتدای کدهای اختصاصی) */
+function pl_clean_code($v): ?string
+{
+    $s = trim((string)($v ?? ''));
+    return ($s === '') ? null : $s;
 }
 
 /** عدد امن — null/خالی/غیرعددی → null (پشتیبانی از ارقام فارسی و ٪) */
@@ -96,7 +208,6 @@ function pl_num_or_null($v)
 /**
  * شرط «فعال» سازگار با هر دو ساختار ستون وضعیت:
  *   varchar ('active') یا عددی (1) + ستون اختیاری is_active
- * دیتابیس‌های مختلف (قدیمی/جدید) بدون خطا و بدون تطبیق اشتباه پوشش داده می‌شوند.
  */
 function pl_active_condition(PDO $pdo, string $table): string
 {
@@ -130,44 +241,141 @@ function pl_active_status_value(PDO $pdo, string $table)
     return 'active';
 }
 
-/** نرمال‌سازی payload قلم فهرست بها (فرم/ایمپورت) — کلیدهای طبقه‌بندی v4.3.86 */
+/**
+ * نرمال‌سازی payload قلم فهرست بها (فرم/ایمپورت) — مدل کشوری v4.3.87
+ * هر کلید فقط اگر ستونش در دیتابیس موجود باشد در INSERT/UPDATE استفاده می‌شود.
+ */
 function pl_item_payload(array $body): array
 {
-    $structure = trim((string)($body['tower_structure'] ?? ''));
     // item_kind: coefficient صریح یا کلید قدیمی is_coefficient
     $kind = strtolower(trim((string)($body['item_kind'] ?? '')));
     if ($kind !== 'coefficient' && !empty($body['is_coefficient'])) $kind = 'coefficient';
     if ($kind !== 'coefficient') $kind = 'base';
+
+    $chapter = pl_num_or_null($body['chapter'] ?? null);
+    if ($chapter === null && !empty($body['code'])) {
+        $fromCode = pl_chapter_from_code((string)$body['code']);
+        if ($fromCode !== null) $chapter = $fromCode;
+    }
+
+    $structure = trim((string)($body['tower_structure'] ?? ''));
+    if ($structure === '' || $structure === 'همه' || $structure === 'general') $structure = null;
+
     return [
-        'item_kind'                 => $kind,
-        'activity_type'             => pl_normalize_activity_type($body['activity_type'] ?? null),
-        'inspection_method'         => pl_normalize_inspection_method($body['inspection_method'] ?? null),
-        'voltage_kv'                => pl_num_or_null($body['voltage_kv'] ?? null),
-        'circuit_count'             => pl_num_or_null($body['circuit_count'] ?? null),
-        'bundle_count'              => pl_num_or_null($body['bundle_count'] ?? null),
-        'terrain_type'              => pl_normalize_terrain($body['terrain_type'] ?? null),
-        'tower_structure'           => ($structure === '' || $structure === 'همه' || $structure === 'general') ? null : $structure,
-        'unit_price_plain'          => pl_num_or_null($body['unit_price_plain'] ?? null),
-        'unit_price_hilly'          => pl_num_or_null($body['unit_price_hilly'] ?? null),
-        'unit_price_semi_mountainous' => pl_num_or_null($body['unit_price_semi_mountainous'] ?? null),
-        'unit_price_impassable'     => pl_num_or_null($body['unit_price_impassable'] ?? null),
-        'coefficient_percent'       => pl_num_or_null($body['coefficient_percent'] ?? null),
+        'item_kind'         => $kind,
+        'chapter'           => $chapter !== null ? (int)$chapter : null,
+        'parent_code'       => pl_clean_code($body['parent_code'] ?? null),
+        'coefficient_kind'  => $kind === 'coefficient'
+            ? (pl_coefficient_kind_normalize($body['coefficient_kind'] ?? null) ?? 'other')
+            : null,
+        'sort_order'        => pl_num_or_null($body['sort_order'] ?? null),
+        'activity_type'     => pl_normalize_activity_type($body['activity_type'] ?? null),
+        'inspection_method' => pl_normalize_inspection_method($body['inspection_method'] ?? null),
+        'voltage_kv'        => pl_num_or_null($body['voltage_kv'] ?? null),
+        'circuit_count'     => pl_num_or_null($body['circuit_count'] ?? null),
+        'bundle_count'      => pl_num_or_null($body['bundle_count'] ?? null),
+        'terrain_type'      => pl_normalize_item_terrain($body['terrain_type'] ?? null),
+        'tower_structure'   => $structure,
     ];
 }
 
-/** آیا ستون‌های فهرست بها نسخه ۴.۳.۸۶ موجودند؟ (پیام راهنما در نبود مهاجرت) */
-function pl_require_v4386(string $table = 'price_list_items'): void
+/** آیا ستون‌های فهرست بهای کشوری موجودند؟ (پیام راهنما در نبود مهاجرت) */
+function pl_require_boq(string $table = 'price_list_items'): void
 {
-    if (!Helpers::columnExists($table, 'item_kind') && !Helpers::columnExists($table, 'coefficient_percent')) {
-        Response::error(409, "ستون‌های فهرست بها هنوز اضافه نشده‌اند.\n\nفایل Powerline_v4.3.86_PriceList_Invoices.sql را در phpMyAdmin اجرا کنید و دوباره تلاش کنید.");
+    if (!Helpers::columnExists($table, 'item_kind')) {
+        Response::error(409, "ستون‌های طبقه‌بندی فهرست بها هنوز اضافه نشده‌اند.\n\nفایل Powerline_v4.3.87_NationalBOQ.sql را در phpMyAdmin اجرا کنید و دوباره تلاش کنید.");
     }
 }
 
 /**
- * تطبیق بهترین قلم فهرست بها با مشخصات خط/دکل/بازدید + جمع ضرایب
- * ctx: price_list_id, activity_type, inspection_method, voltage_kv,
- *      circuit_count, bundle_count, tower_structure, terrain_type
- * خروجی: ['item','base_unit_price','coefficients','coefficient_percent','unit_price']
+ * اعمال ضرایب فرزندِ یک ردیف پایه بر اساس زمینه (خط/دکل/بازدید)
+ * ctx: bundle_count, crew_size, tower_structure, terrain_type (زمین دکل)
+ * خروجی: ['coefficients'=>[...], 'coefficient_amount'=>float]
+ */
+function pl_apply_coefficients(PDO $pdo, int $listId, array $item, array $ctx): array
+{
+    $bundles   = pl_num_or_null($ctx['bundle_count'] ?? null);
+    $crewSize  = (int)($ctx['crew_size'] ?? 1);
+    if ($crewSize < 1) $crewSize = 1;
+    $structure = trim((string)($ctx['tower_structure'] ?? ''));
+    if ($structure === '' || $structure === 'همه') $structure = null;
+    $terrainGroup = pl_terrain_group($ctx['terrain_type'] ?? null);
+    $itemTerrain = pl_normalize_item_terrain($item['terrain_type'] ?? null);
+    $active = pl_active_condition($pdo, 'price_list_items');
+
+    $coefs = [];
+    $sumAmount = 0.0;
+    $cStmt = $pdo->prepare("SELECT * FROM price_list_items WHERE price_list_id = ? AND parent_code = ?"
+        . " AND item_kind = 'coefficient' AND $active ORDER BY COALESCE(sort_order, id) ASC, id ASC");
+    $cStmt->execute([$listId, (string)$item['code']]);
+    foreach ($cStmt->fetchAll(PDO::FETCH_ASSOC) as $cr) {
+        $kind = (string)($cr['coefficient_kind'] ?? '');
+        $apply = false;
+        switch ($kind) {
+            case 'bundle_2': $apply = ($bundles !== null && (int)$bundles === 2 && (int)($item['bundle_count'] ?? 1) !== 2); break;
+            case 'bundle_3': $apply = ($bundles !== null && (int)$bundles === 3 && (int)($item['bundle_count'] ?? 1) !== 3); break;
+            case 'bundle_4': $apply = ($bundles !== null && (int)$bundles === 4 && (int)($item['bundle_count'] ?? 1) !== 4); break;
+            case 'two_person': $apply = ($crewSize >= 2); break;
+            case 'tower_wooden_concrete':
+            case 'tower_telescopic':
+            case 'tower_h_pole':
+                $apply = pl_structure_matches_coefficient($kind, $structure); break;
+            case 'terrain_semi_mountainous':
+                // فقط وقتی ردیف پایه برای این زمین نیست (مدل پایه + ضریب)
+                $apply = ($terrainGroup === 'semi_mountainous' && $itemTerrain !== 'semi_mountainous'); break;
+            case 'terrain_impassable':
+                $apply = ($terrainGroup === 'impassable' && $itemTerrain !== 'impassable'); break;
+            case 'double_insulator':
+            default:
+                $apply = false; // فقط دستی
+        }
+        if (!$apply) continue;
+        $amount = (float)$cr['unit_price'];
+        $sumAmount += $amount;
+        $coefs[] = [
+            'id' => (int)$cr['id'],
+            'code' => (string)$cr['code'],
+            'title' => (string)$cr['title'],
+            'kind' => $kind,
+            'kind_label' => pl_coefficient_kind_label($kind),
+            'amount' => $amount,
+        ];
+    }
+    return ['coefficients' => $coefs, 'coefficient_amount' => round($sumAmount, 2)];
+}
+
+/** آیا ضریبِ سازه برای این نوع دکل صدق می‌کند؟ */
+function pl_structure_matches_coefficient(string $kind, ?string $structure): bool
+{
+    if ($structure === null || $structure === '') return false;
+    $s = trim($structure);
+    switch ($kind) {
+        case 'tower_wooden_concrete':
+            return ($s === 'تیر چوبی' || $s === 'تیر بتنی' || $s === 'تیر چوبی و بتنی'
+                || mb_strpos($s, 'چوبی') !== false || mb_strpos($s, 'بتنی') !== false);
+        case 'tower_telescopic':
+            return (mb_strpos($s, 'تلسکوپی') !== false);
+        case 'tower_h_pole':
+            return ($s === 'H' || $s === 'h' || mb_strpos($s, 'پایه H') !== false || mb_strpos($s, 'پایه h') !== false);
+    }
+    return false;
+}
+
+/**
+ * تطبیق ردیف پایه فهرست بهای کشوری + اعمال ضرایب فرزند — v4.3.87
+ *
+ * ctx:
+ *   price_list_id, activity_type, inspection_method, voltage_kv,
+ *   circuit_count, bundle_count, terrain_type (زمین دکل: plain/hilly/semi_mountainous/impassable
+ *   یا گروه کشوری plain_hilly/...), tower_structure, crew_size (پیش‌فرض ۱), chapter?
+ *
+ * منطق:
+ *   ۱) ردیف پایه با بیشترین امتیاز تطابق (دقیق > عمومی) انتخاب می‌شود؛
+ *      زمین از «موقعیت دکل» می‌آید (plain/hilly → گروه دشت و تپه‌ماهور).
+ *   ۲) ضرایب فرزندِ همان ردیف (parent_code) بر اساس نوعشان اعمال می‌شوند:
+ *      bundle_2/3/4 (باندل خط)، two_person (تعداد نفرات بازدید)،
+ *      tower_* (نوع سازه دکل)، terrain_* (اگر ردیف پایه برای آن زمین نباشد)
+ *   ۳) خروجی: base_unit_price + مجموع مبلغ ضرایب = unit_price
  */
 function pl_match_price_item(PDO $pdo, array $ctx): ?array
 {
@@ -181,71 +389,74 @@ function pl_match_price_item(PDO $pdo, array $ctx): ?array
     $method    = pl_normalize_inspection_method($ctx['inspection_method'] ?? null);
     $structure = trim((string)($ctx['tower_structure'] ?? ''));
     if ($structure === '' || $structure === 'همه') $structure = null;
-    $terrain   = pl_normalize_terrain($ctx['terrain_type'] ?? null);
+    $crewSize = (int)($ctx['crew_size'] ?? 1);
+    if ($crewSize < 1) $crewSize = 1;
+    $terrainGroup = pl_terrain_group($ctx['terrain_type'] ?? null); // plain_hilly|semi_mountainous|impassable|null
+    $chapter = isset($ctx['chapter']) ? pl_num_or_null($ctx['chapter']) : null;
 
     $active = pl_active_condition($pdo, 'price_list_items');
+    $hasChapter = Helpers::columnExists('price_list_items', 'chapter');
 
-    // ── ۱) قلم عادی (base) با بیشترین تطابق اختصاصی ──
-    $where = "price_list_id = ? AND item_kind = 'base' AND $active";
+    // ── ۱) انتخاب ردیف پایه با امتیازدهی تطابق ──
+    $where = "price_list_id = ? AND (item_kind = 'base' OR item_kind IS NULL) AND $active";
     $params = [$listId];
+    if ($method !== null)   { $where .= ' AND (inspection_method = ? OR inspection_method IS NULL)'; $params[] = $method; }
     if ($activity !== null) { $where .= ' AND (activity_type = ? OR activity_type IS NULL)'; $params[] = $activity; }
-    if ($method   !== null) { $where .= ' AND (inspection_method = ? OR inspection_method IS NULL)'; $params[] = $method; }
-    if ($voltage  !== null) { $where .= ' AND (voltage_kv = ? OR voltage_kv IS NULL)'; $params[] = $voltage; }
+    if ($voltage !== null)  { $where .= ' AND (voltage_kv = ? OR voltage_kv IS NULL)'; $params[] = $voltage; }
     if ($circuits !== null) { $where .= ' AND (circuit_count = ? OR circuit_count IS NULL)'; $params[] = (int)$circuits; }
-    if ($bundles  !== null) { $where .= ' AND (bundle_count = ? OR bundle_count IS NULL)'; $params[] = (int)$bundles; }
-    if ($structure !== null) { $where .= ' AND (tower_structure = ? OR tower_structure IS NULL)'; $params[] = $structure; }
-    if ($terrain  !== null) { $where .= ' AND (terrain_type = ? OR terrain_type IS NULL)'; $params[] = $terrain; }
-    $order = ' ORDER BY'
-        . ' (voltage_kv IS NOT NULL) DESC,'
-        . ' (circuit_count IS NOT NULL) DESC,'
-        . ' (bundle_count IS NOT NULL) DESC,'
-        . ' (tower_structure IS NOT NULL) DESC,'
-        . ' (activity_type IS NOT NULL) DESC,'
-        . ' (inspection_method IS NOT NULL) DESC,'
-        . ' (terrain_type IS NOT NULL) DESC,'
-        . ' id ASC LIMIT 1';
+    if ($chapter !== null && $hasChapter) { $where .= ' AND (chapter = ? OR chapter IS NULL)'; $params[] = (int)$chapter; }
+
+    // مقادیر نرمال‌شده برای امتیازدهی (امن — همگی از نگاشت‌های بسته می‌آیند)
+    $m = $method !== null ? "'" . $method . "'" : "''";
+    $a = $activity !== null ? "'" . $activity . "'" : "''";
+    $v = $voltage !== null ? (float)$voltage : 'NULL';
+    $c = $circuits !== null ? (int)$circuits : 'NULL';
+    $b = $bundles !== null ? (int)$bundles : 'NULL';
+    $tg = $terrainGroup !== null ? "'" . $terrainGroup . "'" : "''";
+
+    // امتیاز زمین: ردیف مخصوص همان گروه > بدون زمین (عمومی) > ردیف گروه دیگر (پایه + ضریب زمین)
+    $terrainScore = "(CASE WHEN terrain_type = $tg THEN 3 WHEN terrain_type IS NULL THEN 2 ELSE 1 END)";
+    // امتیاز باندل: باندل دقیق (ردیف‌های ۴۰۰kV دو/سه باندل) > تک‌باندل + ضریب > عمومی
+    $bundleScore = "(CASE WHEN bundle_count = $b THEN 3 WHEN bundle_count = 1 THEN 2 WHEN bundle_count IS NULL THEN 1 ELSE 0 END)";
+
+    $order = " ORDER BY"
+        . " (inspection_method = $m) DESC,"
+        . " (activity_type = $a) DESC,"
+        . " (voltage_kv = $v) DESC,"
+        . " (circuit_count = $c) DESC,"
+        . " $terrainScore DESC,"
+        . " $bundleScore DESC,"
+        . " ((inspection_method IS NOT NULL) + (activity_type IS NOT NULL) + (voltage_kv IS NOT NULL)"
+        . "  + (circuit_count IS NOT NULL) + (terrain_type IS NOT NULL) + (bundle_count IS NOT NULL)) DESC,"
+        . " COALESCE(sort_order, id) ASC, id ASC LIMIT 1";
     $stmt = $pdo->prepare('SELECT * FROM price_list_items WHERE ' . $where . $order);
     $stmt->execute($params);
     $item = $stmt->fetch(PDO::FETCH_ASSOC);
     if (!$item) return null;
 
-    // ── ۲) قیمت واحد: قلم مخصوص همان زمین > ستون قیمت همان زمین > بهای پایه ──
-    $base = null;
-    $itemTerrain = pl_normalize_terrain($item['terrain_type'] ?? null);
-    $col = pl_terrain_price_column($terrain);
-    if ($itemTerrain !== null && $itemTerrain === $terrain && (float)$item['unit_price'] > 0) {
-        $base = (float)$item['unit_price'];
-    } elseif ($col !== null && isset($item[$col]) && $item[$col] !== null && (float)$item[$col] > 0) {
-        $base = (float)$item[$col];
-    } elseif ((float)$item['unit_price'] > 0) {
-        $base = (float)$item['unit_price'];
-    }
+    $base = (float)$item['unit_price'];
 
-    // ── ۳) ضرایب کاهش/افزایش متناسب با دامنه (کد ندارند؛ با دامنه اعمال می‌شوند) ──
-    $coefs = [];
-    $percent = 0.0;
-    $cWhere = "price_list_id = ? AND item_kind = 'coefficient' AND $active";
-    $cParams = [$listId];
-    if ($voltage   !== null) { $cWhere .= ' AND (voltage_kv IS NULL OR voltage_kv = ?)'; $cParams[] = $voltage; }
-    if ($activity  !== null) { $cWhere .= ' AND (activity_type IS NULL OR activity_type = ?)'; $cParams[] = $activity; }
-    if ($method    !== null) { $cWhere .= ' AND (inspection_method IS NULL OR inspection_method = ?)'; $cParams[] = $method; }
-    if ($structure !== null) { $cWhere .= ' AND (tower_structure IS NULL OR tower_structure = ?)'; $cParams[] = $structure; }
-    if ($terrain   !== null) { $cWhere .= ' AND (terrain_type IS NULL OR terrain_type = ?)'; $cParams[] = $terrain; }
-    $stmt = $pdo->prepare("SELECT id, title, coefficient_percent FROM price_list_items WHERE $cWhere ORDER BY id");
-    $stmt->execute($cParams);
-    foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $cRow) {
-        $p = (float)($cRow['coefficient_percent'] ?? 0);
-        $percent += $p;
-        $coefs[] = ['id' => (int)$cRow['id'], 'title' => $cRow['title'], 'percent' => $p];
-    }
-    $final = ($base === null) ? null : round($base * (1 + $percent / 100.0), 2);
+    // ── ۲) ضرایب فرزندِ همین ردیف (کد اختصاصی *<parent>-<n>) ──
+    $applied = pl_apply_coefficients($pdo, $listId, $item, [
+        'bundle_count' => $bundles,
+        'crew_size' => $crewSize,
+        'tower_structure' => $structure,
+        'terrain_type' => $terrainGroup,
+    ]);
+    $coefs = $applied['coefficients'];
+    $sumAmount = $applied['coefficient_amount'];
+
+    $final = round($base + $sumAmount, 2);
 
     return [
         'item' => $item,
         'base_unit_price' => $base,
         'coefficients' => $coefs,
-        'coefficient_percent' => $percent,
+        'coefficient_amount' => round($sumAmount, 2),
+        'coefficient_percent' => ($base > 0 && $sumAmount != 0.0) ? round($sumAmount * 100.0 / $base, 2) : 0.0,
         'unit_price' => $final,
+        'terrain_group' => $terrainGroup,
+        'terrain_label' => pl_terrain_group_label($terrainGroup),
     ];
 }
 
@@ -275,11 +486,11 @@ function registerModuleRoutes(Router $router): void
     // v4.3.70: نمایش نسخه بک‌اند برای اطمینان از آپلود درست فایل‌ها
     // (بدون نیاز به لاگین — فقط شماره نسخه برمی‌گرداند)
     $router->get('backend-version', function () {
-        // v4.3.86: features → گیت شبیه‌ساز توسعه و تشخیص قابلیت‌های موجود روی هاست
+        // v4.3.87: features → گیت شبیه‌ساز توسعه و تشخیص قابلیت‌های موجود روی هاست
         Response::success([
-            'version' => 'v4.3.86',
+            'version' => 'v4.3.87',
             'component' => 'Powerline PHP Backend',
-            'features' => ['price-list-import', 'price-list-match', 'invoice-candidates', 'invoice-generate', 'invoice-items'],
+            'features' => ['price-list-import', 'price-list-match', 'invoice-candidates', 'invoice-generate', 'invoice-items', 'boq-standard-import', 'coefficient-lines'],
         ], 'نسخه بک‌اند');
     });
 
@@ -889,11 +1100,10 @@ function registerModuleRoutes(Router $router): void
     //  بازدیدهای ارسال‌شده/تأییدشدهٔ یک قرارداد در یک دوره، همراه با
     //  قلم متناسب فهرست بها + قیمت زمین + ضرایب (محاسبهٔ سروری)
     //  params: contract_id, period_start, period_end, price_list_id?, district_id?
-    // ============================================================
     $router->get('invoices/candidates', function () {
         Auth::authenticate();
         Auth::requirePermissionSoft('financial.view');
-        pl_require_v4386();
+        pl_require_boq();
         $pdo = Database::getInstance()->getConnection();
 
         $contractId = Helpers::queryInt('contract_id');
@@ -910,6 +1120,9 @@ function registerModuleRoutes(Router $router): void
         }
         if (!$priceListId) Response::error(404, 'هیچ فهرست بهای فعالی ثبت نشده است');
 
+        $hasCrewSize = Helpers::columnExists('inspections', 'crew_size');
+        $crewSel = $hasCrewSize ? ', i.crew_size' : ', 1 AS crew_size';
+
         $where = "i.status IN ('submitted','approved') AND i.inspection_date >= ? AND i.inspection_date <= ?";
         $params = [$periodStart, $periodEnd];
         if ($contractId === null || $contractId > 0) {
@@ -919,7 +1132,7 @@ function registerModuleRoutes(Router $router): void
         $districtId = Helpers::queryInt('district_id');
         if ($districtId) { $where .= ' AND i.district_id = ?'; $params[] = $districtId; }
 
-        $stmt = $pdo->prepare("SELECT i.id, i.inspection_code, i.inspection_date, i.inspection_method, i.terrain_type AS ins_terrain,
+        $stmt = $pdo->prepare("SELECT i.id, i.inspection_code, i.inspection_date, i.inspection_method, i.terrain_type AS ins_terrain$crewSel,
                 i.line_id, i.tower_id, l.line_code, l.name AS line_name, l.voltage_kv, l.circuit_count, l.bundle_count,
                 l.tower_structure AS line_structure, t.tower_code, t.tower_structure AS tower_structure, t.terrain_type AS tower_terrain
             FROM inspections i
@@ -932,9 +1145,13 @@ function registerModuleRoutes(Router $router): void
         $out = [];
         foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
             $method = pl_normalize_inspection_method($row['inspection_method'] ?? null) ?? 'climbing';
-            $terrain = pl_normalize_terrain($row['ins_terrain'] ?? null)
-                ?? pl_normalize_terrain($row['tower_terrain'] ?? null) ?? 'plain';
+            // v4.3.87: نوع زمین از «موقعیت دکل» (خواستهٔ کاربر)؛ بازدید فقط در نبود دکل
+            $terrain = pl_normalize_terrain($row['tower_terrain'] ?? null)
+                ?? pl_normalize_terrain($row['ins_terrain'] ?? null) ?? 'plain';
             $structure = $row['tower_structure'] ?? $row['line_structure'] ?? null;
+            $chapter = $method === 'drone' ? 8 : 2; // پهبادی → فصل ۸، صعودی/پیمایشی → فصل ۲
+            $crewSize = (int)($row['crew_size'] ?? 1);
+            if ($crewSize < 1) $crewSize = 1;
             $match = pl_match_price_item($pdo, [
                 'price_list_id' => $priceListId,
                 'voltage_kv' => $row['voltage_kv'] ?? null,
@@ -944,6 +1161,8 @@ function registerModuleRoutes(Router $router): void
                 'inspection_method' => $method,
                 'tower_structure' => $structure,
                 'terrain_type' => $terrain,
+                'crew_size' => $crewSize,
+                'chapter' => $chapter,
             ]);
             $out[] = [
                 'inspection_id' => (int)$row['id'],
@@ -954,9 +1173,11 @@ function registerModuleRoutes(Router $router): void
                 'tower_code' => $row['tower_code'],
                 'activity_type' => 'inspection',
                 'inspection_method' => $method,
+                'chapter' => $chapter,
                 'terrain_type' => $terrain,
                 'terrain_label' => pl_terrain_label($terrain),
                 'tower_structure' => $structure,
+                'crew_size' => $crewSize,
                 'voltage_kv' => $row['voltage_kv'] !== null ? $row['voltage_kv'] + 0 : null,
                 'circuit_count' => $row['circuit_count'] !== null ? (int)$row['circuit_count'] : null,
                 'bundle_count' => $row['bundle_count'] !== null ? (int)$row['bundle_count'] : null,
@@ -965,10 +1186,12 @@ function registerModuleRoutes(Router $router): void
                     'code' => $match['item']['code'],
                     'title' => $match['item']['title'],
                     'unit' => $match['item']['unit'],
+                    'chapter' => isset($match['item']['chapter']) ? (int)$match['item']['chapter'] : null,
                     'base_unit_price' => $match['base_unit_price'],
                     'coefficients' => $match['coefficients'],
-                    'coefficient_percent' => $match['coefficient_percent'],
+                    'coefficient_amount' => $match['coefficient_amount'],
                     'unit_price' => $match['unit_price'],
+                    'terrain_label' => $match['terrain_label'],
                 ] : null,
             ];
         }
@@ -976,17 +1199,21 @@ function registerModuleRoutes(Router $router): void
     });
 
     // ============================================================
-    //  v4.3.86 — صدور صورت‌وضعیت از بازدیدها و تعمیرات
+    //  v4.3.87 — صدور صورت‌وضعیت از بازدیدها و تعمیرات
     //  body: { contract_id, period_start, period_end, price_list_id?, district_id?,
     //          tax_percent? (پیش‌فرض ۱۰), notes?, items: [
-    //            { inspection_id, quantity? }  یا  { price_list_item_id, quantity, work_order_id?, terrain_type?, tower_structure? }
+    //            { inspection_id, quantity?, include_coefficients? }
+    //            یا { price_list_item_id, quantity, work_order_id?, line_id?, tower_id?,
+    //                terrain_type?, tower_structure?, crew_size? }
     //          ] }
     //  قیمت‌ها همه در سرور از فهرست بها بازمحاسبه می‌شوند (قابل جعل نیستند)
+    //  هر ضریب، خودش یک ردیف مستقل در اقلام صورت‌وضعیت می‌گیرد
+    //  (مطابق فهرست بهای کشوری: کاهش/اضافه بها زیر ردیف اصلی با کد اختصاصی)
     // ============================================================
     $router->post('invoices/generate', function () {
         $user = Auth::authenticate();
         Auth::requirePermissionSoft('financial.create');
-        pl_require_v4386('invoice_items');
+        pl_require_boq('invoice_items');
         $body = Helpers::getJsonBody();
         $pdo = Database::getInstance()->getConnection();
 
@@ -1017,32 +1244,95 @@ function registerModuleRoutes(Router $router): void
         // ── بازمحاسبهٔ سروری همهٔ اقلام ──
         $lines = [];
         $sumBase = 0.0; $sumCoef = 0.0; $sumNet = 0.0;
-        $insStmt = $pdo->prepare("SELECT i.id, i.inspection_code, i.inspection_method, i.terrain_type AS ins_terrain,
-                l.line_code, l.name AS line_name, l.voltage_kv, l.circuit_count, l.bundle_count,
+        $hasInsCrew = Helpers::columnExists('inspections', 'crew_size');
+        $insStmt = $pdo->prepare("SELECT i.id, i.inspection_code, i.inspection_method, i.terrain_type AS ins_terrain"
+            . ($hasInsCrew ? ', i.crew_size' : '')
+            . ", l.line_code, l.name AS line_name, l.voltage_kv, l.circuit_count, l.bundle_count,
                 l.tower_structure AS line_structure, t.tower_code, t.tower_structure AS tower_structure, t.terrain_type AS tower_terrain
             FROM inspections i
             LEFT JOIN `lines` l ON l.id = i.line_id
             LEFT JOIN towers t ON t.id = i.tower_id
             WHERE i.id = ?");
         $itemStmt = $pdo->prepare('SELECT * FROM price_list_items WHERE id = ? AND price_list_id = ?');
+        $lineStmt = $pdo->prepare('SELECT id, line_code, name, voltage_kv, circuit_count, bundle_count, tower_structure FROM `lines` WHERE id = ?');
+        $towerStmt = $pdo->prepare('SELECT id, tower_code, tower_structure, terrain_type, line_id FROM towers WHERE id = ?');
         $woStmt = $pdo->prepare('SELECT wo_code, title FROM work_orders WHERE id = ?');
+
+        /** افزودن یک ردیف پایه + ردیف‌های ضریب آن */
+        $addEntry = function (array $match, float $quantity, ?int $inspectionId, ?int $workOrderId,
+                              ?string $contextDesc, ?string $terrain, ?string $structure) use (&$lines, &$sumBase, &$sumCoef, &$sumNet): void {
+            $item = $match['item'];
+            $base = (float)$match['base_unit_price'];
+            $unit = $item['unit'] ?: 'عدد';
+            $desc = $contextDesc !== null && $contextDesc !== ''
+                ? $item['title'] . ' — ' . $contextDesc
+                : $item['title'];
+            $desc .= ' [' . $item['code'] . ']';
+
+            $lineBase = round($base * $quantity, 2);
+            $sumBase += $lineBase;
+            $lines[] = [
+                'inspection_id' => $inspectionId,
+                'work_order_id' => $workOrderId,
+                'price_list_item_id' => (int)$item['id'],
+                'description' => $desc,
+                'unit' => $unit,
+                'quantity' => $quantity,
+                'unit_price' => $base,
+                'total_price' => $lineBase,
+                'base_amount' => $lineBase,
+                'coefficient_percent' => null,
+                'coefficient_amount' => 0.0,
+                'is_coefficient' => 0,
+                'terrain_type' => $terrain,
+                'tower_structure' => $structure,
+            ];
+            $sumNet += $lineBase;
+
+            // ردیف‌های ضریب — مستقل، مطابق فهرست کشوری (کاهش/اضافه بها)
+            foreach ($match['coefficients'] as $coef) {
+                $amount = (float)$coef['amount'];
+                $lineCoef = round($amount * $quantity, 2);
+                $sumCoef += $lineCoef;
+                $sumNet += $lineCoef;
+                $coefDesc = $coef['title'] . ($contextDesc ? ' — ' . $contextDesc : '') . ' [' . $coef['code'] . ']';
+                $lines[] = [
+                    'inspection_id' => $inspectionId,
+                    'work_order_id' => $workOrderId,
+                    'price_list_item_id' => (int)$coef['id'],
+                    'description' => $coefDesc,
+                    'unit' => $unit,
+                    'quantity' => $quantity,
+                    'unit_price' => $amount,
+                    'total_price' => $lineCoef,
+                    'base_amount' => 0.0,
+                    'coefficient_percent' => null,
+                    'coefficient_amount' => $lineCoef,
+                    'is_coefficient' => 1,
+                    'terrain_type' => $terrain,
+                    'tower_structure' => $structure,
+                ];
+            }
+        };
 
         foreach ($items as $it) {
             if (!is_array($it)) continue;
             $quantity = max(0.001, (float)($it['quantity'] ?? 1));
-            $desc = ''; $unit = ''; $matchedCode = null; $inspectionId = null; $workOrderId = null;
-            $priceListItemId = null; $base = 0.0; $pct = 0.0; $terrain = null; $structure = null;
+            $workOrderId = !empty($it['work_order_id']) ? (int)$it['work_order_id'] : null;
 
             if (!empty($it['inspection_id'])) {
-                // ── قلم بازدید: تطبیق خودکار از فهرست بها ──
+                // ── قلم بازدید: تطبیق خودکار از فهرست بها (زمین از دکل) ──
                 $inspectionId = (int)$it['inspection_id'];
                 $insStmt->execute([$inspectionId]);
                 $ins = $insStmt->fetch(PDO::FETCH_ASSOC);
                 if (!$ins) Response::error(404, "بازدید #$inspectionId پیدا نشد");
                 $method = pl_normalize_inspection_method($ins['inspection_method'] ?? null) ?? 'climbing';
-                $terrain = pl_normalize_terrain($ins['ins_terrain'] ?? null)
-                    ?? pl_normalize_terrain($ins['tower_terrain'] ?? null) ?? 'plain';
+                $terrain = pl_normalize_terrain($ins['tower_terrain'] ?? null)
+                    ?? pl_normalize_terrain($ins['ins_terrain'] ?? null) ?? 'plain';
                 $structure = $ins['tower_structure'] ?? $ins['line_structure'] ?? null;
+                $crewSize = (int)($ins['crew_size'] ?? 1);
+                if ($crewSize < 1) $crewSize = 1;
+                $chapter = $method === 'drone' ? 8 : 2;
                 $match = pl_match_price_item($pdo, [
                     'price_list_id' => $priceListId,
                     'voltage_kv' => $ins['voltage_kv'] ?? null,
@@ -1052,87 +1342,77 @@ function registerModuleRoutes(Router $router): void
                     'inspection_method' => $method,
                     'tower_structure' => $structure,
                     'terrain_type' => $terrain,
+                    'crew_size' => $crewSize,
+                    'chapter' => $chapter,
                 ]);
+                $methodLabels = ['climbing' => 'بازدید صعودی', 'patrol' => 'بازدید پیمایشی', 'drone' => 'بازدید پهبادی'];
                 if (!$match || $match['unit_price'] === null) {
-                    Response::error(422, "برای بازدید {$ins['inspection_code']} قلم مناسبی در فهرست بها یافت نشد (" . ($method === 'patrol' ? 'پیمایشی' : 'صعودی') . ' / ' . pl_terrain_label($terrain) . ')');
+                    Response::error(422, "برای بازدید {$ins['inspection_code']} ردیف مناسبی در فهرست بها یافت نشد ("
+                        . ($methodLabels[$method] ?? $method) . ' / ' . pl_terrain_label($terrain) . ')');
                 }
-                $matchedCode = $match['item']['code'];
-                $priceListItemId = (int)$match['item']['id'];
-                $unit = $match['item']['unit'] ?: 'دکل';
-                $actLabel = $method === 'patrol' ? 'بازدید پیمایشی' : 'بازدید صعودی';
-                $desc = $actLabel . ' دکل ' . ($ins['tower_code'] ?: '—') . ' — خط ' . ($ins['line_code'] ?: '—')
+                $context = 'دکل ' . ($ins['tower_code'] ?: '—') . ' — خط ' . ($ins['line_code'] ?: '—')
                     . ' — ' . pl_terrain_label($terrain)
-                    . ($structure ? " — $structure" : '')
-                    . ' [' . $matchedCode . ']';
-                $base = $match['base_unit_price']; $pct = $match['coefficient_percent'];
+                    . ($structure ? " — $structure" : '');
+                $addEntry($match, $quantity, $inspectionId, $workOrderId, $context, $terrain, $structure);
             } elseif (!empty($it['price_list_item_id'])) {
-                // ── قلم دستی (تعمیرات/عملیات) ──
+                // ── قلم دستی (تعمیرات/عملیات/خدمات) + زمینه اختیاری خط/دکل ──
                 $itemStmt->execute([(int)$it['price_list_item_id'], $priceListId]);
                 $pli = $itemStmt->fetch(PDO::FETCH_ASSOC);
                 if (!$pli) Response::error(404, 'قلم فهرست بها پیدا نشد: ' . (int)$it['price_list_item_id']);
-                $terrain = pl_normalize_terrain($it['terrain_type'] ?? null);
-                $structure = trim((string)($it['tower_structure'] ?? '')) ?: null;
-                $base = null; $col = pl_terrain_price_column($terrain);
-                $itemTerrain = pl_normalize_terrain($pli['terrain_type'] ?? null);
-                if ($itemTerrain !== null && $itemTerrain === $terrain && (float)$pli['unit_price'] > 0) {
-                    $base = (float)$pli['unit_price'];
-                } elseif ($col !== null && $pli[$col] !== null && (float)$pli[$col] > 0) {
-                    $base = (float)$pli[$col];
-                } elseif ((float)$pli['unit_price'] > 0) {
-                    $base = (float)$pli['unit_price'];
-                } else {
-                    $base = 0.0;
+                if (($pli['item_kind'] ?? 'base') === 'coefficient') {
+                    Response::error(400, 'ردیف‌های ضریب به‌تنهایی قابل انتخاب نیستند — ردیف اصلی را انتخاب کنید تا ضرایب مربوط خودکار اعمال شوند (' . $pli['code'] . ')');
                 }
-                // ضرایب فقط وقتی دامنه مشخص شده باشد (سازه/فعالیت/روش/زمین)
-                $cActive = pl_active_condition($pdo, 'price_list_items');
-                $cWhere = "price_list_id = ? AND item_kind = 'coefficient' AND $cActive";
-                $cParams = [$priceListId];
-                $activity = pl_normalize_activity_type($pli['activity_type'] ?? null);
-                $mth = pl_normalize_inspection_method($pli['inspection_method'] ?? null);
-                $voltage = pl_num_or_null($pli['voltage_kv'] ?? null);
-                if ($voltage   !== null) { $cWhere .= ' AND (voltage_kv IS NULL OR voltage_kv = ?)'; $cParams[] = $voltage; }
-                if ($activity  !== null) { $cWhere .= ' AND (activity_type IS NULL OR activity_type = ?)'; $cParams[] = $activity; }
-                if ($mth       !== null) { $cWhere .= ' AND (inspection_method IS NULL OR inspection_method = ?)'; $cParams[] = $mth; }
-                if ($structure !== null) { $cWhere .= ' AND (tower_structure IS NULL OR tower_structure = ?)'; $cParams[] = $structure; }
-                if ($terrain   !== null) { $cWhere .= ' AND (terrain_type IS NULL OR terrain_type = ?)'; $cParams[] = $terrain; }
-                $cs = $pdo->prepare("SELECT title, coefficient_percent FROM price_list_items WHERE $cWhere ORDER BY id");
-                $cs->execute($cParams);
-                $pct = 0.0;
-                foreach ($cs->fetchAll(PDO::FETCH_ASSOC) as $cRow) $pct += (float)$cRow['coefficient_percent'];
-                $matchedCode = $pli['code'];
-                $priceListItemId = (int)$pli['id'];
-                $unit = $pli['unit'] ?: 'عدد';
-                $desc = $pli['title'];
-                if (!empty($it['work_order_id'])) {
-                    $workOrderId = (int)$it['work_order_id'];
+                // زمینه: دکل → خط؛ یا خط مستقیم؛ یا مقدار صریح
+                $line = null; $tower = null; $structure = null; $terrain = null; $crewSize = 1;
+                if (!empty($it['tower_id'])) {
+                    $towerStmt->execute([(int)$it['tower_id']]);
+                    $tower = $towerStmt->fetch(PDO::FETCH_ASSOC);
+                    if (!$tower) Response::error(404, 'دکل زمینه پیدا نشد: ' . (int)$it['tower_id']);
+                    if ($tower['line_id']) {
+                        $lineStmt->execute([(int)$tower['line_id']]);
+                        $line = $lineStmt->fetch(PDO::FETCH_ASSOC);
+                    }
+                    $structure = $tower['tower_structure'] ?? null;
+                    $terrain = pl_normalize_terrain($tower['terrain_type'] ?? null);
+                } elseif (!empty($it['line_id'])) {
+                    $lineStmt->execute([(int)$it['line_id']]);
+                    $line = $lineStmt->fetch(PDO::FETCH_ASSOC);
+                    if (!$line) Response::error(404, 'خط زمینه پیدا نشد: ' . (int)$it['line_id']);
+                    $structure = $line['tower_structure'] ?? null;
+                }
+                // مقادیر صریح بر زمینه اولویت دارند (زمین/سازه/تعداد نفرات)
+                if (!empty($it['terrain_type'])) $terrain = pl_normalize_terrain($it['terrain_type']) ?? $terrain;
+                if (!empty($it['tower_structure'])) $structure = trim((string)$it['tower_structure']);
+                if (!empty($it['crew_size'])) $crewSize = max(1, (int)$it['crew_size']);
+
+                $match = [
+                    'item' => $pli,
+                    'base_unit_price' => (float)$pli['unit_price'],
+                    'coefficients' => [],
+                    'coefficient_amount' => 0.0,
+                ];
+                $applied = pl_apply_coefficients($pdo, $priceListId, $pli, [
+                    'bundle_count' => $line['bundle_count'] ?? null,
+                    'crew_size' => $crewSize,
+                    'tower_structure' => $structure,
+                    'terrain_type' => $terrain,
+                ]);
+                $match['coefficients'] = $applied['coefficients'];
+                $match['coefficient_amount'] = $applied['coefficient_amount'];
+
+                $context = '';
+                if ($line) $context .= 'خط ' . ($line['line_code'] ?: '—');
+                if ($tower) $context .= ($context ? ' — ' : '') . 'دکل ' . ($tower['tower_code'] ?: '—');
+                if ($terrain) $context .= ($context ? ' — ' : '') . pl_terrain_label($terrain);
+                if ($workOrderId) {
                     $woStmt->execute([$workOrderId]);
                     $wo = $woStmt->fetch(PDO::FETCH_ASSOC);
-                    if ($wo) $desc .= ' — دستورکار ' . $wo['wo_code'];
+                    if ($wo) $context .= ($context ? ' — ' : '') . 'دستورکار ' . $wo['wo_code'];
                 }
-                $desc .= ' [' . $matchedCode . ']';
+                $addEntry($match, $quantity, null, $workOrderId, $context !== '' ? $context : null, $terrain, $structure);
             } else {
                 continue;
             }
-
-            $lineBase = round($base * $quantity, 2);
-            $lineCoef = round($lineBase * $pct / 100.0, 2);
-            $lineTotal = $lineBase + $lineCoef;
-            $sumBase += $lineBase; $sumCoef += $lineCoef; $sumNet += $lineTotal;
-            $lines[] = [
-                'inspection_id' => $inspectionId,
-                'work_order_id' => $workOrderId,
-                'price_list_item_id' => $priceListItemId,
-                'description' => $desc,
-                'unit' => $unit,
-                'quantity' => $quantity,
-                'unit_price' => $base,
-                'total_price' => $lineTotal,
-                'base_amount' => $lineBase,
-                'coefficient_percent' => $pct,
-                'coefficient_amount' => $lineCoef,
-                'terrain_type' => $terrain ?? null,
-                'tower_structure' => $structure,
-            ];
         }
         if (count($lines) === 0) Response::error(400, 'هیچ قلم معتبری یافت نشد');
 
@@ -1148,8 +1428,8 @@ function registerModuleRoutes(Router $router): void
         $invParams = [$code, $contractId, $contractorId, $periodStart, $periodEnd, $sumNet, $tax, $final, $body['notes'] ?? null];
         foreach ([
             'price_list_id' => $priceListId,
-            'net_amount' => $sumNet,
-            'coefficient_amount' => $sumCoef,
+            'net_amount' => round($sumNet, 2),
+            'coefficient_amount' => round($sumCoef, 2),
             'tax_percent' => $taxPercent,
         ] as $col => $val) {
             if (Helpers::columnExists('invoices', $col)) { $invCols[] = "`$col`"; $invVals[] = '?'; $invParams[] = $val; }
@@ -1159,7 +1439,7 @@ function registerModuleRoutes(Router $router): void
         $pdo->prepare('INSERT INTO invoices (' . implode(', ', $invCols) . ') VALUES (' . implode(', ', $invVals) . ')')->execute($invParams);
         $invoiceId = (int)$pdo->lastInsertId();
 
-        // ── ثبت اقلام ──
+        // ── ثبت اقلام (پایه + ضریب، هر کدام یک ردیف) ──
         $iiCols = ['invoice_id', 'price_list_item_id', 'work_order_id', 'description', 'unit', 'quantity', 'unit_price', 'total_price'];
         foreach (['inspection_id', 'terrain_type', 'tower_structure', 'coefficient_percent', 'coefficient_amount', 'base_amount'] as $col) {
             if (Helpers::columnExists('invoice_items', $col)) $iiCols[] = "`$col`";
@@ -1187,9 +1467,6 @@ function registerModuleRoutes(Router $router): void
         ], 'صورت‌وضعیت صادر شد', 201);
     });
 
-    // ============================================================
-    //  v4.3.86 — اقلام یک صورت‌وضعیت (برای مشاهده و چاپ)
-    // ============================================================
     $router->get('invoices/{id}/items', function ($id) {
         Auth::authenticate();
         Auth::requirePermissionSoft('financial.view');
@@ -2262,8 +2539,13 @@ function registerModuleRoutes(Router $router): void
         $body = Helpers::getJsonBody();
         if (empty($body['name'])) Response::error(400, 'نام فهرست الزامی است');
         $pdo = Database::getInstance()->getConnection();
-        $stmt = $pdo->prepare("INSERT INTO price_lists (name, version, effective_date, contract_id, status, created_at) VALUES (?, ?, ?, ?, 'active', NOW())");
-        $stmt->execute([$body['name'], $body['version'] ?? '1.0', $body['effective_date'] ?? date('Y-m-d'), $body['contract_id'] ?? null]);
+        // v4.3.87: سازگار با هر دو ساختار — ستون status (varchar) یا is_active (tinyint)
+        $cols = ['name', 'version', 'effective_date', 'contract_id', 'created_at'];
+        $params = [$body['name'], $body['version'] ?? '1.0', $body['effective_date'] ?? date('Y-m-d'), $body['contract_id'] ?? null, date('Y-m-d H:i:s')];
+        if (Helpers::columnExists('price_lists', 'status')) { $cols[] = 'status'; $params[] = pl_active_status_value($pdo, 'price_lists'); }
+        elseif (Helpers::columnExists('price_lists', 'is_active')) { $cols[] = 'is_active'; $params[] = 1; }
+        $stmt = $pdo->prepare('INSERT INTO price_lists (' . implode(', ', $cols) . ') VALUES (' . implode(', ', array_fill(0, count($cols), '?')) . ')');
+        $stmt->execute($params);
         Response::success(['id' => (int)$pdo->lastInsertId()], 'فهرست بها ایجاد شد', 201);
     });
 
@@ -2272,7 +2554,17 @@ function registerModuleRoutes(Router $router): void
         Auth::requirePermissionSoft('price_lists.update');
         $body = Helpers::getJsonBody();
         $pdo = Database::getInstance()->getConnection();
-        $fields = ['name','version','effective_date','contract_id','status'];
+        $fields = ['name','version','effective_date','contract_id'];
+        // v4.3.87: وضعیت فقط روی ستونی که واقعاً وجود دارد
+        if (array_key_exists('status', $body)) {
+            if (Helpers::columnExists('price_lists', 'status')) $fields[] = 'status';
+            elseif (Helpers::columnExists('price_lists', 'is_active')) {
+                $fields[] = 'is_active';
+                $body['is_active'] = in_array(strtolower(trim((string)$body['status'])), ['inactive','0','false','deactive'], true) ? 0 : 1;
+            }
+            unset($body['status']);
+        }
+        if (array_key_exists('is_active', $body) && Helpers::columnExists('price_lists', 'is_active')) $fields[] = 'is_active';
         $updates=[]; $params=[];
         foreach ($fields as $f) { if (array_key_exists($f,$body)) { $updates[] = "`$f` = ?"; $params[] = $body[$f]; } }
         if (!$updates) Response::error(400, 'هیچ فیلدی برای ویرایش ارسال نشده');
@@ -2288,7 +2580,7 @@ function registerModuleRoutes(Router $router): void
         $listId = Helpers::queryInt('list_id');
         $where = '1=1'; $params = [];
         if ($listId) { $where .= ' AND pli.price_list_id = ?'; $params[] = $listId; }
-        // v4.3.86: فیلترهای طبقه‌بندی — ولتاژ/مدار/باندل/فعالیت/روش بازدید/سازه/ضریب + جستجو
+        // v4.3.87: فیلترهای طبقه‌بندی کشوری — فصل/ولتاژ/مدار/باندل/فعالیت/روش/زمین/نوع ضریب/والد + جستجو
         $voltage = Helpers::query('voltage_kv');
         if ($voltage !== null && $voltage !== '') {
             if ($voltage === 'general') { $where .= ' AND pli.voltage_kv IS NULL'; }
@@ -2314,27 +2606,55 @@ function registerModuleRoutes(Router $router): void
             $m = pl_normalize_inspection_method($method);
             if ($m !== null) { $where .= ' AND pli.inspection_method = ?'; $params[] = $m; }
         }
+        $terrain = Helpers::query('terrain_type');
+        if ($terrain !== null && $terrain !== '') {
+            if ($terrain === 'general') { $where .= ' AND pli.terrain_type IS NULL'; }
+            else {
+                $g = pl_normalize_item_terrain($terrain);
+                if ($g !== null) { $where .= ' AND pli.terrain_type = ?'; $params[] = $g; }
+            }
+        }
         $kind = Helpers::query('item_kind');
-        if ($kind === 'coefficient' || $kind === 'base') { $where .= ' AND pli.item_kind = ?'; $params[] = $kind; }
+        if ($kind === 'coefficient' || $kind === 'base') {
+            if ($kind === 'base') { $where .= " AND (pli.item_kind = 'base' OR pli.item_kind IS NULL)"; }
+            else { $where .= ' AND pli.item_kind = ?'; $params[] = $kind; }
+        }
         $coef = Helpers::query('coefficient');
         if ($coef === '1') { $where .= " AND pli.item_kind = 'coefficient'"; }
         elseif ($coef === '0') { $where .= " AND (pli.item_kind = 'base' OR pli.item_kind IS NULL)"; }
+        $chapter = Helpers::query('chapter');
+        if ($chapter !== null && $chapter !== '') {
+            if (Helpers::columnExists('price_list_items', 'chapter')) {
+                $where .= ' AND pli.chapter = ?'; $params[] = (int)$chapter;
+            }
+        }
+        $coefKind = Helpers::query('coefficient_kind');
+        if ($coefKind !== null && $coefKind !== '') {
+            $ck = pl_coefficient_kind_normalize($coefKind);
+            if ($ck !== null) { $where .= ' AND pli.coefficient_kind = ?'; $params[] = $ck; }
+        }
+        $parentCode = Helpers::query('parent_code');
+        if ($parentCode !== null && $parentCode !== '') {
+            $where .= ' AND pli.parent_code = ?'; $params[] = trim((string)$parentCode);
+        }
         $search = Helpers::getSearch();
         if (!empty($search)) {
-            $where .= ' AND (pli.code LIKE ? OR pli.title LIKE ? OR pli.category LIKE ?)';
-            $sp = "%$search%"; $params[] = $sp; $params[] = $sp; $params[] = $sp;
+            $where .= ' AND (pli.code LIKE ? OR pli.title LIKE ? OR pli.category LIKE ? OR pli.parent_code LIKE ?)';
+            $sp = "%$search%"; $params[] = $sp; $params[] = $sp; $params[] = $sp; $params[] = $sp;
         }
-        $hasClassCols = Helpers::columnExists('price_list_items', 'item_kind') || Helpers::columnExists('price_list_items', 'coefficient_percent');
-        $orderBy = $hasClassCols ? " ORDER BY (pli.item_kind = 'coefficient') ASC, pli.id ASC" : ' ORDER BY pli.id ASC';
+        // ترتیب: مثل فایل رسمی — ردیف اصلی و بعد ضرایبش (sort_order فایل اصلی)
+        $orderBy = Helpers::columnExists('price_list_items', 'sort_order')
+            ? ' ORDER BY COALESCE(pli.sort_order, pli.id) ASC, pli.id ASC'
+            : " ORDER BY (pli.item_kind = 'coefficient') ASC, pli.id ASC";
         $stmt = $pdo->prepare("SELECT pli.* FROM price_list_items pli WHERE $where$orderBy LIMIT 5000");
         $stmt->execute($params);
         $rows = $stmt->fetchAll();
         // اعداد به int/float تبدیل می‌شوند تا فرانت بدون تبدیل محاسبه کند
         foreach ($rows as &$r) {
-            foreach (['voltage_kv','unit_price','unit_price_plain','unit_price_hilly','unit_price_semi_mountainous','unit_price_impassable','coefficient_percent'] as $k) {
+            foreach (['voltage_kv','unit_price','coefficient_percent'] as $k) {
                 if (array_key_exists($k, $r) && $r[$k] !== null) $r[$k] = $r[$k] + 0;
             }
-            foreach (['circuit_count','bundle_count'] as $k) {
+            foreach (['circuit_count','bundle_count','chapter','sort_order'] as $k) {
                 if (array_key_exists($k, $r) && $r[$k] !== null) $r[$k] = (int)$r[$k];
             }
         }
@@ -2347,27 +2667,47 @@ function registerModuleRoutes(Router $router): void
         Auth::requirePermissionSoft('price_lists.create');
         $body = Helpers::getJsonBody();
         if (empty($body['title']) || empty($body['price_list_id'])) Response::error(400, 'عنوان و فهرست الزامی است');
-        pl_require_v4386();
+        pl_require_boq();
         $pdo = Database::getInstance()->getConnection();
-        $code = $body['code'] ?? ('PL-' . str_pad((string)random_int(0, 9999), 4, '0', STR_PAD_LEFT));
+        $code = pl_clean_code($body['code'] ?? null) ?? ('PL-' . str_pad((string)random_int(0, 9999), 4, '0', STR_PAD_LEFT));
         $cls = pl_item_payload($body);
-        // وضعیت فعال — سازگار با ستون varchar/عددی + is_active
-        $cols = ['price_list_id', 'code', 'title', 'unit', 'unit_price', 'category',
-            'item_kind', 'activity_type', 'inspection_method', 'voltage_kv', 'circuit_count', 'bundle_count',
-            'terrain_type', 'tower_structure',
-            'unit_price_plain', 'unit_price_hilly', 'unit_price_semi_mountainous', 'unit_price_impassable',
-            'coefficient_percent'];
-        $params = [
-            (int)$body['price_list_id'], $code, $body['title'], $body['unit'] ?? 'دکل', $body['unit_price'] ?? 0, $body['category'] ?? 'عملیات',
-            $cls['item_kind'], $cls['activity_type'], $cls['inspection_method'], $cls['voltage_kv'], $cls['circuit_count'], $cls['bundle_count'],
-            $cls['terrain_type'], $cls['tower_structure'],
-            $cls['unit_price_plain'], $cls['unit_price_hilly'], $cls['unit_price_semi_mountainous'], $cls['unit_price_impassable'],
-            $cls['coefficient_percent'],
+
+        // ساخت INSERT پویا — فقط ستون‌های موجود در این دیتابیس
+        $candidateCols = ['price_list_id', 'code', 'title', 'unit', 'unit_price', 'category',
+            'item_kind', 'chapter', 'parent_code', 'coefficient_kind', 'sort_order',
+            'activity_type', 'inspection_method', 'voltage_kv', 'circuit_count', 'bundle_count',
+            'terrain_type', 'tower_structure'];
+        $values = [
+            'price_list_id' => (int)$body['price_list_id'],
+            'code' => $code,
+            'title' => $body['title'],
+            'unit' => trim((string)($body['unit'] ?? '')) !== '' ? $body['unit']
+                : ($cls['item_kind'] === 'coefficient' ? 'ضریب' : 'برج'),
+            'unit_price' => pl_num_or_null($body['unit_price'] ?? null) ?? 0,
+            'category' => trim((string)($body['category'] ?? '')) !== '' ? $body['category']
+                : ($cls['chapter'] !== null ? pl_chapter_label($cls['chapter']) : 'عملیات'),
+            'item_kind' => $cls['item_kind'],
+            'chapter' => $cls['chapter'],
+            'parent_code' => $cls['parent_code'],
+            'coefficient_kind' => $cls['coefficient_kind'],
+            'sort_order' => $cls['sort_order'],
+            'activity_type' => $cls['activity_type'],
+            'inspection_method' => $cls['inspection_method'],
+            'voltage_kv' => $cls['voltage_kv'],
+            'circuit_count' => $cls['circuit_count'],
+            'bundle_count' => $cls['bundle_count'],
+            'terrain_type' => $cls['terrain_type'],
+            'tower_structure' => $cls['tower_structure'],
         ];
-        $vals = array_fill(0, count($cols), '?');
-        if (Helpers::columnExists('price_list_items', 'status')) { $cols[] = 'status'; $vals[] = '?'; $params[] = pl_active_status_value($pdo, 'price_list_items'); }
-        if (Helpers::columnExists('price_list_items', 'is_active')) { $cols[] = 'is_active'; $vals[] = '1'; }
-        $stmt = $pdo->prepare('INSERT INTO price_list_items (' . implode(', ', $cols) . ') VALUES (' . implode(', ', $vals) . ')');
+        $cols = []; $marks = []; $params = [];
+        foreach ($candidateCols as $c) {
+            if (Helpers::columnExists('price_list_items', $c)) {
+                $cols[] = "`$c`"; $marks[] = '?'; $params[] = $values[$c];
+            }
+        }
+        if (Helpers::columnExists('price_list_items', 'status')) { $cols[] = 'status'; $marks[] = '?'; $params[] = pl_active_status_value($pdo, 'price_list_items'); }
+        if (Helpers::columnExists('price_list_items', 'is_active')) { $cols[] = 'is_active'; $marks[] = '1'; }
+        $stmt = $pdo->prepare('INSERT INTO price_list_items (' . implode(', ', $cols) . ') VALUES (' . implode(', ', $marks) . ')');
         $stmt->execute($params);
         Response::success(['id' => (int)$pdo->lastInsertId(), 'code' => $code], 'قلم ایجاد شد', 201);
     });
@@ -2379,12 +2719,13 @@ function registerModuleRoutes(Router $router): void
         // v4.3.81: قفل امور — تغییر امور رکورد فقط برای مدیر
         $body = Helpers::stripDistrictForNonAdmin($body);
         $fields = ['code','title','unit','unit_price','category'];
-        // v4.3.86: فیلدهای طبقه‌بندی + قیمت‌های زمین + ضریب — فقط فیلدهای ارسال‌شده
-        // با مقدار «نرمال‌شده» ذخیره می‌شوند (فارسی → کلید استاندارد)؛ فیلد ارسال‌نشده دست نمی‌خورد
-        if (Helpers::columnExists('price_list_items', 'item_kind') || Helpers::columnExists('price_list_items', 'coefficient_percent')) {
+        // v4.3.87: فیلدهای طبقه‌بندی کشوری — فقط فیلدهای ارسال‌شده با مقدار نرمال‌شده
+        if (Helpers::columnExists('price_list_items', 'item_kind')) {
             $cls = pl_item_payload($body);
             foreach ($cls as $k => $v) {
-                if (array_key_exists($k, $body)) { $body[$k] = $v; $fields[] = $k; }
+                if (array_key_exists($k, $body) && Helpers::columnExists('price_list_items', $k)) {
+                    $body[$k] = $v; $fields[] = $k;
+                }
             }
         }
         // وضعیت: مقدار 'active'/'inactive' به شکل عددی ستون تبدیل می‌شود
@@ -2399,7 +2740,6 @@ function registerModuleRoutes(Router $router): void
                 $body['is_active'] = $isInactive ? 0 : 1;
             }
         } elseif (array_key_exists('status', $body)) {
-            // ستون status وجود ندارد — مقدار نادیده گرفته می‌شود
             unset($body['status']);
         }
         $updates = []; $params = [];
@@ -2413,19 +2753,31 @@ function registerModuleRoutes(Router $router): void
     $router->delete('price-list-items/{id}', function ($id) {
         Auth::authenticate();
         Auth::requirePermissionSoft('price_lists.delete');
-        Database::getInstance()->execute("DELETE FROM price_list_items WHERE id = ?", [(int)$id]);
+        $pdo = Database::getInstance()->getConnection();
+        // حذف ردیف اصلی، ضرایب فرزندش هم حذف می‌شوند (بی‌والد می‌مانند)
+        $stmt = $pdo->prepare('SELECT code, price_list_id FROM price_list_items WHERE id = ?');
+        $stmt->execute([(int)$id]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        if ($row) {
+            $del = $pdo->prepare('DELETE FROM price_list_items WHERE price_list_id = ? AND parent_code = ?');
+            $del->execute([(int)$row['price_list_id'], (string)$row['code']]);
+        }
+        Database::getInstance()->execute('DELETE FROM price_list_items WHERE id = ?', [(int)$id]);
         Response::success(null, 'قلم حذف شد');
     });
 
     // ============================================================
-    //  v4.3.86 — ایمپورت گروهی فهرست بها (شیت «اقلام» + شیت «ضرایب»)
+    //  v4.3.87 — ایمپورت گروهی فهرست بهای کشوری
     //  body: { price_list_id, items: [...], replace?: bool }
-    //  هر item همان فیلدهای POST + اجبار title
+    //  هر item فیلدهای POST + اجبار title؛ اقلامِ پارس‌شده از فرمت استاندارد
+    //  (شماره ردیف فصل | شرح | واحد | بهای واحد) توسط فرانت پارس و ارسال می‌شوند.
+    //  ردیف‌های بدون کد (ضرایب) باید code اختصاصی *<کد والد>-<n> و parent_code داشته باشند.
+    //  همهٔ ستون‌های اختیاری فقط در صورت وجود در دیتابیس نوشته می‌شوند.
     // ============================================================
     $router->post('price-list-items/import', function () {
         Auth::authenticate();
         Auth::requirePermissionSoft('price_lists.create');
-        pl_require_v4386();
+        pl_require_boq();
         $body = Helpers::getJsonBody();
         $listId = (int)($body['price_list_id'] ?? 0);
         $items = is_array($body['items'] ?? null) ? $body['items'] : [];
@@ -2438,14 +2790,16 @@ function registerModuleRoutes(Router $router): void
         $chk->execute([$listId]);
         if (!$chk->fetch()) Response::error(404, 'فهرست بها پیدا نشد');
 
-        // ساخت INSERT پویا — سازگار با وجود/نبود ستون‌های status و is_active
-        $insCols = ['price_list_id', 'code', 'title', 'unit', 'unit_price', 'category',
-            'item_kind', 'activity_type', 'inspection_method', 'voltage_kv', 'circuit_count', 'bundle_count', 'terrain_type', 'tower_structure',
-            'unit_price_plain', 'unit_price_hilly', 'unit_price_semi_mountainous', 'unit_price_impassable',
-            'coefficient_percent'];
+        // ساخت INSERT پویا — سازگار با وجود/نبود ستون‌ها در هر دیتابیس
+        $candidateCols = ['price_list_id', 'code', 'title', 'unit', 'unit_price', 'category',
+            'item_kind', 'chapter', 'parent_code', 'coefficient_kind', 'sort_order',
+            'activity_type', 'inspection_method', 'voltage_kv', 'circuit_count', 'bundle_count',
+            'terrain_type', 'tower_structure',
+            // ستون‌های قدیمی v4.3.86 — فقط اگر دیتابیس داشته باشد
+            'unit_price_plain', 'unit_price_hilly', 'unit_price_semi_mountainous', 'unit_price_impassable', 'coefficient_percent'];
         $hasStatusCol = Helpers::columnExists('price_list_items', 'status');
         $hasIsActiveCol = Helpers::columnExists('price_list_items', 'is_active');
-        $insValCols = $insCols;
+        $insValCols = array_values(array_filter($candidateCols, fn($c) => Helpers::columnExists('price_list_items', $c)));
         if ($hasStatusCol) $insValCols[] = 'status';
         if ($hasIsActiveCol) $insValCols[] = 'is_active';
         $stmt = $pdo->prepare('INSERT INTO price_list_items (' . implode(', ', $insValCols) . ') VALUES ('
@@ -2461,23 +2815,49 @@ function registerModuleRoutes(Router $router): void
             foreach ($items as $it) {
                 if (!is_array($it) || empty($it['title'])) continue;
                 $cls = pl_item_payload($it);
-                $code = trim((string)($it['code'] ?? ''));
-                if ($code === '') {
+                $code = pl_clean_code($it['code'] ?? null);
+                if ($code === null) {
                     $seq++;
                     $code = ($cls['item_kind'] === 'coefficient' ? 'COEF-' : 'PL-') . str_pad((string)$seq, 3, '0', STR_PAD_LEFT);
                 }
-                $row = [
-                    $listId, $code, $it['title'],
-                    trim((string)($it['unit'] ?? '')) !== '' ? $it['unit'] : ($cls['item_kind'] === 'coefficient' ? 'ضریب' : 'دکل'),
-                    pl_num_or_null($it['unit_price'] ?? null) ?? 0,
-                    trim((string)($it['category'] ?? '')) !== '' ? $it['category'] : ($cls['item_kind'] === 'coefficient' ? 'ضریب' : 'عملیات'),
-                    $cls['item_kind'], $cls['activity_type'], $cls['inspection_method'],
-                    $cls['voltage_kv'], $cls['circuit_count'], $cls['bundle_count'], $cls['terrain_type'], $cls['tower_structure'],
-                    $cls['unit_price_plain'], $cls['unit_price_hilly'], $cls['unit_price_semi_mountainous'], $cls['unit_price_impassable'],
-                    $cls['coefficient_percent'],
+                $unit = trim((string)($it['unit'] ?? '')) !== '' ? $it['unit']
+                    : ($cls['item_kind'] === 'coefficient' ? 'ضریب' : 'برج');
+                $category = trim((string)($it['category'] ?? '')) !== '' ? $it['category']
+                    : ($cls['chapter'] !== null ? pl_chapter_label($cls['chapter'])
+                        : ($cls['item_kind'] === 'coefficient' ? 'ضریب' : 'عملیات'));
+
+                $rowByCol = [
+                    'price_list_id' => $listId,
+                    'code' => $code,
+                    'title' => $it['title'],
+                    'unit' => $unit,
+                    'unit_price' => pl_num_or_null($it['unit_price'] ?? null) ?? 0,
+                    'category' => $category,
+                    'item_kind' => $cls['item_kind'],
+                    'chapter' => $cls['chapter'],
+                    'parent_code' => $cls['parent_code'],
+                    'coefficient_kind' => $cls['coefficient_kind'],
+                    'sort_order' => $cls['sort_order'],
+                    'activity_type' => $cls['activity_type'],
+                    'inspection_method' => $cls['inspection_method'],
+                    'voltage_kv' => $cls['voltage_kv'],
+                    'circuit_count' => $cls['circuit_count'],
+                    'bundle_count' => $cls['bundle_count'],
+                    'terrain_type' => $cls['terrain_type'],
+                    'tower_structure' => $cls['tower_structure'],
+                    // قدیمی v4.3.86 — اگر ستون‌ها موجودند
+                    'unit_price_plain' => pl_num_or_null($it['unit_price_plain'] ?? null),
+                    'unit_price_hilly' => pl_num_or_null($it['unit_price_hilly'] ?? null),
+                    'unit_price_semi_mountainous' => pl_num_or_null($it['unit_price_semi_mountainous'] ?? null),
+                    'unit_price_impassable' => pl_num_or_null($it['unit_price_impassable'] ?? null),
+                    'coefficient_percent' => pl_num_or_null($it['coefficient_percent'] ?? null),
                 ];
-                if ($hasStatusCol) $row[] = $activeVal;
-                if ($hasIsActiveCol) $row[] = 1;
+                $row = [];
+                foreach ($insValCols as $c) {
+                    if ($c === 'status') { $row[] = $activeVal; }
+                    elseif ($c === 'is_active') { $row[] = 1; }
+                    else { $row[] = $rowByCol[$c] ?? null; }
+                }
                 $stmt->execute($row);
                 if ($cls['item_kind'] === 'coefficient') $coefs++; else $normal++;
             }
@@ -2487,24 +2867,27 @@ function registerModuleRoutes(Router $router): void
             Response::error(500, 'خطا در ذخیره اقلام: ' . $e->getMessage());
         }
         Response::success(['imported_items' => $normal, 'imported_coefficients' => $coefs],
-            "ایمپورت انجام شد — $normal قلم و $coefs ضریب ثبت شد" . ($replace ? ' (اقلام قبلی حذف شدند)' : ''), 201);
+            "ایمپورت انجام شد — $normal ردیف اصلی و $coefs ردیف ضریب ثبت شد" . ($replace ? ' (ردیف‌های قبلی حذف شدند)' : ''), 201);
     });
 
     // ============================================================
-    //  v4.3.86 — تطبیق قلم فهرست بها با خط/دکل/روش بازدید
-    //  params: line_id, tower_id?, inspection_method (صعودی/پیمایشی),
-    //          terrain_type?, price_list_id? (پیش‌فرض: آخرین فهرست فعال)
+    //  v4.3.87 — تطبیق ردیف فهرست بها با خط/دکل/روش بازدید
+    //  params: line_id, tower_id?, inspection_method (صعودی/پیمایشی/پهبادی),
+    //          terrain_type? (پیش‌فرض: زمین دکل), crew_size?,
+    //          price_list_id? (پیش‌فرض: آخرین فهرست فعال)
+    //  زمین و سازه از دکل خوانده می‌شود — قیمت متناسب با موقعیت دکل
     // ============================================================
     $router->get('price-list-items/match', function () {
         Auth::authenticate();
         Auth::requirePermissionSoft('price_lists.view');
-        pl_require_v4386();
+        pl_require_boq();
         $pdo = Database::getInstance()->getConnection();
 
         $lineId = Helpers::queryInt('line_id');
         $towerId = Helpers::queryInt('tower_id');
         $method = pl_normalize_inspection_method(Helpers::query('inspection_method') ?? Helpers::query('inspection_type')) ?? 'climbing';
-        $terrainOverride = pl_normalize_terrain(Helpers::query('terrain_type'));
+        $terrainOverride = Helpers::query('terrain_type');
+        $crewSize = Helpers::queryInt('crew_size');
         $priceListId = Helpers::queryInt('price_list_id');
 
         // فهرست پیش‌فرض: آخرین فهرست فعال (سازگار با ستون وضعیت عددی/متنی)
@@ -2521,12 +2904,15 @@ function registerModuleRoutes(Router $router): void
             if (!$line) Response::error(404, 'خط پیدا نشد');
         }
         if ($towerId) {
-            $tower = $pdo->query('SELECT id, tower_code, tower_structure, terrain_type FROM towers WHERE id = ' . (int)$towerId)->fetch(PDO::FETCH_ASSOC);
+            $tower = $pdo->query('SELECT id, tower_code, tower_structure, terrain_type, line_id FROM towers WHERE id = ' . (int)$towerId)->fetch(PDO::FETCH_ASSOC);
             if (!$tower) Response::error(404, 'دکل پیدا نشد');
         }
 
         $structure = $tower['tower_structure'] ?? ($line['tower_structure'] ?? null);
-        $terrain = $terrainOverride ?? pl_normalize_terrain($tower['terrain_type'] ?? null) ?? 'plain';
+        // v4.3.87: زمین از دکل (اولویت)، سپس بازدید/پارامتر، پیش‌فرض دشت
+        $terrain = pl_normalize_terrain($tower['terrain_type'] ?? null)
+            ?? pl_normalize_terrain($terrainOverride ?? null) ?? 'plain';
+        $chapter = $method === 'drone' ? 8 : 2;
 
         $match = pl_match_price_item($pdo, [
             'price_list_id' => $priceListId,
@@ -2537,6 +2923,8 @@ function registerModuleRoutes(Router $router): void
             'inspection_method' => $method,
             'tower_structure' => $structure,
             'terrain_type' => $terrain,
+            'crew_size' => $crewSize ?: 1,
+            'chapter' => $chapter,
         ]);
 
         Response::success([
@@ -2552,10 +2940,12 @@ function registerModuleRoutes(Router $router): void
                 'code' => $match['item']['code'],
                 'title' => $match['item']['title'],
                 'unit' => $match['item']['unit'],
+                'chapter' => isset($match['item']['chapter']) ? (int)$match['item']['chapter'] : null,
                 'base_unit_price' => $match['base_unit_price'],
                 'coefficients' => $match['coefficients'],
-                'coefficient_percent' => $match['coefficient_percent'],
+                'coefficient_amount' => $match['coefficient_amount'],
                 'unit_price' => $match['unit_price'],
+                'terrain_label' => $match['terrain_label'],
             ] : null,
         ]);
     });

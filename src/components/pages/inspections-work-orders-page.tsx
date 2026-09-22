@@ -36,8 +36,8 @@ export function InspectionsPage() {
     try { await apiClient.post(API_ENDPOINTS.inspections, { inspection_date: row.inspection_date, inspection_method: ((row as any).inspection_method || (row as any).inspection_type) || "climbing", terrain_type: (row as any).terrain_type || null, line_id: row.line_id || null, tower_id: row.tower_id || null, priority: row.priority, weather: row.weather || null, notes: row.notes || null, contract_id: row.contract_id || null, district_id: resolveDistrictValue((row as any).district_id) }); setRefreshKey(k => k + 1); } catch (e) { console.error(e); }
   };
 
-  // v4.3.86: عنوان فارسی روش بازدید/نوع زمین — مبنای قیمت‌گذاری فهرست بها
-  const inspectionTypeLabels: Record<string, string> = { climbing: "بازدید صعودی", patrol: "بازدید پیمایشی" };
+  // v4.3.87: عنوان فارسی روش بازدید/نوع زمین — مبنای قیمت‌گذاری فهرست بهای کشوری
+  const inspectionTypeLabels: Record<string, string> = { climbing: "بازدید صعودی", patrol: "بازدید پیمایشی", drone: "بازدید پهبادی" };
   const terrainLabels: Record<string, string> = { plain: "دشت", hilly: "تپه‌ماهور", semi_mountainous: "نیمه‌کوهستانی", impassable: "صعب‌العبور" };
 
   const columns: DataTableColumn<Inspection>[] = [
@@ -48,8 +48,8 @@ export function InspectionsPage() {
     { key: "line_code", header: "خط", sortable: true, filterable: true },
     { key: "tower_code", header: "دکل" },
     { key: "inspector_name", header: "بازرس", sortable: true, filterable: true },
-    // v4.3.86: روش بازدید (صعودی/پیمایشی) + نوع زمین — مبنای قیمت‌گذاری صورت‌وضعیت
-    { key: "inspection_method", header: "نوع بازدید", type: "badge", badgeLabels: inspectionTypeLabels, badgeColors: { climbing: "bg-indigo-100 text-indigo-700", patrol: "bg-teal-100 text-teal-700" } },
+    // v4.3.87: روش بازدید (صعودی/پیمایشی/پهبادی) + نوع زمین — مبنای قیمت‌گذاری صورت‌وضعیت
+    { key: "inspection_method", header: "نوع بازدید", type: "badge", badgeLabels: inspectionTypeLabels, badgeColors: { climbing: "bg-indigo-100 text-indigo-700", patrol: "bg-teal-100 text-teal-700", drone: "bg-sky-100 text-sky-700" } },
     { key: "terrain_type", header: "نوع زمین", type: "badge", badgeLabels: terrainLabels, badgeColors: { plain: "bg-green-100 text-green-700", hilly: "bg-lime-100 text-lime-700", semi_mountainous: "bg-amber-100 text-amber-700", impassable: "bg-orange-100 text-orange-700" } },
     { key: "inspection_date", header: "تاریخ", sortable: true, type: "date" },
     { key: "priority", header: "نوع", type: "badge", badgeLabels: priorityLabels, badgeColors: { routine: "bg-slate-100 text-slate-700", emergency: "bg-red-100 text-red-700", follow_up: "bg-amber-100 text-amber-700", commissioning: "bg-blue-100 text-blue-700" } },

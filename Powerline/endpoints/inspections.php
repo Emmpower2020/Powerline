@@ -49,9 +49,9 @@ function registerInspectionRoutes(Router $router): void
             $params[] = $towerId;
         }
 
-        // v4.3.86: روش بازدید (climbing/patrol — فارسی هم پذیرفته می‌شود)
+        // v4.3.87: روش بازدید (صعودی/پیمایشی/پهبادی — فارسی هم پذیرفته می‌شود)
         if ($inspectionMethod !== null && $inspectionMethod !== '') {
-            $map = ['صعودی' => 'climbing', 'پیمایشی' => 'patrol', 'بازدید صعودی' => 'climbing', 'بازدید پیمایشی' => 'patrol'];
+            $map = ['صعودی' => 'climbing', 'پیمایشی' => 'patrol', 'پهبادی' => 'drone', 'پهپادی' => 'drone', 'بازدید صعودی' => 'climbing', 'بازدید پیمایشی' => 'patrol', 'بازدید پهبادی' => 'drone'];
             $kt = $map[trim((string)$inspectionMethod)] ?? $inspectionMethod;
             $where .= ' AND i.inspection_method = ?';
             $params[] = $kt;
@@ -146,10 +146,10 @@ function registerInspectionRoutes(Router $router): void
             $body['weather'] ?? null,
             $body['notes'] ?? null,
         ];
-        // v4.3.86: روش بازدید (صعودی/پیمایشی) + نوع زمین — پس از migration
+        // v4.3.87: روش بازدید (صعودی/پیمایشی/پهبادی) + نوع زمین + تعداد نفرات
         if (Helpers::columnExists('inspections', 'inspection_method')) {
             $insCols[] = 'inspection_method'; $insVals[] = '?';
-            $typeMap = ['صعودی' => 'climbing', 'پیمایشی' => 'patrol', 'بازدید صعودی' => 'climbing', 'بازدید پیمایشی' => 'patrol'];
+            $typeMap = ['صعودی' => 'climbing', 'پیمایشی' => 'patrol', 'پهبادی' => 'drone', 'پهپادی' => 'drone', 'بازدید صعودی' => 'climbing', 'بازدید پیمایشی' => 'patrol', 'بازدید پهبادی' => 'drone'];
             $rawType = trim((string)($body['inspection_method'] ?? $body['inspection_type'] ?? ''));
             $insParams[] = $rawType === '' ? 'climbing' : ($typeMap[$rawType] ?? $rawType);
         }
@@ -158,6 +158,12 @@ function registerInspectionRoutes(Router $router): void
             $tMap = ['دشت' => 'plain', 'تپه ماهور' => 'hilly', 'تپه‌ماهور' => 'hilly', 'نیمه کوهستانی' => 'semi_mountainous', 'نیمه‌کوهستانی' => 'semi_mountainous', 'صعب العبور' => 'impassable', 'صعب‌العبور' => 'impassable'];
             $rawTerrain = trim((string)($body['terrain_type'] ?? ''));
             $insParams[] = $rawTerrain === '' ? null : ($tMap[$rawTerrain] ?? $rawTerrain);
+        }
+        // v4.3.87: تعداد نفرات بازدید (مبنای ضریب «بازدید دو نفره» فهرست بها)
+        if (Helpers::columnExists('inspections', 'crew_size')) {
+            $insCols[] = 'crew_size'; $insVals[] = '?';
+            $rawCrew = trim((string)($body['crew_size'] ?? ''));
+            $insParams[] = $rawCrew === '' ? 1 : max(1, (int)$rawCrew);
         }
         if (Helpers::columnExists('inspections', 'activity_status')) { $insCols[] = 'activity_status'; $insVals[] = "'inactive'"; }
         if (Helpers::columnExists('inspections', 'district_id')) { $insCols[] = 'district_id'; $insVals[] = '?'; $insParams[] = $districtId; }
@@ -190,6 +196,8 @@ function registerInspectionRoutes(Router $router): void
             $fields[] = 'inspection_method';
         }
         if (Helpers::columnExists('inspections', 'terrain_type')) $fields[] = 'terrain_type';
+        // v4.3.87: تعداد نفرات بازدید
+        if (Helpers::columnExists('inspections', 'crew_size')) $fields[] = 'crew_size';
         $updates = []; $params = [];
         foreach ($fields as $f) { if (array_key_exists($f, $body)) { $updates[] = "`$f` = ?"; $params[] = ($body[$f] === '' ? null : $body[$f]); } }
         if (!$updates) Response::error(400, 'هیچ فیلدی ارسال نشده');
@@ -258,10 +266,11 @@ function formatInspectionRow(array $row): array
         'tower_code'        => $row['tower_code'] ?? null,
         'inspector_name'    => trim(($row['inspector_first'] ?? '') . ' ' . ($row['inspector_last'] ?? '')),
         'inspection_date'   => $row['inspection_date'],
-        // v4.3.86: روش بازدید (صعودی/پیمایشی) + نوع زمین
+        // v4.3.87: روش بازدید (صعودی/پیمایشی/پهبادی) + نوع زمین + تعداد نفرات
         'inspection_method' => $row['inspection_method'] ?? null,
         'inspection_type'   => $row['inspection_method'] ?? null, // کلید قدیمی برای سازگاری
         'terrain_type'      => $row['terrain_type'] ?? null,
+        'crew_size'         => isset($row['crew_size']) ? (int)$row['crew_size'] : null,
         'start_time'        => $row['start_time'],
         'end_time'          => $row['end_time'],
         'gps_lat'           => $row['gps_lat'] !== null ? (float) $row['gps_lat'] : null,
