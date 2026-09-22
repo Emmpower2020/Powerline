@@ -8,9 +8,6 @@ import type { Inspection, WorkOrder, PaginatedResponse } from "@/lib/types";
 import { DataTable, type DataTableColumn } from "@/components/data-table";
 import { CreateInspectionDialog, CreateWorkOrderDialog } from "@/components/create-dialogs";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Calculator } from "lucide-react";
-import { PriceListMatcherDialog } from "@/components/price-list-matcher-dialog";
 import { GenericBulkActions } from "@/components/generic-bulk-actions";
 
 export function InspectionsPage() {
@@ -18,7 +15,6 @@ export function InspectionsPage() {
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
-  const [billingSource, setBillingSource] = useState<Inspection | null>(null);
 
   useEffect(() => {
     const load = async () => {
@@ -37,8 +33,12 @@ export function InspectionsPage() {
     setRefreshKey(k => k + 1);
   };
   const handleDuplicate = async (row: Inspection) => {
-    try { await apiClient.post(API_ENDPOINTS.inspections, { inspection_date: row.inspection_date, priority: row.priority, weather: row.weather || null, notes: row.notes || null, line_id: row.line_id || null, tower_id: row.tower_id || null, contract_id: row.contract_id || null, district_id: resolveDistrictValue((row as any).district_id) }); setRefreshKey(k => k + 1); } catch (e) { console.error(e); }
+    try { await apiClient.post(API_ENDPOINTS.inspections, { inspection_date: row.inspection_date, inspection_method: ((row as any).inspection_method || (row as any).inspection_type) || "climbing", terrain_type: (row as any).terrain_type || null, line_id: row.line_id || null, tower_id: row.tower_id || null, priority: row.priority, weather: row.weather || null, notes: row.notes || null, contract_id: row.contract_id || null, district_id: resolveDistrictValue((row as any).district_id) }); setRefreshKey(k => k + 1); } catch (e) { console.error(e); }
   };
+
+  // v4.3.86: عنوان فارسی روش بازدید/نوع زمین — مبنای قیمت‌گذاری فهرست بها
+  const inspectionTypeLabels: Record<string, string> = { climbing: "بازدید صعودی", patrol: "بازدید پیمایشی" };
+  const terrainLabels: Record<string, string> = { plain: "دشت", hilly: "تپه‌ماهور", semi_mountainous: "نیمه‌کوهستانی", impassable: "صعب‌العبور" };
 
   const columns: DataTableColumn<Inspection>[] = [
     { key: "contract_title", header: "قرارداد", sortable: true, filterable: true, wrap: true },
@@ -48,6 +48,9 @@ export function InspectionsPage() {
     { key: "line_code", header: "خط", sortable: true, filterable: true },
     { key: "tower_code", header: "دکل" },
     { key: "inspector_name", header: "بازرس", sortable: true, filterable: true },
+    // v4.3.86: روش بازدید (صعودی/پیمایشی) + نوع زمین — مبنای قیمت‌گذاری صورت‌وضعیت
+    { key: "inspection_method", header: "نوع بازدید", type: "badge", badgeLabels: inspectionTypeLabels, badgeColors: { climbing: "bg-indigo-100 text-indigo-700", patrol: "bg-teal-100 text-teal-700" } },
+    { key: "terrain_type", header: "نوع زمین", type: "badge", badgeLabels: terrainLabels, badgeColors: { plain: "bg-green-100 text-green-700", hilly: "bg-lime-100 text-lime-700", semi_mountainous: "bg-amber-100 text-amber-700", impassable: "bg-orange-100 text-orange-700" } },
     { key: "inspection_date", header: "تاریخ", sortable: true, type: "date" },
     { key: "priority", header: "نوع", type: "badge", badgeLabels: priorityLabels, badgeColors: { routine: "bg-slate-100 text-slate-700", emergency: "bg-red-100 text-red-700", follow_up: "bg-amber-100 text-amber-700", commissioning: "bg-blue-100 text-blue-700" } },
     // v4.3.78: ستون وضعیت استاندارد فعال/غیرفعال — ستون مرحله با نام «مرحله بازدید» جدا شد
@@ -61,9 +64,8 @@ export function InspectionsPage() {
         searchKeys={columns.map(c => c.key)}
         title="بازدیدها" onAdd={() => setShowCreate(true)} onRefresh={() => setRefreshKey(k => k + 1)}
         onCopy={() => {}} onDelete={handleDelete} onDuplicate={handleDuplicate} onImport={() => alert("برای وارد کردن اطلاعات بازدید از قالب اکسل پروژه استفاده کنید.")} onLoadAllRows={async () => data}
-        toolbarExtra={(rows) => <div className="flex items-center gap-2"><GenericBulkActions rows={rows} endpoint={API_ENDPOINTS.inspections} entityName="بازدید" onApplied={() => setRefreshKey(k => k + 1)} canToggleStatus statusField="activity_status" canChangeContract canChangeDistrict />{rows.length === 1 && <Button size="sm" variant="outline" onClick={() => setBillingSource(rows[0])} title="اتصال بازدید به فهرست بها"><Calculator className="w-4 h-4 ml-2" />فهرست بها / متره</Button>}</div>} />
+        toolbarExtra={(rows) => <GenericBulkActions rows={rows} endpoint={API_ENDPOINTS.inspections} entityName="بازدید" onApplied={() => setRefreshKey(k => k + 1)} canToggleStatus statusField="activity_status" canChangeContract canChangeDistrict />} />
       <CreateInspectionDialog open={showCreate} onClose={() => setShowCreate(false)} onCreated={() => { setShowCreate(false); setRefreshKey(k => k + 1); }} />
-      <PriceListMatcherDialog open={!!billingSource} onClose={() => setBillingSource(null)} sourceType="inspection" sourceId={billingSource?.id ?? null} sourceLabel={billingSource?.inspection_code} />
     </div>
   );
 }
@@ -73,7 +75,6 @@ export function WorkOrdersPage() {
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
-  const [billingSource, setBillingSource] = useState<WorkOrder | null>(null);
 
   useEffect(() => {
     const load = async () => {
@@ -115,9 +116,8 @@ export function WorkOrdersPage() {
         searchKeys={columns.map(c => c.key)}
         title="دستورکارها" onAdd={() => setShowCreate(true)} onRefresh={() => setRefreshKey(k => k + 1)}
         onCopy={() => {}} onDelete={handleDelete} onDuplicate={handleDuplicate} onImport={() => alert("برای وارد کردن اطلاعات دستورکار از قالب اکسل پروژه استفاده کنید.")} onLoadAllRows={async () => data}
-        toolbarExtra={(rows) => <div className="flex items-center gap-2"><GenericBulkActions rows={rows} endpoint={API_ENDPOINTS.workOrders} entityName="دستورکار" onApplied={() => setRefreshKey(k => k + 1)} canToggleStatus statusField="activity_status" canChangeContract canChangeDistrict />{rows.length === 1 && <Button size="sm" variant="outline" onClick={() => setBillingSource(rows[0])} title="اتصال دستورکار به فهرست بها"><Calculator className="w-4 h-4 ml-2" />فهرست بها / متره</Button>}</div>} />
+        toolbarExtra={(rows) => <GenericBulkActions rows={rows} endpoint={API_ENDPOINTS.workOrders} entityName="دستورکار" onApplied={() => setRefreshKey(k => k + 1)} canToggleStatus statusField="activity_status" canChangeContract canChangeDistrict />} />
       <CreateWorkOrderDialog open={showCreate} onClose={() => setShowCreate(false)} onCreated={() => { setShowCreate(false); setRefreshKey(k => k + 1); }} />
-      <PriceListMatcherDialog open={!!billingSource} onClose={() => setBillingSource(null)} sourceType="work_order" sourceId={billingSource?.id ?? null} sourceLabel={billingSource?.wo_code} />
     </div>
   );
 }

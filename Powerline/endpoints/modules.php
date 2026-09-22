@@ -4,6 +4,251 @@
  * قراردادها، صورت‌وضعیت، ایمنی، پرسنل، پیمانکاران، تجهیزات، فهرست بها، چک‌لیست، لاگ ممیزی، سازمان، اکیپ‌ها
  */
 
+// ═══════════════════════════════════════════════════════════════
+// v4.3.86 — فهرست بها: توابع مشترک طبقه‌بندی، قیمت زمین و ضرایب
+//   مورد استفاده: price-list-items (CRUD/ایمپورت/تطبیق) و
+//   invoices (کاندیدهای دوره / تولید صورت‌وضعیت)
+//
+//   واژگان کلیدی (هم‌نام با ستون‌های موجود دیتابیس):
+//     item_kind         : base = قلم عادی | coefficient = ردیف ضریب
+//     activity_type     : inspection = بازدید | repair = تعمیرات | operation = عملیات
+//     inspection_method : climbing = صعودی | patrol = پیمایشی
+//     terrain_type      : plain / hilly / semi_mountainous / impassable
+// ═══════════════════════════════════════════════════════════════
+
+/** نگاشت عنوان فارسی/انگلیسی نوع فعالیت به کلید استاندارد (خالی = عمومی) */
+function pl_normalize_activity_type($v): ?string
+{
+    if ($v === null || $v === '') return null;
+    $map = [
+        'inspection' => 'inspection', 'repair' => 'repair', 'operation' => 'operation',
+        'بازدید' => 'inspection', 'بازديدي' => 'inspection',
+        'تعمیرات' => 'repair', 'تعميرات' => 'repair',
+        'عملیات' => 'operation', 'عمليات' => 'operation',
+    ];
+    $k = trim(mb_strtolower((string)$v, 'UTF-8'));
+    return $map[$k] ?? $map[trim((string)$v)] ?? null;
+}
+
+/** نگاشت روش بازدید: climbing = صعودی | patrol = پیمایشی (خالی = عمومی) */
+function pl_normalize_inspection_method($v): ?string
+{
+    if ($v === null || $v === '') return null;
+    $map = [
+        'climbing' => 'climbing', 'patrol' => 'patrol',
+        'صعودی' => 'climbing', 'بازدید صعودی' => 'climbing', 'بازدیدصعودی' => 'climbing',
+        'پیمایشی' => 'patrol', 'بازدید پیمایشی' => 'patrol', 'بازدیدپیمایشی' => 'patrol',
+    ];
+    $k = trim(mb_strtolower((string)$v, 'UTF-8'));
+    return $map[$k] ?? $map[trim((string)$v)] ?? null;
+}
+
+/** نگاشت عنوان فارسی/انگلیسی نوع زمین به کلید استاندارد (خالی = نامشخص) */
+function pl_normalize_terrain($v): ?string
+{
+    if ($v === null || $v === '') return null;
+    $map = [
+        'plain' => 'plain', 'hilly' => 'hilly', 'semi_mountainous' => 'semi_mountainous', 'impassable' => 'impassable',
+        'دشت' => 'plain',
+        'تپه ماهور' => 'hilly', 'تپه‌ماهور' => 'hilly',
+        'نیمه کوهستانی' => 'semi_mountainous', 'نیمه‌کوهستانی' => 'semi_mountainous',
+        'صعب العبور' => 'impassable', 'صعب‌العبور' => 'impassable',
+        'کوهستانی' => 'impassable',
+    ];
+    return $map[trim((string)$v)] ?? null;
+}
+
+/** عنوان فارسی نوع زمین */
+function pl_terrain_label(?string $t): string
+{
+    switch ($t) {
+        case 'plain': return 'دشت';
+        case 'hilly': return 'تپه‌ماهور';
+        case 'semi_mountainous': return 'نیمه‌کوهستانی';
+        case 'impassable': return 'صعب‌العبور';
+    }
+    return 'نامشخص';
+}
+
+/** نام ستون قیمت بر اساس نوع زمین */
+function pl_terrain_price_column(?string $terrain): ?string
+{
+    switch ($terrain) {
+        case 'plain': return 'unit_price_plain';
+        case 'hilly': return 'unit_price_hilly';
+        case 'semi_mountainous': return 'unit_price_semi_mountainous';
+        case 'impassable': return 'unit_price_impassable';
+    }
+    return null;
+}
+
+/** عدد امن — null/خالی/غیرعددی → null (پشتیبانی از ارقام فارسی و ٪) */
+function pl_num_or_null($v)
+{
+    if ($v === null || $v === '' || $v === false) return null;
+    if (is_numeric($v)) return $v + 0;
+    $fa = ['۰'=>'0','۱'=>'1','۲'=>'2','۳'=>'3','۴'=>'4','۵'=>'5','۶'=>'6','۷'=>'7','۸'=>'8','۹'=>'9','٫'=>'.','٪'=>''];
+    $s = strtr(trim((string)$v), $fa);
+    $s = preg_replace('/[^0-9.\-+]/', '', $s);
+    return ($s === '' || !is_numeric($s)) ? null : $s + 0;
+}
+
+/**
+ * شرط «فعال» سازگار با هر دو ساختار ستون وضعیت:
+ *   varchar ('active') یا عددی (1) + ستون اختیاری is_active
+ * دیتابیس‌های مختلف (قدیمی/جدید) بدون خطا و بدون تطبیق اشتباه پوشش داده می‌شوند.
+ */
+function pl_active_condition(PDO $pdo, string $table): string
+{
+    static $cache = [];
+    $key = $table;
+    if (!isset($cache[$key])) {
+        $isInt = false;
+        try {
+            $row = $pdo->query("SHOW COLUMNS FROM `$table` LIKE 'status'")->fetch(PDO::FETCH_ASSOC);
+            if ($row) $isInt = strpos(strtolower((string)$row['Type']), 'int') !== false;
+        } catch (Exception $e) { /* بدون ستون status */ }
+        if ($isInt) {
+            $parts = ['`status` = 1'];
+            if (Helpers::columnExists($table, 'is_active')) $parts[] = '`is_active` = 1';
+        } else {
+            $parts = ["`status` = 'active'", "`status` = '1'"];
+            if (Helpers::columnExists($table, 'is_active')) $parts[] = '`is_active` = 1';
+        }
+        $cache[$key] = '(' . implode(' OR ', $parts) . ')';
+    }
+    return $cache[$key];
+}
+
+/** مقدار «فعال» مناسب نوع ستون status برای INSERT/UPDATE (عددی 1 یا 'active') */
+function pl_active_status_value(PDO $pdo, string $table)
+{
+    try {
+        $row = $pdo->query("SHOW COLUMNS FROM `$table` LIKE 'status'")->fetch(PDO::FETCH_ASSOC);
+        if ($row && strpos(strtolower((string)$row['Type']), 'int') !== false) return 1;
+    } catch (Exception $e) { /* ignore */ }
+    return 'active';
+}
+
+/** نرمال‌سازی payload قلم فهرست بها (فرم/ایمپورت) — کلیدهای طبقه‌بندی v4.3.86 */
+function pl_item_payload(array $body): array
+{
+    $structure = trim((string)($body['tower_structure'] ?? ''));
+    // item_kind: coefficient صریح یا کلید قدیمی is_coefficient
+    $kind = strtolower(trim((string)($body['item_kind'] ?? '')));
+    if ($kind !== 'coefficient' && !empty($body['is_coefficient'])) $kind = 'coefficient';
+    if ($kind !== 'coefficient') $kind = 'base';
+    return [
+        'item_kind'                 => $kind,
+        'activity_type'             => pl_normalize_activity_type($body['activity_type'] ?? null),
+        'inspection_method'         => pl_normalize_inspection_method($body['inspection_method'] ?? null),
+        'voltage_kv'                => pl_num_or_null($body['voltage_kv'] ?? null),
+        'circuit_count'             => pl_num_or_null($body['circuit_count'] ?? null),
+        'bundle_count'              => pl_num_or_null($body['bundle_count'] ?? null),
+        'terrain_type'              => pl_normalize_terrain($body['terrain_type'] ?? null),
+        'tower_structure'           => ($structure === '' || $structure === 'همه' || $structure === 'general') ? null : $structure,
+        'unit_price_plain'          => pl_num_or_null($body['unit_price_plain'] ?? null),
+        'unit_price_hilly'          => pl_num_or_null($body['unit_price_hilly'] ?? null),
+        'unit_price_semi_mountainous' => pl_num_or_null($body['unit_price_semi_mountainous'] ?? null),
+        'unit_price_impassable'     => pl_num_or_null($body['unit_price_impassable'] ?? null),
+        'coefficient_percent'       => pl_num_or_null($body['coefficient_percent'] ?? null),
+    ];
+}
+
+/** آیا ستون‌های فهرست بها نسخه ۴.۳.۸۶ موجودند؟ (پیام راهنما در نبود مهاجرت) */
+function pl_require_v4386(string $table = 'price_list_items'): void
+{
+    if (!Helpers::columnExists($table, 'item_kind') && !Helpers::columnExists($table, 'coefficient_percent')) {
+        Response::error(409, "ستون‌های فهرست بها هنوز اضافه نشده‌اند.\n\nفایل Powerline_v4.3.86_PriceList_Invoices.sql را در phpMyAdmin اجرا کنید و دوباره تلاش کنید.");
+    }
+}
+
+/**
+ * تطبیق بهترین قلم فهرست بها با مشخصات خط/دکل/بازدید + جمع ضرایب
+ * ctx: price_list_id, activity_type, inspection_method, voltage_kv,
+ *      circuit_count, bundle_count, tower_structure, terrain_type
+ * خروجی: ['item','base_unit_price','coefficients','coefficient_percent','unit_price']
+ */
+function pl_match_price_item(PDO $pdo, array $ctx): ?array
+{
+    $listId = (int)($ctx['price_list_id'] ?? 0);
+    if ($listId <= 0) return null;
+
+    $voltage   = pl_num_or_null($ctx['voltage_kv'] ?? null);
+    $circuits  = pl_num_or_null($ctx['circuit_count'] ?? null);
+    $bundles   = pl_num_or_null($ctx['bundle_count'] ?? null);
+    $activity  = pl_normalize_activity_type($ctx['activity_type'] ?? null);
+    $method    = pl_normalize_inspection_method($ctx['inspection_method'] ?? null);
+    $structure = trim((string)($ctx['tower_structure'] ?? ''));
+    if ($structure === '' || $structure === 'همه') $structure = null;
+    $terrain   = pl_normalize_terrain($ctx['terrain_type'] ?? null);
+
+    $active = pl_active_condition($pdo, 'price_list_items');
+
+    // ── ۱) قلم عادی (base) با بیشترین تطابق اختصاصی ──
+    $where = "price_list_id = ? AND item_kind = 'base' AND $active";
+    $params = [$listId];
+    if ($activity !== null) { $where .= ' AND (activity_type = ? OR activity_type IS NULL)'; $params[] = $activity; }
+    if ($method   !== null) { $where .= ' AND (inspection_method = ? OR inspection_method IS NULL)'; $params[] = $method; }
+    if ($voltage  !== null) { $where .= ' AND (voltage_kv = ? OR voltage_kv IS NULL)'; $params[] = $voltage; }
+    if ($circuits !== null) { $where .= ' AND (circuit_count = ? OR circuit_count IS NULL)'; $params[] = (int)$circuits; }
+    if ($bundles  !== null) { $where .= ' AND (bundle_count = ? OR bundle_count IS NULL)'; $params[] = (int)$bundles; }
+    if ($structure !== null) { $where .= ' AND (tower_structure = ? OR tower_structure IS NULL)'; $params[] = $structure; }
+    if ($terrain  !== null) { $where .= ' AND (terrain_type = ? OR terrain_type IS NULL)'; $params[] = $terrain; }
+    $order = ' ORDER BY'
+        . ' (voltage_kv IS NOT NULL) DESC,'
+        . ' (circuit_count IS NOT NULL) DESC,'
+        . ' (bundle_count IS NOT NULL) DESC,'
+        . ' (tower_structure IS NOT NULL) DESC,'
+        . ' (activity_type IS NOT NULL) DESC,'
+        . ' (inspection_method IS NOT NULL) DESC,'
+        . ' (terrain_type IS NOT NULL) DESC,'
+        . ' id ASC LIMIT 1';
+    $stmt = $pdo->prepare('SELECT * FROM price_list_items WHERE ' . $where . $order);
+    $stmt->execute($params);
+    $item = $stmt->fetch(PDO::FETCH_ASSOC);
+    if (!$item) return null;
+
+    // ── ۲) قیمت واحد: قلم مخصوص همان زمین > ستون قیمت همان زمین > بهای پایه ──
+    $base = null;
+    $itemTerrain = pl_normalize_terrain($item['terrain_type'] ?? null);
+    $col = pl_terrain_price_column($terrain);
+    if ($itemTerrain !== null && $itemTerrain === $terrain && (float)$item['unit_price'] > 0) {
+        $base = (float)$item['unit_price'];
+    } elseif ($col !== null && isset($item[$col]) && $item[$col] !== null && (float)$item[$col] > 0) {
+        $base = (float)$item[$col];
+    } elseif ((float)$item['unit_price'] > 0) {
+        $base = (float)$item['unit_price'];
+    }
+
+    // ── ۳) ضرایب کاهش/افزایش متناسب با دامنه (کد ندارند؛ با دامنه اعمال می‌شوند) ──
+    $coefs = [];
+    $percent = 0.0;
+    $cWhere = "price_list_id = ? AND item_kind = 'coefficient' AND $active";
+    $cParams = [$listId];
+    if ($voltage   !== null) { $cWhere .= ' AND (voltage_kv IS NULL OR voltage_kv = ?)'; $cParams[] = $voltage; }
+    if ($activity  !== null) { $cWhere .= ' AND (activity_type IS NULL OR activity_type = ?)'; $cParams[] = $activity; }
+    if ($method    !== null) { $cWhere .= ' AND (inspection_method IS NULL OR inspection_method = ?)'; $cParams[] = $method; }
+    if ($structure !== null) { $cWhere .= ' AND (tower_structure IS NULL OR tower_structure = ?)'; $cParams[] = $structure; }
+    if ($terrain   !== null) { $cWhere .= ' AND (terrain_type IS NULL OR terrain_type = ?)'; $cParams[] = $terrain; }
+    $stmt = $pdo->prepare("SELECT id, title, coefficient_percent FROM price_list_items WHERE $cWhere ORDER BY id");
+    $stmt->execute($cParams);
+    foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $cRow) {
+        $p = (float)($cRow['coefficient_percent'] ?? 0);
+        $percent += $p;
+        $coefs[] = ['id' => (int)$cRow['id'], 'title' => $cRow['title'], 'percent' => $p];
+    }
+    $final = ($base === null) ? null : round($base * (1 + $percent / 100.0), 2);
+
+    return [
+        'item' => $item,
+        'base_unit_price' => $base,
+        'coefficients' => $coefs,
+        'coefficient_percent' => $percent,
+        'unit_price' => $final,
+    ];
+}
+
 function registerModuleRoutes(Router $router): void
 {
     // v4.3.69: ستون «سمت» پرسنل در نسخه‌های مختلف دیتابیس یا position است یا
@@ -30,7 +275,12 @@ function registerModuleRoutes(Router $router): void
     // v4.3.70: نمایش نسخه بک‌اند برای اطمینان از آپلود درست فایل‌ها
     // (بدون نیاز به لاگین — فقط شماره نسخه برمی‌گرداند)
     $router->get('backend-version', function () {
-        Response::success(['version' => 'v4.3.86', 'component' => 'Powerline PHP Backend'], 'نسخه بک‌اند');
+        // v4.3.86: features → گیت شبیه‌ساز توسعه و تشخیص قابلیت‌های موجود روی هاست
+        Response::success([
+            'version' => 'v4.3.86',
+            'component' => 'Powerline PHP Backend',
+            'features' => ['price-list-import', 'price-list-match', 'invoice-candidates', 'invoice-generate', 'invoice-items'],
+        ], 'نسخه بک‌اند');
     });
 
 
@@ -119,9 +369,9 @@ function registerModuleRoutes(Router $router): void
         if ($statusActive) {
             $specific = $table === 'contracts'
                 ? 'قرارداد فعال است و برای جلوگیری از حذف ناخواسته تا زمانی که وضعیت آن را از «فعال» خارج نکنید، حذف نمی‌شود.'
-                : ($table === 'contractors'
+                : $table === 'contractors'
                     ? 'پیمانکار فعال است و برای جلوگیری از حذف ناخواسته تا زمانی که وضعیت آن را به «غیرفعال» تغییر ندهید، حذف نمی‌شود.'
-                    : "$label فعال است — برای امنیت داده، ابتدا وضعیت آن را به «غیرفعال» تغییر دهید؛ رکوردهای غیرفعال قابل حذف هستند.");
+                    : "$label فعال است — برای امنیت داده، ابتدا وضعیت آن را به «غیرفعال» تغییر دهید؛ رکوردهای غیرفعال قابل حذف هستند.";
             Response::error(409, "حذف $label انجام نشد.\n\n$specific");
         }
 
@@ -632,6 +882,337 @@ function registerModuleRoutes(Router $router): void
         $stmt = $pdo->prepare("INSERT INTO invoices (" . implode(', ', $cols) . ") VALUES (" . implode(', ', $vals) . ")");
         $stmt->execute($params);
         Response::success(['id' => (int)$pdo->lastInsertId(), 'invoice_code' => $code], 'صورت‌وضعیت ایجاد شد', 201);
+    });
+
+    // ============================================================
+    //  v4.3.86 — کاندیداهای صورت‌وضعیت:
+    //  بازدیدهای ارسال‌شده/تأییدشدهٔ یک قرارداد در یک دوره، همراه با
+    //  قلم متناسب فهرست بها + قیمت زمین + ضرایب (محاسبهٔ سروری)
+    //  params: contract_id, period_start, period_end, price_list_id?, district_id?
+    // ============================================================
+    $router->get('invoices/candidates', function () {
+        Auth::authenticate();
+        Auth::requirePermissionSoft('financial.view');
+        pl_require_v4386();
+        $pdo = Database::getInstance()->getConnection();
+
+        $contractId = Helpers::queryInt('contract_id');
+        $periodStart = Helpers::query('period_start');
+        $periodEnd = Helpers::query('period_end');
+        if ($periodStart === null || $periodEnd === null || $periodStart === '' || $periodEnd === '') {
+            Response::error(400, 'ابتدا دوره (از تاریخ / تا تاریخ) را مشخص کنید');
+        }
+        $priceListId = Helpers::queryInt('price_list_id');
+        if (!$priceListId) {
+            $listActive = pl_active_condition($pdo, 'price_lists');
+            $row = $pdo->query("SELECT id FROM price_lists WHERE $listActive ORDER BY id DESC LIMIT 1")->fetch();
+            $priceListId = $row ? (int)$row['id'] : 0;
+        }
+        if (!$priceListId) Response::error(404, 'هیچ فهرست بهای فعالی ثبت نشده است');
+
+        $where = "i.status IN ('submitted','approved') AND i.inspection_date >= ? AND i.inspection_date <= ?";
+        $params = [$periodStart, $periodEnd];
+        if ($contractId === null || $contractId > 0) {
+            $where .= ' AND i.contract_id = ?';
+            $params[] = (int)($contractId ?? 0);
+        }
+        $districtId = Helpers::queryInt('district_id');
+        if ($districtId) { $where .= ' AND i.district_id = ?'; $params[] = $districtId; }
+
+        $stmt = $pdo->prepare("SELECT i.id, i.inspection_code, i.inspection_date, i.inspection_method, i.terrain_type AS ins_terrain,
+                i.line_id, i.tower_id, l.line_code, l.name AS line_name, l.voltage_kv, l.circuit_count, l.bundle_count,
+                l.tower_structure AS line_structure, t.tower_code, t.tower_structure AS tower_structure, t.terrain_type AS tower_terrain
+            FROM inspections i
+            LEFT JOIN `lines` l ON l.id = i.line_id
+            LEFT JOIN towers t ON t.id = i.tower_id
+            WHERE $where
+            ORDER BY i.inspection_date ASC, i.id ASC LIMIT 2000");
+        $stmt->execute($params);
+
+        $out = [];
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            $method = pl_normalize_inspection_method($row['inspection_method'] ?? null) ?? 'climbing';
+            $terrain = pl_normalize_terrain($row['ins_terrain'] ?? null)
+                ?? pl_normalize_terrain($row['tower_terrain'] ?? null) ?? 'plain';
+            $structure = $row['tower_structure'] ?? $row['line_structure'] ?? null;
+            $match = pl_match_price_item($pdo, [
+                'price_list_id' => $priceListId,
+                'voltage_kv' => $row['voltage_kv'] ?? null,
+                'circuit_count' => $row['circuit_count'] ?? null,
+                'bundle_count' => $row['bundle_count'] ?? null,
+                'activity_type' => 'inspection',
+                'inspection_method' => $method,
+                'tower_structure' => $structure,
+                'terrain_type' => $terrain,
+            ]);
+            $out[] = [
+                'inspection_id' => (int)$row['id'],
+                'inspection_code' => $row['inspection_code'],
+                'inspection_date' => $row['inspection_date'],
+                'line_code' => $row['line_code'],
+                'line_name' => $row['line_name'],
+                'tower_code' => $row['tower_code'],
+                'activity_type' => 'inspection',
+                'inspection_method' => $method,
+                'terrain_type' => $terrain,
+                'terrain_label' => pl_terrain_label($terrain),
+                'tower_structure' => $structure,
+                'voltage_kv' => $row['voltage_kv'] !== null ? $row['voltage_kv'] + 0 : null,
+                'circuit_count' => $row['circuit_count'] !== null ? (int)$row['circuit_count'] : null,
+                'bundle_count' => $row['bundle_count'] !== null ? (int)$row['bundle_count'] : null,
+                'matched' => $match ? [
+                    'item_id' => (int)$match['item']['id'],
+                    'code' => $match['item']['code'],
+                    'title' => $match['item']['title'],
+                    'unit' => $match['item']['unit'],
+                    'base_unit_price' => $match['base_unit_price'],
+                    'coefficients' => $match['coefficients'],
+                    'coefficient_percent' => $match['coefficient_percent'],
+                    'unit_price' => $match['unit_price'],
+                ] : null,
+            ];
+        }
+        Response::success(['price_list_id' => $priceListId, 'items' => $out]);
+    });
+
+    // ============================================================
+    //  v4.3.86 — صدور صورت‌وضعیت از بازدیدها و تعمیرات
+    //  body: { contract_id, period_start, period_end, price_list_id?, district_id?,
+    //          tax_percent? (پیش‌فرض ۱۰), notes?, items: [
+    //            { inspection_id, quantity? }  یا  { price_list_item_id, quantity, work_order_id?, terrain_type?, tower_structure? }
+    //          ] }
+    //  قیمت‌ها همه در سرور از فهرست بها بازمحاسبه می‌شوند (قابل جعل نیستند)
+    // ============================================================
+    $router->post('invoices/generate', function () {
+        $user = Auth::authenticate();
+        Auth::requirePermissionSoft('financial.create');
+        pl_require_v4386('invoice_items');
+        $body = Helpers::getJsonBody();
+        $pdo = Database::getInstance()->getConnection();
+
+        $contractId = (int)($body['contract_id'] ?? 0);
+        $items = is_array($body['items'] ?? null) ? $body['items'] : [];
+        if ($contractId <= 0) Response::error(400, 'قرارداد الزامی است');
+        if (count($items) === 0) Response::error(400, 'هیچ قلمی برای صورت‌وضعیت انتخاب نشده است');
+
+        $contract = $pdo->prepare('SELECT id, title, contractor_id FROM contracts WHERE id = ?');
+        $contract->execute([$contractId]);
+        $contract = $contract->fetch(PDO::FETCH_ASSOC);
+        if (!$contract) Response::error(404, 'قرارداد پیدا نشد');
+
+        $periodStart = $body['period_start'] ?? date('Y-m-d');
+        $periodEnd = $body['period_end'] ?? date('Y-m-d');
+        $taxPercent = pl_num_or_null($body['tax_percent'] ?? null);
+        if ($taxPercent === null) $taxPercent = 10.0;
+        $contractorId = $body['contractor_id'] ?? $contract['contractor_id'] ?? null;
+
+        $priceListId = (int)($body['price_list_id'] ?? 0);
+        if ($priceListId <= 0) {
+            $listActive = pl_active_condition($pdo, 'price_lists');
+            $row = $pdo->query("SELECT id FROM price_lists WHERE $listActive ORDER BY id DESC LIMIT 1")->fetch();
+            $priceListId = $row ? (int)$row['id'] : 0;
+        }
+        if ($priceListId <= 0) Response::error(404, 'فهرست بهای مبنای محاسبه پیدا نشد');
+
+        // ── بازمحاسبهٔ سروری همهٔ اقلام ──
+        $lines = [];
+        $sumBase = 0.0; $sumCoef = 0.0; $sumNet = 0.0;
+        $insStmt = $pdo->prepare("SELECT i.id, i.inspection_code, i.inspection_method, i.terrain_type AS ins_terrain,
+                l.line_code, l.name AS line_name, l.voltage_kv, l.circuit_count, l.bundle_count,
+                l.tower_structure AS line_structure, t.tower_code, t.tower_structure AS tower_structure, t.terrain_type AS tower_terrain
+            FROM inspections i
+            LEFT JOIN `lines` l ON l.id = i.line_id
+            LEFT JOIN towers t ON t.id = i.tower_id
+            WHERE i.id = ?");
+        $itemStmt = $pdo->prepare('SELECT * FROM price_list_items WHERE id = ? AND price_list_id = ?');
+        $woStmt = $pdo->prepare('SELECT wo_code, title FROM work_orders WHERE id = ?');
+
+        foreach ($items as $it) {
+            if (!is_array($it)) continue;
+            $quantity = max(0.001, (float)($it['quantity'] ?? 1));
+            $desc = ''; $unit = ''; $matchedCode = null; $inspectionId = null; $workOrderId = null;
+            $priceListItemId = null; $base = 0.0; $pct = 0.0; $terrain = null; $structure = null;
+
+            if (!empty($it['inspection_id'])) {
+                // ── قلم بازدید: تطبیق خودکار از فهرست بها ──
+                $inspectionId = (int)$it['inspection_id'];
+                $insStmt->execute([$inspectionId]);
+                $ins = $insStmt->fetch(PDO::FETCH_ASSOC);
+                if (!$ins) Response::error(404, "بازدید #$inspectionId پیدا نشد");
+                $method = pl_normalize_inspection_method($ins['inspection_method'] ?? null) ?? 'climbing';
+                $terrain = pl_normalize_terrain($ins['ins_terrain'] ?? null)
+                    ?? pl_normalize_terrain($ins['tower_terrain'] ?? null) ?? 'plain';
+                $structure = $ins['tower_structure'] ?? $ins['line_structure'] ?? null;
+                $match = pl_match_price_item($pdo, [
+                    'price_list_id' => $priceListId,
+                    'voltage_kv' => $ins['voltage_kv'] ?? null,
+                    'circuit_count' => $ins['circuit_count'] ?? null,
+                    'bundle_count' => $ins['bundle_count'] ?? null,
+                    'activity_type' => 'inspection',
+                    'inspection_method' => $method,
+                    'tower_structure' => $structure,
+                    'terrain_type' => $terrain,
+                ]);
+                if (!$match || $match['unit_price'] === null) {
+                    Response::error(422, "برای بازدید {$ins['inspection_code']} قلم مناسبی در فهرست بها یافت نشد (" . ($method === 'patrol' ? 'پیمایشی' : 'صعودی') . ' / ' . pl_terrain_label($terrain) . ')');
+                }
+                $matchedCode = $match['item']['code'];
+                $priceListItemId = (int)$match['item']['id'];
+                $unit = $match['item']['unit'] ?: 'دکل';
+                $actLabel = $method === 'patrol' ? 'بازدید پیمایشی' : 'بازدید صعودی';
+                $desc = $actLabel . ' دکل ' . ($ins['tower_code'] ?: '—') . ' — خط ' . ($ins['line_code'] ?: '—')
+                    . ' — ' . pl_terrain_label($terrain)
+                    . ($structure ? " — $structure" : '')
+                    . ' [' . $matchedCode . ']';
+                $base = $match['base_unit_price']; $pct = $match['coefficient_percent'];
+            } elseif (!empty($it['price_list_item_id'])) {
+                // ── قلم دستی (تعمیرات/عملیات) ──
+                $itemStmt->execute([(int)$it['price_list_item_id'], $priceListId]);
+                $pli = $itemStmt->fetch(PDO::FETCH_ASSOC);
+                if (!$pli) Response::error(404, 'قلم فهرست بها پیدا نشد: ' . (int)$it['price_list_item_id']);
+                $terrain = pl_normalize_terrain($it['terrain_type'] ?? null);
+                $structure = trim((string)($it['tower_structure'] ?? '')) ?: null;
+                $base = null; $col = pl_terrain_price_column($terrain);
+                $itemTerrain = pl_normalize_terrain($pli['terrain_type'] ?? null);
+                if ($itemTerrain !== null && $itemTerrain === $terrain && (float)$pli['unit_price'] > 0) {
+                    $base = (float)$pli['unit_price'];
+                } elseif ($col !== null && $pli[$col] !== null && (float)$pli[$col] > 0) {
+                    $base = (float)$pli[$col];
+                } elseif ((float)$pli['unit_price'] > 0) {
+                    $base = (float)$pli['unit_price'];
+                } else {
+                    $base = 0.0;
+                }
+                // ضرایب فقط وقتی دامنه مشخص شده باشد (سازه/فعالیت/روش/زمین)
+                $cActive = pl_active_condition($pdo, 'price_list_items');
+                $cWhere = "price_list_id = ? AND item_kind = 'coefficient' AND $cActive";
+                $cParams = [$priceListId];
+                $activity = pl_normalize_activity_type($pli['activity_type'] ?? null);
+                $mth = pl_normalize_inspection_method($pli['inspection_method'] ?? null);
+                $voltage = pl_num_or_null($pli['voltage_kv'] ?? null);
+                if ($voltage   !== null) { $cWhere .= ' AND (voltage_kv IS NULL OR voltage_kv = ?)'; $cParams[] = $voltage; }
+                if ($activity  !== null) { $cWhere .= ' AND (activity_type IS NULL OR activity_type = ?)'; $cParams[] = $activity; }
+                if ($mth       !== null) { $cWhere .= ' AND (inspection_method IS NULL OR inspection_method = ?)'; $cParams[] = $mth; }
+                if ($structure !== null) { $cWhere .= ' AND (tower_structure IS NULL OR tower_structure = ?)'; $cParams[] = $structure; }
+                if ($terrain   !== null) { $cWhere .= ' AND (terrain_type IS NULL OR terrain_type = ?)'; $cParams[] = $terrain; }
+                $cs = $pdo->prepare("SELECT title, coefficient_percent FROM price_list_items WHERE $cWhere ORDER BY id");
+                $cs->execute($cParams);
+                $pct = 0.0;
+                foreach ($cs->fetchAll(PDO::FETCH_ASSOC) as $cRow) $pct += (float)$cRow['coefficient_percent'];
+                $matchedCode = $pli['code'];
+                $priceListItemId = (int)$pli['id'];
+                $unit = $pli['unit'] ?: 'عدد';
+                $desc = $pli['title'];
+                if (!empty($it['work_order_id'])) {
+                    $workOrderId = (int)$it['work_order_id'];
+                    $woStmt->execute([$workOrderId]);
+                    $wo = $woStmt->fetch(PDO::FETCH_ASSOC);
+                    if ($wo) $desc .= ' — دستورکار ' . $wo['wo_code'];
+                }
+                $desc .= ' [' . $matchedCode . ']';
+            } else {
+                continue;
+            }
+
+            $lineBase = round($base * $quantity, 2);
+            $lineCoef = round($lineBase * $pct / 100.0, 2);
+            $lineTotal = $lineBase + $lineCoef;
+            $sumBase += $lineBase; $sumCoef += $lineCoef; $sumNet += $lineTotal;
+            $lines[] = [
+                'inspection_id' => $inspectionId,
+                'work_order_id' => $workOrderId,
+                'price_list_item_id' => $priceListItemId,
+                'description' => $desc,
+                'unit' => $unit,
+                'quantity' => $quantity,
+                'unit_price' => $base,
+                'total_price' => $lineTotal,
+                'base_amount' => $lineBase,
+                'coefficient_percent' => $pct,
+                'coefficient_amount' => $lineCoef,
+                'terrain_type' => $terrain ?? null,
+                'tower_structure' => $structure,
+            ];
+        }
+        if (count($lines) === 0) Response::error(400, 'هیچ قلم معتبری یافت نشد');
+
+        $tax = round($sumNet * $taxPercent / 100.0, 2);
+        $final = round($sumNet + $tax, 2);
+        $code = 'INV-' . date('Y') . '-' . str_pad((string)random_int(0, 9999), 4, '0', STR_PAD_LEFT);
+        $districtId = Helpers::districtFromBody($body, 'invoices');
+
+        // ── ثبت صورت‌وضعیت ──
+        $invCols = ['invoice_code', 'contract_id', 'contractor_id', 'period_start', 'period_end',
+            'total_amount', 'tax_amount', 'final_amount', 'status', 'notes', 'created_at'];
+        $invVals = ['?', '?', '?', '?', '?', '?', '?', '?', "'draft'", '?', 'NOW()'];
+        $invParams = [$code, $contractId, $contractorId, $periodStart, $periodEnd, $sumNet, $tax, $final, $body['notes'] ?? null];
+        foreach ([
+            'price_list_id' => $priceListId,
+            'net_amount' => $sumNet,
+            'coefficient_amount' => $sumCoef,
+            'tax_percent' => $taxPercent,
+        ] as $col => $val) {
+            if (Helpers::columnExists('invoices', $col)) { $invCols[] = "`$col`"; $invVals[] = '?'; $invParams[] = $val; }
+        }
+        if (Helpers::columnExists('invoices', 'activity_status')) { $invCols[] = 'activity_status'; $invVals[] = "'inactive'"; }
+        if (Helpers::columnExists('invoices', 'district_id')) { $invCols[] = 'district_id'; $invVals[] = '?'; $invParams[] = $districtId; }
+        $pdo->prepare('INSERT INTO invoices (' . implode(', ', $invCols) . ') VALUES (' . implode(', ', $invVals) . ')')->execute($invParams);
+        $invoiceId = (int)$pdo->lastInsertId();
+
+        // ── ثبت اقلام ──
+        $iiCols = ['invoice_id', 'price_list_item_id', 'work_order_id', 'description', 'unit', 'quantity', 'unit_price', 'total_price'];
+        foreach (['inspection_id', 'terrain_type', 'tower_structure', 'coefficient_percent', 'coefficient_amount', 'base_amount'] as $col) {
+            if (Helpers::columnExists('invoice_items', $col)) $iiCols[] = "`$col`";
+        }
+        $iiStmt = $pdo->prepare('INSERT INTO invoice_items (' . implode(', ', $iiCols) . ') VALUES (' . implode(', ', array_fill(0, count($iiCols), '?')) . ')');
+        foreach ($lines as $ln) {
+            $p = [];
+            foreach ($iiCols as $c) {
+                $k = trim($c, '`');
+                $p[] = $ln[$k] ?? null;
+            }
+            $iiStmt->execute($p);
+        }
+
+        Logger::info('Invoice generated', ['invoice_id' => $invoiceId, 'code' => $code, 'items' => count($lines), 'user_id' => $user['id']]);
+        Response::success([
+            'id' => $invoiceId,
+            'invoice_code' => $code,
+            'items_count' => count($lines),
+            'base_amount' => round($sumBase, 2),
+            'coefficient_amount' => round($sumCoef, 2),
+            'net_amount' => round($sumNet, 2),
+            'tax_amount' => $tax,
+            'final_amount' => $final,
+        ], 'صورت‌وضعیت صادر شد', 201);
+    });
+
+    // ============================================================
+    //  v4.3.86 — اقلام یک صورت‌وضعیت (برای مشاهده و چاپ)
+    // ============================================================
+    $router->get('invoices/{id}/items', function ($id) {
+        Auth::authenticate();
+        Auth::requirePermissionSoft('financial.view');
+        $pdo = Database::getInstance()->getConnection();
+        $stmt = $pdo->prepare("SELECT ii.*, pli.code AS pli_code, ins.inspection_code, wo.wo_code
+            FROM invoice_items ii
+            LEFT JOIN price_list_items pli ON pli.id = ii.price_list_item_id
+            LEFT JOIN inspections ins ON ins.id = ii.inspection_id
+            LEFT JOIN work_orders wo ON wo.id = ii.work_order_id
+            WHERE ii.invoice_id = ?
+            ORDER BY ii.id ASC");
+        $stmt->execute([(int)$id]);
+        $rows = $stmt->fetchAll();
+        foreach ($rows as &$r) {
+            foreach (['quantity','unit_price','total_price','base_amount','coefficient_amount'] as $k) {
+                if (array_key_exists($k, $r) && $r[$k] !== null) $r[$k] = $r[$k] + 0;
+            }
+        }
+        unset($r);
+        $inv = $pdo->prepare('SELECT i.*, c.title AS contract_title, ct.contractor_name FROM invoices i LEFT JOIN contracts c ON c.id = i.contract_id LEFT JOIN contractors ct ON ct.id = i.contractor_id WHERE i.id = ?');
+        $inv->execute([(int)$id]);
+        $invoice = $inv->fetch(PDO::FETCH_ASSOC);
+        Response::success(['invoice' => $invoice ?: null, 'items' => $rows]);
     });
 
     $router->put('invoices/{id}', function ($id) {
@@ -1668,10 +2249,9 @@ function registerModuleRoutes(Router $router): void
         Auth::requirePermissionSoft('price_lists.view');
         $pdo = Database::getInstance()->getConnection();
         $contractId = Helpers::getContractId();
-        $statusCol = plb_list_status_col($pdo);
         $where = '1=1'; $params = [];
         if ($contractId === 0) { $where .= ' AND pl.contract_id IS NULL'; } elseif ($contractId !== null) { $where .= ' AND pl.contract_id = ?'; $params[] = $contractId; }
-        $stmt = $pdo->prepare("SELECT pl.*, c.title AS contract_title, pl.`$statusCol` AS status FROM price_lists pl LEFT JOIN contracts c ON c.id = pl.contract_id WHERE $where ORDER BY pl.id DESC");
+        $stmt = $pdo->prepare("SELECT pl.*, c.title AS contract_title FROM price_lists pl LEFT JOIN contracts c ON c.id = pl.contract_id WHERE $where ORDER BY pl.id DESC");
         $stmt->execute($params);
         Response::success($stmt->fetchAll());
     });
@@ -1682,10 +2262,8 @@ function registerModuleRoutes(Router $router): void
         $body = Helpers::getJsonBody();
         if (empty($body['name'])) Response::error(400, 'نام فهرست الزامی است');
         $pdo = Database::getInstance()->getConnection();
-        $statusCol = plb_list_status_col($pdo);
-        $statusValue = $statusCol === 'is_active' ? 1 : 'active';
-        $stmt = $pdo->prepare("INSERT INTO price_lists (name, version, effective_date, contract_id, `$statusCol`, created_at) VALUES (?, ?, ?, ?, ?, NOW())");
-        $stmt->execute([$body['name'], $body['version'] ?? '1.0', $body['effective_date'] ?? date('Y-m-d'), $body['contract_id'] ?? null, $statusValue]);
+        $stmt = $pdo->prepare("INSERT INTO price_lists (name, version, effective_date, contract_id, status, created_at) VALUES (?, ?, ?, ?, 'active', NOW())");
+        $stmt->execute([$body['name'], $body['version'] ?? '1.0', $body['effective_date'] ?? date('Y-m-d'), $body['contract_id'] ?? null]);
         Response::success(['id' => (int)$pdo->lastInsertId()], 'فهرست بها ایجاد شد', 201);
     });
 
@@ -1694,15 +2272,9 @@ function registerModuleRoutes(Router $router): void
         Auth::requirePermissionSoft('price_lists.update');
         $body = Helpers::getJsonBody();
         $pdo = Database::getInstance()->getConnection();
-        $statusCol = plb_list_status_col($pdo);
+        $fields = ['name','version','effective_date','contract_id','status'];
         $updates=[]; $params=[];
-        foreach (['name','version','effective_date','contract_id'] as $f) { if (array_key_exists($f,$body)) { $updates[] = "`$f` = ?"; $params[] = $body[$f]; } }
-        if (array_key_exists('status',$body)) {
-            $updates[] = "`$statusCol` = ?";
-            $params[] = $statusCol === 'is_active'
-                ? (in_array($body['status'], [1,'1',true,'active'], true) ? 1 : 0)
-                : (in_array($body['status'], [1,'1',true,'active'], true) ? 'active' : 'inactive');
-        }
+        foreach ($fields as $f) { if (array_key_exists($f,$body)) { $updates[] = "`$f` = ?"; $params[] = $body[$f]; } }
         if (!$updates) Response::error(400, 'هیچ فیلدی برای ویرایش ارسال نشده');
         $params[]=(int)$id;
         $pdo->prepare("UPDATE price_lists SET ".implode(', ',$updates)." WHERE id = ?")->execute($params);
@@ -1714,12 +2286,60 @@ function registerModuleRoutes(Router $router): void
         Auth::requirePermissionSoft('price_lists.view');
         $pdo = Database::getInstance()->getConnection();
         $listId = Helpers::queryInt('list_id');
-        $statusCol = plb_price_status_col($pdo);
         $where = '1=1'; $params = [];
-        if ($listId) { $where = 'pli.price_list_id = ?'; $params[] = $listId; }
-        $stmt = $pdo->prepare("SELECT pli.*, pli.`$statusCol` AS status FROM price_list_items pli WHERE $where ORDER BY pli.id LIMIT 5000");
+        if ($listId) { $where .= ' AND pli.price_list_id = ?'; $params[] = $listId; }
+        // v4.3.86: فیلترهای طبقه‌بندی — ولتاژ/مدار/باندل/فعالیت/روش بازدید/سازه/ضریب + جستجو
+        $voltage = Helpers::query('voltage_kv');
+        if ($voltage !== null && $voltage !== '') {
+            if ($voltage === 'general') { $where .= ' AND pli.voltage_kv IS NULL'; }
+            else { $where .= ' AND pli.voltage_kv = ?'; $params[] = (float)$voltage; }
+        }
+        $circuits = Helpers::query('circuit_count');
+        if ($circuits !== null && $circuits !== '') {
+            if ($circuits === 'general') { $where .= ' AND pli.circuit_count IS NULL'; }
+            else { $where .= ' AND pli.circuit_count = ?'; $params[] = (int)$circuits; }
+        }
+        $bundles = Helpers::query('bundle_count');
+        if ($bundles !== null && $bundles !== '') {
+            if ($bundles === 'general') { $where .= ' AND pli.bundle_count IS NULL'; }
+            else { $where .= ' AND pli.bundle_count = ?'; $params[] = (int)$bundles; }
+        }
+        $activity = Helpers::query('activity_type');
+        if ($activity !== null && $activity !== '') {
+            $act = pl_normalize_activity_type($activity);
+            if ($act !== null) { $where .= ' AND pli.activity_type = ?'; $params[] = $act; }
+        }
+        $method = Helpers::query('inspection_method');
+        if ($method !== null && $method !== '') {
+            $m = pl_normalize_inspection_method($method);
+            if ($m !== null) { $where .= ' AND pli.inspection_method = ?'; $params[] = $m; }
+        }
+        $kind = Helpers::query('item_kind');
+        if ($kind === 'coefficient' || $kind === 'base') { $where .= ' AND pli.item_kind = ?'; $params[] = $kind; }
+        $coef = Helpers::query('coefficient');
+        if ($coef === '1') { $where .= " AND pli.item_kind = 'coefficient'"; }
+        elseif ($coef === '0') { $where .= " AND (pli.item_kind = 'base' OR pli.item_kind IS NULL)"; }
+        $search = Helpers::getSearch();
+        if (!empty($search)) {
+            $where .= ' AND (pli.code LIKE ? OR pli.title LIKE ? OR pli.category LIKE ?)';
+            $sp = "%$search%"; $params[] = $sp; $params[] = $sp; $params[] = $sp;
+        }
+        $hasClassCols = Helpers::columnExists('price_list_items', 'item_kind') || Helpers::columnExists('price_list_items', 'coefficient_percent');
+        $orderBy = $hasClassCols ? " ORDER BY (pli.item_kind = 'coefficient') ASC, pli.id ASC" : ' ORDER BY pli.id ASC';
+        $stmt = $pdo->prepare("SELECT pli.* FROM price_list_items pli WHERE $where$orderBy LIMIT 5000");
         $stmt->execute($params);
-        Response::success($stmt->fetchAll());
+        $rows = $stmt->fetchAll();
+        // اعداد به int/float تبدیل می‌شوند تا فرانت بدون تبدیل محاسبه کند
+        foreach ($rows as &$r) {
+            foreach (['voltage_kv','unit_price','unit_price_plain','unit_price_hilly','unit_price_semi_mountainous','unit_price_impassable','coefficient_percent'] as $k) {
+                if (array_key_exists($k, $r) && $r[$k] !== null) $r[$k] = $r[$k] + 0;
+            }
+            foreach (['circuit_count','bundle_count'] as $k) {
+                if (array_key_exists($k, $r) && $r[$k] !== null) $r[$k] = (int)$r[$k];
+            }
+        }
+        unset($r);
+        Response::success($rows);
     });
 
     $router->post('price-list-items', function () {
@@ -1727,12 +2347,27 @@ function registerModuleRoutes(Router $router): void
         Auth::requirePermissionSoft('price_lists.create');
         $body = Helpers::getJsonBody();
         if (empty($body['title']) || empty($body['price_list_id'])) Response::error(400, 'عنوان و فهرست الزامی است');
+        pl_require_v4386();
         $pdo = Database::getInstance()->getConnection();
         $code = $body['code'] ?? ('PL-' . str_pad((string)random_int(0, 9999), 4, '0', STR_PAD_LEFT));
-        $statusCol = plb_price_status_col($pdo); $statusVal = $statusCol === 'is_active' ? 1 : 'active';
-        $cols=['price_list_id','code','title','unit','unit_price','category',$statusCol]; $vals=['?','?','?','?','?','?','?']; $params=[(int)$body['price_list_id'],$code,$body['title'],$body['unit'] ?? 'عدد',$body['unit_price'] ?? 0,$body['category'] ?? 'عملیات',$statusVal];
-        foreach (['item_kind','activity_type','voltage_kv','circuit_count','bundle_count','terrain_type','inspection_method'] as $f) { if (Helpers::columnExists('price_list_items',$f)) { $cols[]=$f; $vals[]='?'; $params[]=$body[$f] ?? null; } }
-        $stmt=$pdo->prepare("INSERT INTO price_list_items (`" . implode('`,`',$cols) . "`) VALUES (" . implode(',',$vals) . ")");
+        $cls = pl_item_payload($body);
+        // وضعیت فعال — سازگار با ستون varchar/عددی + is_active
+        $cols = ['price_list_id', 'code', 'title', 'unit', 'unit_price', 'category',
+            'item_kind', 'activity_type', 'inspection_method', 'voltage_kv', 'circuit_count', 'bundle_count',
+            'terrain_type', 'tower_structure',
+            'unit_price_plain', 'unit_price_hilly', 'unit_price_semi_mountainous', 'unit_price_impassable',
+            'coefficient_percent'];
+        $params = [
+            (int)$body['price_list_id'], $code, $body['title'], $body['unit'] ?? 'دکل', $body['unit_price'] ?? 0, $body['category'] ?? 'عملیات',
+            $cls['item_kind'], $cls['activity_type'], $cls['inspection_method'], $cls['voltage_kv'], $cls['circuit_count'], $cls['bundle_count'],
+            $cls['terrain_type'], $cls['tower_structure'],
+            $cls['unit_price_plain'], $cls['unit_price_hilly'], $cls['unit_price_semi_mountainous'], $cls['unit_price_impassable'],
+            $cls['coefficient_percent'],
+        ];
+        $vals = array_fill(0, count($cols), '?');
+        if (Helpers::columnExists('price_list_items', 'status')) { $cols[] = 'status'; $vals[] = '?'; $params[] = pl_active_status_value($pdo, 'price_list_items'); }
+        if (Helpers::columnExists('price_list_items', 'is_active')) { $cols[] = 'is_active'; $vals[] = '1'; }
+        $stmt = $pdo->prepare('INSERT INTO price_list_items (' . implode(', ', $cols) . ') VALUES (' . implode(', ', $vals) . ')');
         $stmt->execute($params);
         Response::success(['id' => (int)$pdo->lastInsertId(), 'code' => $code], 'قلم ایجاد شد', 201);
     });
@@ -1743,11 +2378,32 @@ function registerModuleRoutes(Router $router): void
         $body = Helpers::getJsonBody(); $pdo = Database::getInstance()->getConnection();
         // v4.3.81: قفل امور — تغییر امور رکورد فقط برای مدیر
         $body = Helpers::stripDistrictForNonAdmin($body);
-        $statusCol = plb_price_status_col($pdo);
-        $fields = ['code','title','unit','unit_price','category','item_kind','activity_type','voltage_kv','circuit_count','bundle_count','terrain_type','inspection_method'];
+        $fields = ['code','title','unit','unit_price','category'];
+        // v4.3.86: فیلدهای طبقه‌بندی + قیمت‌های زمین + ضریب — فقط فیلدهای ارسال‌شده
+        // با مقدار «نرمال‌شده» ذخیره می‌شوند (فارسی → کلید استاندارد)؛ فیلد ارسال‌نشده دست نمی‌خورد
+        if (Helpers::columnExists('price_list_items', 'item_kind') || Helpers::columnExists('price_list_items', 'coefficient_percent')) {
+            $cls = pl_item_payload($body);
+            foreach ($cls as $k => $v) {
+                if (array_key_exists($k, $body)) { $body[$k] = $v; $fields[] = $k; }
+            }
+        }
+        // وضعیت: مقدار 'active'/'inactive' به شکل عددی ستون تبدیل می‌شود
+        if (array_key_exists('status', $body) && Helpers::columnExists('price_list_items', 'status')) {
+            $fields[] = 'status';
+            $isInactive = in_array(strtolower(trim((string)$body['status'])), ['inactive', '0', 'false', 'deactive'], true);
+            $activeVal = pl_active_status_value($pdo, 'price_list_items');
+            $inactiveVal = is_int($activeVal) ? 0 : 'inactive';
+            $body['status'] = $isInactive ? $inactiveVal : $activeVal;
+            if (Helpers::columnExists('price_list_items', 'is_active')) {
+                $fields[] = 'is_active';
+                $body['is_active'] = $isInactive ? 0 : 1;
+            }
+        } elseif (array_key_exists('status', $body)) {
+            // ستون status وجود ندارد — مقدار نادیده گرفته می‌شود
+            unset($body['status']);
+        }
         $updates = []; $params = [];
         foreach ($fields as $f) { if (array_key_exists($f, $body)) { $updates[] = "`$f` = ?"; $params[] = $body[$f]; } }
-        if (array_key_exists('status',$body)) { $updates[]="`$statusCol` = ?"; $params[]=$statusCol==='is_active'?(in_array($body['status'],[1,'1',true,'active'],true)?1:0):(in_array($body['status'],[1,'1',true,'active'],true)?'active':'inactive'); }
         if (!$updates) Response::error(400, 'هیچ فیلدی ارسال نشده');
         $params[] = (int)$id;
         $pdo->prepare("UPDATE price_list_items SET " . implode(', ', $updates) . " WHERE id = ?")->execute($params);
@@ -1759,6 +2415,149 @@ function registerModuleRoutes(Router $router): void
         Auth::requirePermissionSoft('price_lists.delete');
         Database::getInstance()->execute("DELETE FROM price_list_items WHERE id = ?", [(int)$id]);
         Response::success(null, 'قلم حذف شد');
+    });
+
+    // ============================================================
+    //  v4.3.86 — ایمپورت گروهی فهرست بها (شیت «اقلام» + شیت «ضرایب»)
+    //  body: { price_list_id, items: [...], replace?: bool }
+    //  هر item همان فیلدهای POST + اجبار title
+    // ============================================================
+    $router->post('price-list-items/import', function () {
+        Auth::authenticate();
+        Auth::requirePermissionSoft('price_lists.create');
+        pl_require_v4386();
+        $body = Helpers::getJsonBody();
+        $listId = (int)($body['price_list_id'] ?? 0);
+        $items = is_array($body['items'] ?? null) ? $body['items'] : [];
+        $replace = !empty($body['replace']);
+        if ($listId <= 0) Response::error(400, 'ابتدا یک فهرست بها انتخاب کنید');
+        if (count($items) === 0) Response::error(400, 'هیچ ردیفی برای ایمپورت یافت نشد');
+
+        $pdo = Database::getInstance()->getConnection();
+        $chk = $pdo->prepare('SELECT id FROM price_lists WHERE id = ?');
+        $chk->execute([$listId]);
+        if (!$chk->fetch()) Response::error(404, 'فهرست بها پیدا نشد');
+
+        // ساخت INSERT پویا — سازگار با وجود/نبود ستون‌های status و is_active
+        $insCols = ['price_list_id', 'code', 'title', 'unit', 'unit_price', 'category',
+            'item_kind', 'activity_type', 'inspection_method', 'voltage_kv', 'circuit_count', 'bundle_count', 'terrain_type', 'tower_structure',
+            'unit_price_plain', 'unit_price_hilly', 'unit_price_semi_mountainous', 'unit_price_impassable',
+            'coefficient_percent'];
+        $hasStatusCol = Helpers::columnExists('price_list_items', 'status');
+        $hasIsActiveCol = Helpers::columnExists('price_list_items', 'is_active');
+        $insValCols = $insCols;
+        if ($hasStatusCol) $insValCols[] = 'status';
+        if ($hasIsActiveCol) $insValCols[] = 'is_active';
+        $stmt = $pdo->prepare('INSERT INTO price_list_items (' . implode(', ', $insValCols) . ') VALUES ('
+            . implode(', ', array_fill(0, count($insValCols), '?')) . ')');
+
+        $pdo->beginTransaction();
+        try {
+            if ($replace) {
+                $pdo->prepare('DELETE FROM price_list_items WHERE price_list_id = ?')->execute([$listId]);
+            }
+            $normal = 0; $coefs = 0; $seq = 0;
+            $activeVal = pl_active_status_value($pdo, 'price_list_items');
+            foreach ($items as $it) {
+                if (!is_array($it) || empty($it['title'])) continue;
+                $cls = pl_item_payload($it);
+                $code = trim((string)($it['code'] ?? ''));
+                if ($code === '') {
+                    $seq++;
+                    $code = ($cls['item_kind'] === 'coefficient' ? 'COEF-' : 'PL-') . str_pad((string)$seq, 3, '0', STR_PAD_LEFT);
+                }
+                $row = [
+                    $listId, $code, $it['title'],
+                    trim((string)($it['unit'] ?? '')) !== '' ? $it['unit'] : ($cls['item_kind'] === 'coefficient' ? 'ضریب' : 'دکل'),
+                    pl_num_or_null($it['unit_price'] ?? null) ?? 0,
+                    trim((string)($it['category'] ?? '')) !== '' ? $it['category'] : ($cls['item_kind'] === 'coefficient' ? 'ضریب' : 'عملیات'),
+                    $cls['item_kind'], $cls['activity_type'], $cls['inspection_method'],
+                    $cls['voltage_kv'], $cls['circuit_count'], $cls['bundle_count'], $cls['terrain_type'], $cls['tower_structure'],
+                    $cls['unit_price_plain'], $cls['unit_price_hilly'], $cls['unit_price_semi_mountainous'], $cls['unit_price_impassable'],
+                    $cls['coefficient_percent'],
+                ];
+                if ($hasStatusCol) $row[] = $activeVal;
+                if ($hasIsActiveCol) $row[] = 1;
+                $stmt->execute($row);
+                if ($cls['item_kind'] === 'coefficient') $coefs++; else $normal++;
+            }
+            $pdo->commit();
+        } catch (Exception $e) {
+            $pdo->rollBack();
+            Response::error(500, 'خطا در ذخیره اقلام: ' . $e->getMessage());
+        }
+        Response::success(['imported_items' => $normal, 'imported_coefficients' => $coefs],
+            "ایمپورت انجام شد — $normal قلم و $coefs ضریب ثبت شد" . ($replace ? ' (اقلام قبلی حذف شدند)' : ''), 201);
+    });
+
+    // ============================================================
+    //  v4.3.86 — تطبیق قلم فهرست بها با خط/دکل/روش بازدید
+    //  params: line_id, tower_id?, inspection_method (صعودی/پیمایشی),
+    //          terrain_type?, price_list_id? (پیش‌فرض: آخرین فهرست فعال)
+    // ============================================================
+    $router->get('price-list-items/match', function () {
+        Auth::authenticate();
+        Auth::requirePermissionSoft('price_lists.view');
+        pl_require_v4386();
+        $pdo = Database::getInstance()->getConnection();
+
+        $lineId = Helpers::queryInt('line_id');
+        $towerId = Helpers::queryInt('tower_id');
+        $method = pl_normalize_inspection_method(Helpers::query('inspection_method') ?? Helpers::query('inspection_type')) ?? 'climbing';
+        $terrainOverride = pl_normalize_terrain(Helpers::query('terrain_type'));
+        $priceListId = Helpers::queryInt('price_list_id');
+
+        // فهرست پیش‌فرض: آخرین فهرست فعال (سازگار با ستون وضعیت عددی/متنی)
+        if (!$priceListId) {
+            $listActive = pl_active_condition($pdo, 'price_lists');
+            $row = $pdo->query("SELECT id FROM price_lists WHERE $listActive ORDER BY id DESC LIMIT 1")->fetch();
+            if (!$row) Response::error(404, 'هیچ فهرست بهای فعالی ثبت نشده است');
+            $priceListId = (int)$row['id'];
+        }
+
+        $line = null; $tower = null;
+        if ($lineId) {
+            $line = $pdo->query("SELECT id, line_code, name, voltage_kv, circuit_count, bundle_count, tower_structure FROM `lines` WHERE id = " . (int)$lineId)->fetch(PDO::FETCH_ASSOC);
+            if (!$line) Response::error(404, 'خط پیدا نشد');
+        }
+        if ($towerId) {
+            $tower = $pdo->query('SELECT id, tower_code, tower_structure, terrain_type FROM towers WHERE id = ' . (int)$towerId)->fetch(PDO::FETCH_ASSOC);
+            if (!$tower) Response::error(404, 'دکل پیدا نشد');
+        }
+
+        $structure = $tower['tower_structure'] ?? ($line['tower_structure'] ?? null);
+        $terrain = $terrainOverride ?? pl_normalize_terrain($tower['terrain_type'] ?? null) ?? 'plain';
+
+        $match = pl_match_price_item($pdo, [
+            'price_list_id' => $priceListId,
+            'voltage_kv' => $line['voltage_kv'] ?? null,
+            'circuit_count' => $line['circuit_count'] ?? null,
+            'bundle_count' => $line['bundle_count'] ?? null,
+            'activity_type' => 'inspection',
+            'inspection_method' => $method,
+            'tower_structure' => $structure,
+            'terrain_type' => $terrain,
+        ]);
+
+        Response::success([
+            'price_list_id' => $priceListId,
+            'line' => $line,
+            'tower' => $tower,
+            'inspection_method' => $method,
+            'terrain_type' => $terrain,
+            'terrain_label' => pl_terrain_label($terrain),
+            'tower_structure' => $structure,
+            'matched' => $match ? [
+                'item_id' => (int)$match['item']['id'],
+                'code' => $match['item']['code'],
+                'title' => $match['item']['title'],
+                'unit' => $match['item']['unit'],
+                'base_unit_price' => $match['base_unit_price'],
+                'coefficients' => $match['coefficients'],
+                'coefficient_percent' => $match['coefficient_percent'],
+                'unit_price' => $match['unit_price'],
+            ] : null,
+        ]);
     });
 
     // ============================================================

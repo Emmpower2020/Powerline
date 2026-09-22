@@ -4,4 +4,4 @@
 export const APP_VERSION = "v4.3.86";
 
 /** تاریخ انتشار نسخه فعلی */
-export const APP_VERSION_DATE = "2026-09-21";
+export const APP_VERSION_DATE = "2026-09-22";

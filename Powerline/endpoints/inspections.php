@@ -19,6 +19,8 @@ function registerInspectionRoutes(Router $router): void
         $status = Helpers::query('status');
         $lineId = Helpers::queryInt('line_id');
         $towerId = Helpers::queryInt('tower_id');
+        // v4.3.86: فیلتر روش بازدید (صعودی/پیمایشی)
+        $inspectionMethod = Helpers::query('inspection_method') ?? Helpers::query('inspection_type');
 
         $where = '1=1';
         $params = [];
@@ -45,6 +47,14 @@ function registerInspectionRoutes(Router $router): void
         if ($towerId) {
             $where .= ' AND i.tower_id = ?';
             $params[] = $towerId;
+        }
+
+        // v4.3.86: روش بازدید (climbing/patrol — فارسی هم پذیرفته می‌شود)
+        if ($inspectionMethod !== null && $inspectionMethod !== '') {
+            $map = ['صعودی' => 'climbing', 'پیمایشی' => 'patrol', 'بازدید صعودی' => 'climbing', 'بازدید پیمایشی' => 'patrol'];
+            $kt = $map[trim((string)$inspectionMethod)] ?? $inspectionMethod;
+            $where .= ' AND i.inspection_method = ?';
+            $params[] = $kt;
         }
 
         $countSql = "SELECT COUNT(*) FROM inspections i WHERE $where";
@@ -136,9 +146,19 @@ function registerInspectionRoutes(Router $router): void
             $body['weather'] ?? null,
             $body['notes'] ?? null,
         ];
-        if (Helpers::columnExists('inspections','inspection_method')) { $insCols[]='inspection_method'; $insVals[]='?'; $insParams[]=$body['inspection_method'] ?? null; }
-        if (Helpers::columnExists('inspections','crew_size')) { $insCols[]='crew_size'; $insVals[]='?'; $insParams[]=$body['crew_size'] ?? null; }
-        if (Helpers::columnExists('inspections','terrain_type')) { $insCols[]='terrain_type'; $insVals[]='?'; $insParams[]=$body['terrain_type'] ?? null; }
+        // v4.3.86: روش بازدید (صعودی/پیمایشی) + نوع زمین — پس از migration
+        if (Helpers::columnExists('inspections', 'inspection_method')) {
+            $insCols[] = 'inspection_method'; $insVals[] = '?';
+            $typeMap = ['صعودی' => 'climbing', 'پیمایشی' => 'patrol', 'بازدید صعودی' => 'climbing', 'بازدید پیمایشی' => 'patrol'];
+            $rawType = trim((string)($body['inspection_method'] ?? $body['inspection_type'] ?? ''));
+            $insParams[] = $rawType === '' ? 'climbing' : ($typeMap[$rawType] ?? $rawType);
+        }
+        if (Helpers::columnExists('inspections', 'terrain_type')) {
+            $insCols[] = 'terrain_type'; $insVals[] = '?';
+            $tMap = ['دشت' => 'plain', 'تپه ماهور' => 'hilly', 'تپه‌ماهور' => 'hilly', 'نیمه کوهستانی' => 'semi_mountainous', 'نیمه‌کوهستانی' => 'semi_mountainous', 'صعب العبور' => 'impassable', 'صعب‌العبور' => 'impassable'];
+            $rawTerrain = trim((string)($body['terrain_type'] ?? ''));
+            $insParams[] = $rawTerrain === '' ? null : ($tMap[$rawTerrain] ?? $rawTerrain);
+        }
         if (Helpers::columnExists('inspections', 'activity_status')) { $insCols[] = 'activity_status'; $insVals[] = "'inactive'"; }
         if (Helpers::columnExists('inspections', 'district_id')) { $insCols[] = 'district_id'; $insVals[] = '?'; $insParams[] = $districtId; }
         $sql = "INSERT INTO inspections (" . implode(', ', $insCols) . ") VALUES (" . implode(', ', $insVals) . ")";
@@ -159,10 +179,17 @@ function registerInspectionRoutes(Router $router): void
         // v4.3.81: قفل امور — تغییر امور رکورد فقط برای مدیر
         $body = Helpers::stripDistrictForNonAdmin($body);
         $fields = ['inspection_date','priority','weather','notes','line_id','tower_id','contract_id','inspector_id','crew_id','status'];
-        foreach (['inspection_method','crew_size','terrain_type'] as $f) { if (Helpers::columnExists('inspections',$f)) $fields[]=$f; }
         // v4.3.78: ویرایش امور بهره‌برداری و وضعیت فعال/غیرفعال بازدید
         if (Helpers::columnExists('inspections', 'district_id')) $fields[] = 'district_id';
         if (Helpers::columnExists('inspections', 'activity_status')) $fields[] = 'activity_status';
+        // v4.3.86: روش بازدید + نوع زمین (کلید قدیمی inspection_type هم پذیرفته می‌شود)
+        if (Helpers::columnExists('inspections', 'inspection_method')) {
+            if (array_key_exists('inspection_type', $body) && !array_key_exists('inspection_method', $body)) {
+                $body['inspection_method'] = $body['inspection_type'];
+            }
+            $fields[] = 'inspection_method';
+        }
+        if (Helpers::columnExists('inspections', 'terrain_type')) $fields[] = 'terrain_type';
         $updates = []; $params = [];
         foreach ($fields as $f) { if (array_key_exists($f, $body)) { $updates[] = "`$f` = ?"; $params[] = ($body[$f] === '' ? null : $body[$f]); } }
         if (!$updates) Response::error(400, 'هیچ فیلدی ارسال نشده');
@@ -231,15 +258,16 @@ function formatInspectionRow(array $row): array
         'tower_code'        => $row['tower_code'] ?? null,
         'inspector_name'    => trim(($row['inspector_first'] ?? '') . ' ' . ($row['inspector_last'] ?? '')),
         'inspection_date'   => $row['inspection_date'],
+        // v4.3.86: روش بازدید (صعودی/پیمایشی) + نوع زمین
+        'inspection_method' => $row['inspection_method'] ?? null,
+        'inspection_type'   => $row['inspection_method'] ?? null, // کلید قدیمی برای سازگاری
+        'terrain_type'      => $row['terrain_type'] ?? null,
         'start_time'        => $row['start_time'],
         'end_time'          => $row['end_time'],
         'gps_lat'           => $row['gps_lat'] !== null ? (float) $row['gps_lat'] : null,
         'gps_lng'           => $row['gps_lng'] !== null ? (float) $row['gps_lng'] : null,
         'status'            => $row['status'],
         'priority'          => $row['priority'],
-        'inspection_method' => $row['inspection_method'] ?? null,
-        'crew_size'        => isset($row['crew_size']) && $row['crew_size'] !== null ? (int)$row['crew_size'] : null,
-        'terrain_type'     => $row['terrain_type'] ?? null,
         'weather'           => $row['weather'],
         'notes'             => $row['notes'],
         // v4.3.78: وضعیت فعال/غیرفعال + امور بهره‌برداری (بعد از migration)

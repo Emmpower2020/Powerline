@@ -32,9 +32,10 @@ export const API_ENDPOINTS = {
   districts: "/districts",
   equipment: "/equipment", equipmentClasses: "/equipment-classes",
   priceLists: "/price-lists", priceListItems: "/price-list-items",
-  priceListImport: "/price-lists/import", priceListAdjustments: "/price-list-adjustments",
-  priceListMatch: (sourceType: "inspection" | "work_order", id: number) => `/price-list-match/${sourceType}/${id}`,
-  billingMeasurements: "/billing-measurements", invoiceFromMeasurements: "/invoices/from-measurements",
+  // v4.3.86: ایمپورت گروهی فهرست بها + تطبیق قلم + صدور صورت‌وضعیت
+  priceListImport: "/price-list-items/import", priceListMatch: "/price-list-items/match",
+  invoiceCandidates: "/invoices/candidates", invoiceGenerate: "/invoices/generate",
+  invoiceItems: (id: number) => `/invoices/${id}/items`,
   checklistTemplates: "/checklist-templates",
   auditLog: "/audit-log", organization: "/organization", crews: "/crews",
 } as const;

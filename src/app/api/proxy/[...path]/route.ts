@@ -109,7 +109,10 @@ function invalidateAllCache(): void {
 // می‌گرفت. تا زمان آپلود بک‌اند جدید (4.3.85: چند-اموری)، نوشتن‌های /users
 // و /roles در حالت توسعه به‌صورت محلی شبیه‌سازی می‌شوند (روی overlay حافظه‌ای)
 // و هرگز به هاست نمی‌رسند. با آپلود بک‌اند جدید، شبیه‌ساز خودش غیرفعال می‌شود.
-const SIM_VERSION = [4, 3, 85];
+// v4.3.86: نسخهٔ بستهٔ فعلی ۴.۳.۸۶ است؛ شبیه‌ساز کاربران/نقش‌ها به نسخهٔ
+// اختصاصی خودش (۴.۳.۸۵) گره خورد تا با هاست ۴.۳.۸۵ خاموش بماند.
+const SIM_VERSION = [4, 3, 86];
+const SIM_USERS_VERSION = [4, 3, 85];
 let upstreamVersionCache: number[] | null = null;
 
 function versionAtLeast(v: number[], ref: number[]): boolean {
@@ -129,10 +132,25 @@ async function upstreamBackendVersion(): Promise<number[]> {
     const parsed = JSON.parse(text);
     const m = /(\d+)\.(\d+)\.(\d+)/.exec(String(parsed?.data?.version ?? ""));
     upstreamVersionCache = m ? [Number(m[1]), Number(m[2]), Number(m[3])] : [];
+    // v4.3.86: فهرست قابلیت‌های هاست هم کش می‌شود (برای گیت شبیه‌ساز فهرست بها)
+    upstreamFeaturesCache = Array.isArray(parsed?.data?.features) ? parsed.data.features.map(String) : [];
   } catch {
     upstreamVersionCache = [];
   }
   return upstreamVersionCache;
+}
+
+/** v4.3.86: قابلیت‌های اعلام‌شدهٔ بک‌اند هاست (features در پاسخ backend-version).
+ *  بک‌اند ۴.۳.۸۶ این فهرست را برمی‌گرداند؛ هاست‌های قدیمی/تغییریافته که endpoint
+ *  های جدید را ندارند اینجا چیزی اعلام نمی‌کنند و شبیه‌ساز فعال می‌شود. */
+let upstreamFeaturesCache: string[] | null = null;
+
+async function hostHasFeature(feature: string): Promise<boolean> {
+  if (upstreamFeaturesCache === null) {
+    await upstreamBackendVersion();
+    if (upstreamFeaturesCache === null) upstreamFeaturesCache = [];
+  }
+  return upstreamFeaturesCache.includes(feature);
 }
 
 /** وضعیت حافظه‌ای شبیه‌ساز کاربران */
@@ -441,6 +459,524 @@ function describeUpstreamNetworkFailure(code: string, message: string): string {
   return message ? `خطای اتصال به سرور API: ${message}` : "اتصال به سرور API برقرار نشد.";
 }
 
+// ═══════════════════════════════════════════════════════════════
+// v4.3.86 (فقط توسعه): شبیه‌ساز فهرست بها + بازدید + صورت‌وضعیت
+// تا آپلود بک‌اند ۴.۳.۸۶ روی هاست و اجرای SQL جدید، این مسیرها محلی
+// شبیه‌سازی می‌شوند: overlay اقلام فهرست (فیلدهای طبقه‌بندی + ضرایب)،
+// بازدیدهای ساخت محلی (نوع صعودی/پیمایشی + خط/دکل/زمین)، تطبیق قلم،
+// کاندیدهای دوره، صدور صورت‌وضعیت و اقلام آن.
+// ═══════════════════════════════════════════════════════════════
+const simPriceItemPatches = new Map<number, Record<string, any>>();
+const simPriceItemsCreated: any[] = [];
+const simPriceItemDeleted = new Set<number>();
+let simPriceItemNextId = 900001;
+const simInspectionsCreated: any[] = [];
+let simInspectionNextId = 910001;
+const simInvoicesCreated: any[] = [];
+const simInvoiceItemsStore = new Map<number, any[]>();
+let simInvoiceNextId = 920001;
+
+const simJson = (payload: any, status = 200) => new NextResponse(JSON.stringify(payload), {
+  status,
+  headers: { "Content-Type": "application/json; charset=utf-8", "X-Dev-Simulated": "pricelist-invoices" },
+});
+
+async function simFetchHost(pathWithQuery: string, authHeader: string): Promise<any | null> {
+  try {
+    const finalHeaders: Record<string, string> = {};
+    if (authHeader) finalHeaders.Authorization = authHeader;
+    const cookie = validDdgCookieHeader();
+    if (cookie) finalHeaders.Cookie = cookie;
+    const res = await fetch(`${API_BASE_URL}${pathWithQuery}`, { cache: "no-store", headers: finalHeaders });
+    return await res.json();
+  } catch {
+    return null;
+  }
+}
+
+/** اقلام فهرست = اقلام هاست + پچ‌های محلی + اقلام ساخته‌شده محلی */
+async function simMergedPriceItems(authHeader: string): Promise<any[]> {
+  const host = await simFetchHost("/price-list-items?page=1&page_size=5000", authHeader);
+  const hostItems: any[] = Array.isArray(host?.data) ? host.data : [];
+  const merged = hostItems
+    .filter((it: any) => !simPriceItemDeleted.has(Number(it.id)))
+    .map((it: any) => ({ ...it, ...(simPriceItemPatches.get(Number(it.id)) ?? {}) }));
+  return [...simPriceItemsCreated.filter(it => !simPriceItemDeleted.has(Number(it.id))), ...merged];
+}
+
+/** آیا ردیف «فعال» است؟ — سازگار با status 'active'/'1'/1 و is_active=1 */
+function simIsActive(it: any): boolean {
+  const st = it?.status;
+  return st === "active" || st === "1" || st === 1 || Number(it?.is_active) === 1;
+}
+
+/** منطق تطبیق قلم فهرست بها — قرینهٔ PHP pl_match_price_item */
+function simMatchPriceItem(items: any[], ctx: any) {
+  const num = (v: any) => (v == null || v === "" ? null : Number(v));
+  const voltage = num(ctx.voltage_kv);
+  const circuits = num(ctx.circuit_count);
+  const bundles = num(ctx.bundle_count);
+  const activity = ctx.activity_type ?? null;
+  const method = ctx.inspection_method ?? null;
+  const structure = ctx.tower_structure || null;
+  const terrain = ctx.terrain_type || null;
+  const isBase = (it: any) => it.item_kind !== "coefficient" && Number(it.is_coefficient) !== 1;
+  const isCoef = (it: any) => it.item_kind === "coefficient" || Number(it.is_coefficient) === 1;
+  const cands = items.filter(it =>
+    isBase(it) && simIsActive(it) &&
+    (activity == null || !it.activity_type || it.activity_type === activity) &&
+    (method == null || !it.inspection_method || it.inspection_method === method) &&
+    (voltage == null || it.voltage_kv == null || Number(it.voltage_kv) === voltage) &&
+    (circuits == null || it.circuit_count == null || Number(it.circuit_count) === circuits) &&
+    (bundles == null || it.bundle_count == null || Number(it.bundle_count) === bundles) &&
+    (structure == null || !it.tower_structure || it.tower_structure === structure) &&
+    (terrain == null || !it.terrain_type || it.terrain_type === terrain));
+  if (!cands.length) return null;
+  const score = (it: any) => (it.voltage_kv != null ? 32 : 0) + (it.circuit_count != null ? 16 : 0) +
+    (it.bundle_count != null ? 8 : 0) + (it.tower_structure ? 4 : 0) + (it.activity_type ? 2 : 0) +
+    (it.inspection_method ? 1.5 : 0) + (it.terrain_type ? 1 : 0);
+  cands.sort((a, b) => score(b) - score(a) || Number(a.id) - Number(b.id));
+  const item = cands[0];
+  const terrainCol = terrain ? TERRAIN_PRICE_COLS[terrain] : undefined;
+  let base: number | null = null;
+  if (item.terrain_type && item.terrain_type === terrain && Number(item.unit_price) > 0) base = Number(item.unit_price);
+  else if (terrainCol && item[terrainCol] != null && Number(item[terrainCol]) > 0) base = Number(item[terrainCol]);
+  else if (Number(item.unit_price) > 0) base = Number(item.unit_price);
+  const coefs = items.filter(it => isCoef(it) && simIsActive(it) &&
+    (it.voltage_kv == null || voltage == null || Number(it.voltage_kv) === voltage) &&
+    (!it.activity_type || activity == null || it.activity_type === activity) &&
+    (!it.inspection_method || method == null || it.inspection_method === method) &&
+    (!it.tower_structure || structure == null || it.tower_structure === structure) &&
+    (!it.terrain_type || terrain == null || it.terrain_type === terrain));
+  const percent = coefs.reduce((s, c) => s + Number(c.coefficient_percent || 0), 0);
+  return {
+    item,
+    base_unit_price: base,
+    coefficients: coefs.map(c => ({ id: Number(c.id), title: c.title, percent: Number(c.coefficient_percent || 0) })),
+    coefficient_percent: percent,
+    unit_price: base == null ? null : Math.round(base * (1 + percent / 100) * 100) / 100,
+  };
+}
+
+const SIM_TERRAIN_LABELS: Record<string, string> = {
+  plain: "دشت", hilly: "تپه‌ماهور", semi_mountainous: "نیمه‌کوهستانی", impassable: "صعب‌العبور",
+};
+const TERRAIN_PRICE_COLS: Record<string, string> = {
+  plain: "unit_price_plain", hilly: "unit_price_hilly",
+  semi_mountainous: "unit_price_semi_mountainous", impassable: "unit_price_impassable",
+};
+const SIM_ACTIVITY_LABELS: Record<string, string> = {
+  inspection: "بازدید", repair: "تعمیرات", operation: "عملیات",
+};
+const SIM_METHOD_LABELS: Record<string, string> = {
+  climbing: "بازدید صعودی", patrol: "بازدید پیمایشی",
+};
+
+async function simulatePriceListRequest(method: string, path: string, search: string, bodyText: string, authHeader: string): Promise<Response> {
+  const body: any = (() => { try { return bodyText ? JSON.parse(bodyText) : {}; } catch { return {}; } })();
+  const params = new URLSearchParams(search);
+
+  // GET — لیست اقلام (merge هاست + محلی) با فیلترهای طبقه‌بندی
+  if (method === "GET" && path === "/price-list-items") {
+    const all = await simMergedPriceItems(authHeader);
+    const listId = Number(params.get("list_id") || 0);
+    const fActivity = params.get("activity_type");
+    const fMethod = params.get("inspection_method");
+    const fKind = params.get("item_kind");
+    const fCoef = params.get("coefficient");
+    const fVoltage = params.get("voltage_kv");
+    const isCoefRow = (i: any) => i.item_kind === "coefficient" || Number(i.is_coefficient) === 1;
+    let rows = listId ? all.filter(i => Number(i.price_list_id) === listId) : all;
+    if (fActivity) rows = rows.filter(i => (i.activity_type || "") === fActivity);
+    if (fMethod) rows = rows.filter(i => (i.inspection_method || "") === fMethod);
+    if (fKind === "coefficient" || fKind === "base") rows = rows.filter(i => (fKind === "coefficient") === isCoefRow(i));
+    if (fCoef === "1") rows = rows.filter(isCoefRow);
+    else if (fCoef === "0") rows = rows.filter(i => !isCoefRow(i));
+    if (fVoltage) rows = fVoltage === "general" ? rows.filter(i => i.voltage_kv == null) : rows.filter(i => Number(i.voltage_kv) === Number(fVoltage));
+    rows.sort((a, b) => (Number(isCoefRow(a)) - Number(isCoefRow(b))) || (Number(a.id) - Number(b.id)));
+    return simJson({ success: true, data: rows });
+  }
+
+  // POST — قلم جدید (با فیلدهای طبقه‌بندی)
+  if (method === "POST" && path === "/price-list-items") {
+    const id = simPriceItemNextId++;
+    const code = body.code || ("PL-" + String(id % 10000).padStart(4, "0"));
+    simPriceItemsCreated.push({
+      id, price_list_id: Number(body.price_list_id), code, title: body.title,
+      unit: body.unit || "دکل", unit_price: Number(body.unit_price || 0), category: body.category || "عملیات",
+      item_kind: body.item_kind === "coefficient" ? "coefficient" : "base",
+      activity_type: body.activity_type ?? null, inspection_method: body.inspection_method ?? null,
+      voltage_kv: body.voltage_kv ?? null, circuit_count: body.circuit_count ?? null, bundle_count: body.bundle_count ?? null,
+      tower_structure: body.tower_structure ?? null, terrain_type: body.terrain_type ?? null,
+      unit_price_plain: body.unit_price_plain ?? null, unit_price_hilly: body.unit_price_hilly ?? null,
+      unit_price_semi_mountainous: body.unit_price_semi_mountainous ?? null, unit_price_impassable: body.unit_price_impassable ?? null,
+      coefficient_percent: body.coefficient_percent ?? null,
+      status: "active",
+    });
+    console.log(`[DEV SIM] قلم فهرست ساخته شد #${id} ${code}`);
+    return simJson({ success: true, message: "قلم ایجاد شد (شبیه‌ساز توسعه)", data: { id, code } }, 201);
+  }
+
+  // PUT — ویرایش (پچ روی هاست یا محلی)
+  const putMatch = /^\/price-list-items\/(\d+)$/.exec(path);
+  if (method === "PUT" && putMatch) {
+    const id = Number(putMatch[1]);
+    const localIdx = simPriceItemsCreated.findIndex(i => Number(i.id) === id);
+    if (localIdx >= 0) simPriceItemsCreated[localIdx] = { ...simPriceItemsCreated[localIdx], ...body, id };
+    else simPriceItemPatches.set(id, { ...(simPriceItemPatches.get(id) ?? {}), ...body });
+    simPriceItemDeleted.delete(id);
+    return simJson({ success: true, message: "قلم فهرست بها ویرایش شد (شبیه‌ساز توسعه)", data: null });
+  }
+
+  // DELETE
+  const delMatch = /^\/price-list-items\/(\d+)$/.exec(path);
+  if (method === "DELETE" && delMatch) {
+    const id = Number(delMatch[1]);
+    simPriceItemDeleted.add(id);
+    simPriceItemPatches.delete(id);
+    const idx = simPriceItemsCreated.findIndex(i => Number(i.id) === id);
+    if (idx >= 0) simPriceItemsCreated.splice(idx, 1);
+    return simJson({ success: true, message: "قلم حذف شد (شبیه‌ساز توسعه)", data: null });
+  }
+
+  // POST import — ایمپورت گروهی
+  if (method === "POST" && path === "/price-list-items/import") {
+    const items: any[] = Array.isArray(body.items) ? body.items : [];
+    if (!body.price_list_id || !items.length) return simJson({ success: false, error: { code: 400, message: "فهرست و اقلام الزامی است" } }, 400);
+    if (body.replace) {
+      for (const it of await simMergedPriceItems(authHeader)) {
+        if (Number(it.price_list_id) === Number(body.price_list_id)) simPriceItemDeleted.add(Number(it.id));
+      }
+    }
+    let normal = 0, coefs = 0;
+    for (const it of items) {
+      const id = simPriceItemNextId++;
+      const isCoefIt = it.item_kind === "coefficient" || !!it.is_coefficient;
+      simPriceItemsCreated.push({
+        id, price_list_id: Number(body.price_list_id), code: it.code || ("PL-" + String(id % 10000).padStart(4, "0")),
+        title: it.title, unit: it.unit || "دکل", unit_price: Number(it.unit_price || 0), category: it.category || "عملیات",
+        item_kind: isCoefIt ? "coefficient" : "base",
+        activity_type: it.activity_type ?? null, inspection_method: it.inspection_method ?? null,
+        voltage_kv: it.voltage_kv ?? null, circuit_count: it.circuit_count ?? null, bundle_count: it.bundle_count ?? null,
+        tower_structure: it.tower_structure ?? null, terrain_type: it.terrain_type ?? null,
+        unit_price_plain: it.unit_price_plain ?? null, unit_price_hilly: it.unit_price_hilly ?? null,
+        unit_price_semi_mountainous: it.unit_price_semi_mountainous ?? null, unit_price_impassable: it.unit_price_impassable ?? null,
+        coefficient_percent: it.coefficient_percent ?? null,
+        status: "active",
+      });
+      if (isCoefIt) coefs++; else normal++;
+    }
+    console.log(`[DEV SIM] ایمپورت فهرست بها: ${normal} قلم + ${coefs} ضریب`);
+    return simJson({ success: true, message: `ایمپورت انجام شد (شبیه‌ساز توسعه) — ${normal} قلم و ${coefs} ضریب`, data: { imported_items: normal, imported_coefficients: coefs } }, 201);
+  }
+
+  // GET match — تطبیق قلم با خط/دکل/نوع بازدید
+  if (method === "GET" && path === "/price-list-items/match") {
+    const lineId = Number(params.get("line_id") || 0);
+    const towerId = Number(params.get("tower_id") || 0);
+    const methodRaw = params.get("inspection_method") || params.get("inspection_type") || "climbing";
+    const methodMap: Record<string, string> = { "صعودی": "climbing", "پیمایشی": "patrol", climbing: "climbing", patrol: "patrol" };
+    const method = methodMap[methodRaw] || methodRaw;
+    const terrainOverride = params.get("terrain_type") || null;
+    let priceListId = Number(params.get("price_list_id") || 0);
+    const items = await simMergedPriceItems(authHeader);
+    if (!priceListId) {
+      const lists = await simFetchHost("/price-lists", authHeader);
+      const arr: any[] = Array.isArray(lists?.data) ? lists.data : [];
+      const active = arr.filter(l => simIsActive(l));
+      priceListId = active.length ? Number(active[0].id) : (arr.length ? Number(arr[0].id) : 0);
+    }
+    const scoped = items.filter(i => Number(i.price_list_id) === priceListId);
+    let line: any = null, tower: any = null;
+    if (lineId) {
+      const lines = await simFetchHost(`/lines?page=1&page_size=500`, authHeader);
+      line = (Array.isArray(lines?.data) ? lines.data : (lines?.data?.data || [])).find((l: any) => Number(l.id) === lineId) || null;
+    }
+    if (towerId) {
+      const towers = await simFetchHost(`/towers?page=1&page_size=1000${lineId ? `&line_id=${lineId}` : ""}`, authHeader);
+      const tArr: any[] = Array.isArray(towers?.data) ? towers.data : (towers?.data?.data || []);
+      tower = tArr.find(t => Number(t.id) === towerId) || null;
+      if (!tower && !lineId) {
+        // جستجو در همه دکل‌ها به‌صورت صفحه‌ای محدود — کافی برای تست
+        const all = await simFetchHost(`/towers?page=1&page_size=2000`, authHeader);
+        tower = (Array.isArray(all?.data) ? all.data : (all?.data?.data || [])).find((t: any) => Number(t.id) === towerId) || null;
+      }
+    }
+    const structure = tower?.tower_structure || line?.tower_structure || null;
+    const terrain = terrainOverride || tower?.terrain_type || "plain";
+    const match = simMatchPriceItem(scoped, {
+      price_list_id: priceListId,
+      voltage_kv: line?.voltage_kv ?? null, circuit_count: line?.circuit_count ?? null, bundle_count: line?.bundle_count ?? null,
+      activity_type: "inspection", inspection_method: method, tower_structure: structure, terrain_type: terrain,
+    });
+    return simJson({
+      success: true,
+      data: {
+        price_list_id: priceListId, line, tower, inspection_method: method, terrain_type: terrain,
+        terrain_label: SIM_TERRAIN_LABELS[terrain] || terrain, tower_structure: structure,
+        matched: match ? {
+          item_id: Number(match.item.id), code: match.item.code, title: match.item.title, unit: match.item.unit,
+          base_unit_price: match.base_unit_price, coefficients: match.coefficients,
+          coefficient_percent: match.coefficient_percent, unit_price: match.unit_price,
+        } : null,
+      },
+    });
+  }
+
+  return simJson({ success: false, error: { code: 404, message: `مسیر شبیه‌ساز پشتیبانی نمی‌شود: ${method} ${path}` } }, 404);
+}
+
+/** شبیه‌ساز بازدیدها: ساخت محلی (با نوع بازدید/خط/دکل/زمین) + merge در لیست */
+async function simulateInspectionsRequest(method: string, path: string, bodyText: string, authHeader: string): Promise<Response | null> {
+  if (method === "POST" && path === "/inspections") {
+    const body: any = (() => { try { return JSON.parse(bodyText || "{}"); } catch { return {}; } })();
+    const id = simInspectionNextId++;
+    const lineId = body.line_id ? Number(body.line_id) : null;
+    const towerId = body.tower_id ? Number(body.tower_id) : null;
+    let lineCode: string | null = null, towerCode: string | null = null, contractTitle: string | null = null;
+    if (lineId) {
+      const lines = await simFetchHost(`/lines?page=1&page_size=500`, authHeader);
+      const l = (Array.isArray(lines?.data) ? lines.data : (lines?.data?.data || [])).find((x: any) => Number(x.id) === lineId);
+      lineCode = l?.line_code ?? null;
+    }
+    if (towerId) {
+      const towers = await simFetchHost(`/towers?page=1&page_size=2000`, authHeader);
+      const t = (Array.isArray(towers?.data) ? towers.data : (towers?.data?.data || [])).find((x: any) => Number(x.id) === towerId);
+      towerCode = t?.tower_code ?? null;
+    }
+    if (body.contract_id) {
+      const contracts = await simFetchHost(`/contracts?page=1&page_size=100`, authHeader);
+      const c = (Array.isArray(contracts?.data) ? contracts.data : (contracts?.data?.data || [])).find((x: any) => Number(x.id) === Number(body.contract_id));
+      contractTitle = c?.title ?? null;
+    }
+    // نکتهٔ تست: بازدید محلی با وضعیت «ارسال شده» ذخیره می‌شود تا در کاندیدهای
+    // صورت‌وضعیت ظاهر شود (در production این مقدار از گردش کار واقعی می‌آید)
+    const row = {
+      id, inspection_code: `INS-SIM-${String(id % 100000)}`, line_id: lineId, line_code: lineCode, line_name: null,
+      tower_id: towerId, tower_code: towerCode, contract_id: body.contract_id ? Number(body.contract_id) : null,
+      contract_title: contractTitle, inspector_name: "کاربر آزمایشی",
+      inspection_date: body.inspection_date || new Date().toISOString().slice(0, 10),
+      inspection_method: body.inspection_method || body.inspection_type || "climbing", terrain_type: body.terrain_type || null,
+      status: "submitted", priority: body.priority || "routine", weather: body.weather || null, notes: body.notes || null,
+      activity_status: "active", district_id: body.district_id ? Number(body.district_id) : null, district_name: null,
+      created_at: new Date().toISOString().slice(0, 19).replace("T", " "),
+    };
+    simInspectionsCreated.unshift(row);
+    console.log(`[DEV SIM] بازدید محلی ساخته شد #${id} (${row.inspection_method}) — وضعیت submitted برای تست صورت‌وضعیت`);
+    return simJson({ success: true, message: "بازدید ثبت شد (شبیه‌ساز توسعه)", data: { id, inspection_code: row.inspection_code } }, 201);
+  }
+  return null;
+}
+
+/** شبیه‌ساز صورت‌وضعیت: کاندیدها + صدور + اقلام */
+async function simulateInvoicesRequest(method: string, path: string, search: string, bodyText: string, authHeader: string): Promise<Response | null> {
+  const body: any = (() => { try { return bodyText ? JSON.parse(bodyText) : {}; } catch { return {}; } })();
+  const params = new URLSearchParams(search);
+
+  // کاندیدهای دوره — بازدیدهای submitted/approved هاست + محلی
+  if (method === "GET" && path === "/invoices/candidates") {
+    const contractId = Number(params.get("contract_id") || 0);
+    const periodStart = params.get("period_start") || "";
+    const periodEnd = params.get("period_end") || "";
+    let priceListId = Number(params.get("price_list_id") || 0);
+    if (!periodStart || !periodEnd) return simJson({ success: false, error: { code: 400, message: "ابتدا دوره (از تاریخ / تا تاریخ) را مشخص کنید" } }, 400);
+    const items = await simMergedPriceItems(authHeader);
+    if (!priceListId) {
+      const lists = await simFetchHost("/price-lists", authHeader);
+      const arr: any[] = Array.isArray(lists?.data) ? lists.data : [];
+      const active = arr.filter(l => simIsActive(l));
+      priceListId = active.length ? Number(active[0].id) : (arr.length ? Number(arr[0].id) : 0);
+    }
+    const scoped = items.filter(i => Number(i.price_list_id) === priceListId);
+
+    // خطوط و قرارداد از هاست
+    const linesJson = await simFetchHost(`/lines?page=1&page_size=500`, authHeader);
+    const lines: any[] = Array.isArray(linesJson?.data) ? linesJson.data : (linesJson?.data?.data || []);
+    // بازدیدها: هاست + محلی
+    const inspJson = await simFetchHost(`/inspections?page=1&page_size=1000`, authHeader);
+    let hostInsp: any[] = Array.isArray(inspJson?.data) ? inspJson.data : (inspJson?.data?.data || []);
+    const allInsp = [...hostInsp.filter(i => !simInspectionsCreated.some(s => Number(s.id) === Number(i.id))), ...simInspectionsCreated];
+
+    // دکل‌ها برای زمین/سازه — فقط خطوطِ بازدیدهای کاندید
+    const towerCache = new Map<number, any[]>();
+    const loadTowers = async (lineId: number) => {
+      if (!towerCache.has(lineId)) {
+        const t = await simFetchHost(`/towers?page=1&page_size=1000&line_id=${lineId}`, authHeader);
+        towerCache.set(lineId, Array.isArray(t?.data) ? t.data : (t?.data?.data || []));
+      }
+      return towerCache.get(lineId) || [];
+    };
+
+    const out: any[] = [];
+    for (const ins of allInsp) {
+      if (!["submitted", "approved"].includes(String(ins.status))) continue;
+      if (periodStart && String(ins.inspection_date) < periodStart) continue;
+      if (periodEnd && String(ins.inspection_date) > periodEnd) continue;
+      if (contractId && Number(ins.contract_id) !== contractId) continue;
+      const line = lines.find(l => Number(l.id) === Number(ins.line_id)) || null;
+      const towers = ins.line_id ? await loadTowers(Number(ins.line_id)) : [];
+      const tower = towers.find(t => Number(t.id) === Number(ins.tower_id)) || null;
+      const method = ins.inspection_method || ins.inspection_type || "climbing";
+      const terrain = ins.terrain_type || tower?.terrain_type || "plain";
+      const structure = tower?.tower_structure || line?.tower_structure || null;
+      const match = simMatchPriceItem(scoped, {
+        price_list_id: priceListId,
+        voltage_kv: line?.voltage_kv ?? null, circuit_count: line?.circuit_count ?? null, bundle_count: line?.bundle_count ?? null,
+        activity_type: "inspection", inspection_method: method, tower_structure: structure, terrain_type: terrain,
+      });
+      out.push({
+        inspection_id: Number(ins.id), inspection_code: ins.inspection_code, inspection_date: ins.inspection_date,
+        line_code: ins.line_code || line?.line_code || null, line_name: line?.name || null,
+        tower_code: ins.tower_code || tower?.tower_code || null,
+        activity_type: "inspection", inspection_method: method,
+        terrain_type: terrain, terrain_label: SIM_TERRAIN_LABELS[terrain] || terrain,
+        tower_structure: structure,
+        voltage_kv: line?.voltage_kv ?? null, circuit_count: line?.circuit_count ?? null, bundle_count: line?.bundle_count ?? null,
+        matched: match ? {
+          item_id: Number(match.item.id), code: match.item.code, title: match.item.title, unit: match.item.unit,
+          base_unit_price: match.base_unit_price, coefficients: match.coefficients,
+          coefficient_percent: match.coefficient_percent, unit_price: match.unit_price,
+        } : null,
+      });
+    }
+    return simJson({ success: true, data: { price_list_id: priceListId, items: out } });
+  }
+
+  // صدور صورت‌وضعیت — محاسبهٔ محلی (قرینهٔ PHP)
+  if (method === "POST" && path === "/invoices/generate") {
+    const contractId = Number(body.contract_id || 0);
+    const itemsBody: any[] = Array.isArray(body.items) ? body.items : [];
+    if (!contractId || !itemsBody.length) return simJson({ success: false, error: { code: 400, message: "قرارداد و اقلام الزامی است" } }, 400);
+    let priceListId = Number(body.price_list_id || 0);
+    const items = await simMergedPriceItems(authHeader);
+    if (!priceListId) {
+      const lists = await simFetchHost("/price-lists", authHeader);
+      const arr: any[] = Array.isArray(lists?.data) ? lists.data : [];
+      const active = arr.filter(l => simIsActive(l));
+      priceListId = active.length ? Number(active[0].id) : (arr.length ? Number(arr[0].id) : 0);
+    }
+    const scoped = items.filter(i => Number(i.price_list_id) === priceListId);
+    const linesJson = await simFetchHost(`/lines?page=1&page_size=500`, authHeader);
+    const lines: any[] = Array.isArray(linesJson?.data) ? linesJson.data : (linesJson?.data?.data || []);
+    const inspJson = await simFetchHost(`/inspections?page=1&page_size=1000`, authHeader);
+    const hostInsp: any[] = Array.isArray(inspJson?.data) ? inspJson.data : (inspJson?.data?.data || []);
+    const allInsp = [...hostInsp.filter(i => !simInspectionsCreated.some(s => Number(s.id) === Number(i.id))), ...simInspectionsCreated];
+    const contractsJson = await simFetchHost(`/contracts?page=1&page_size=100`, authHeader);
+    const contracts: any[] = Array.isArray(contractsJson?.data) ? contractsJson.data : (contractsJson?.data?.data || []);
+    const contract = contracts.find(c => Number(c.id) === contractId);
+
+    const towerCache = new Map<number, any[]>();
+    const loadTowers = async (lineId: number) => {
+      if (!towerCache.has(lineId)) {
+        const t = await simFetchHost(`/towers?page=1&page_size=1000&line_id=${lineId}`, authHeader);
+        towerCache.set(lineId, Array.isArray(t?.data) ? t.data : (t?.data?.data || []));
+      }
+      return towerCache.get(lineId) || [];
+    };
+
+    const linesOut: any[] = [];
+    let sumBase = 0, sumCoef = 0, sumNet = 0;
+    for (const it of itemsBody) {
+      const quantity = Math.max(0.001, Number(it.quantity ?? 1));
+      let base = 0, pct = 0, desc = "", unit = "دکل", pliCode: string | null = null, inspectionId: any = null, workOrderId: any = null, pliId: any = null, terrain: any = null, structure: any = null;
+      if (it.inspection_id) {
+        inspectionId = Number(it.inspection_id);
+        const ins = allInsp.find(x => Number(x.id) === inspectionId);
+        if (!ins) return simJson({ success: false, error: { code: 404, message: `بازدید #${inspectionId} پیدا نشد` } }, 404);
+        const line = lines.find(l => Number(l.id) === Number(ins.line_id)) || null;
+        const towers = ins.line_id ? await loadTowers(Number(ins.line_id)) : [];
+        const tower = towers.find(t => Number(t.id) === Number(ins.tower_id)) || null;
+        const method = ins.inspection_method || ins.inspection_type || "climbing";
+        terrain = ins.terrain_type || tower?.terrain_type || "plain";
+        structure = tower?.tower_structure || line?.tower_structure || null;
+        const match = simMatchPriceItem(scoped, {
+          price_list_id: priceListId, voltage_kv: line?.voltage_kv ?? null, circuit_count: line?.circuit_count ?? null,
+          bundle_count: line?.bundle_count ?? null, activity_type: "inspection", inspection_method: method,
+          tower_structure: structure, terrain_type: terrain,
+        });
+        if (!match || match.unit_price == null) return simJson({ success: false, error: { code: 422, message: `برای بازدید ${ins.inspection_code} قلم مناسبی در فهرست بها یافت نشد` } }, 422);
+        base = match.base_unit_price ?? 0; pct = match.coefficient_percent; pliId = Number(match.item.id); pliCode = match.item.code;
+        unit = match.item.unit || "دکل";
+        const actLabel = SIM_METHOD_LABELS[method] || "بازدید";
+        desc = `${actLabel} دکل ${ins.tower_code || "—"} — خط ${ins.line_code || line?.line_code || "—"} — ${SIM_TERRAIN_LABELS[terrain] || terrain}${structure ? ` — ${structure}` : ""} [${pliCode}]`;
+      } else if (it.price_list_item_id) {
+        const pli = scoped.find(p => Number(p.id) === Number(it.price_list_item_id));
+        if (!pli) return simJson({ success: false, error: { code: 404, message: "قلم فهرست بها پیدا نشد" } }, 404);
+        pliId = Number(pli.id); pliCode = pli.code; unit = pli.unit || "عدد";
+        terrain = it.terrain_type || null; structure = it.tower_structure || null;
+        const terrainCol = terrain ? TERRAIN_PRICE_COLS[terrain] : undefined;
+        if (terrainCol && pli[terrainCol] != null && Number(pli[terrainCol]) > 0) base = Number(pli[terrainCol]);
+        else base = Number(pli.unit_price || 0);
+        const coefs = scoped.filter(c => (c.item_kind === "coefficient" || Number(c.is_coefficient) === 1) && simIsActive(c) &&
+          (c.voltage_kv == null || pli.voltage_kv == null || Number(c.voltage_kv) === Number(pli.voltage_kv)) &&
+          (!c.activity_type || c.activity_type === pli.activity_type) &&
+          (!c.inspection_method || c.inspection_method === pli.inspection_method) &&
+          (!c.tower_structure || c.tower_structure === structure) &&
+          (!c.terrain_type || c.terrain_type === terrain));
+        pct = coefs.reduce((s, c) => s + Number(c.coefficient_percent || 0), 0);
+        desc = `${pli.title}${it.work_order_id ? ` — دستورکار #${it.work_order_id}` : ""} [${pli.code}]`;
+        if (it.work_order_id) workOrderId = Number(it.work_order_id);
+      } else {
+        continue;
+      }
+      const lineBase = Math.round(base * quantity * 100) / 100;
+      const lineCoef = Math.round(lineBase * pct / 100 * 100) / 100;
+      const lineTotal = lineBase + lineCoef;
+      sumBase += lineBase; sumCoef += lineCoef; sumNet += lineTotal;
+      linesOut.push({
+        inspection_id: inspectionId, work_order_id: workOrderId, price_list_item_id: pliId, pli_code: pliCode,
+        description: desc, unit, quantity, unit_price: base, total_price: lineTotal,
+        base_amount: lineBase, coefficient_percent: pct, coefficient_amount: lineCoef,
+        terrain_type: terrain, tower_structure: structure,
+      });
+    }
+    if (!linesOut.length) return simJson({ success: false, error: { code: 400, message: "هیچ قلم معتبری یافت نشد" } }, 400);
+    const taxPercent = Number(body.tax_percent ?? 10);
+    const tax = Math.round(sumNet * taxPercent / 100 * 100) / 100;
+    const final = Math.round((sumNet + tax) * 100) / 100;
+    const invoiceId = simInvoiceNextId++;
+    const code = `INV-${new Date().getFullYear()}-${String(invoiceId % 10000).padStart(4, "0")}`;
+    const invoice = {
+      id: invoiceId, invoice_code: code, contract_id: contractId,
+      contract_title: contract?.title || null,
+      contractor_id: contract?.contractor_id ?? body.contractor_id ?? null,
+      contractor_name: null,
+      period_start: body.period_start || new Date().toISOString().slice(0, 10),
+      period_end: body.period_end || new Date().toISOString().slice(0, 10),
+      total_amount: Math.round(sumNet * 100) / 100, net_amount: Math.round(sumNet * 100) / 100,
+      coefficient_amount: Math.round(sumCoef * 100) / 100,
+      tax_amount: tax, tax_percent: taxPercent, final_amount: final,
+      status: "draft", activity_status: "inactive", price_list_id: priceListId,
+      district_id: body.district_id ? Number(body.district_id) : null, district_name: null,
+      notes: body.notes || null,
+      created_at: new Date().toISOString().slice(0, 19).replace("T", " "),
+    };
+    simInvoicesCreated.unshift(invoice);
+    simInvoiceItemsStore.set(invoiceId, linesOut);
+    console.log(`[DEV SIM] صورت‌وضعیت محلی صادر شد #${invoiceId} ${code} — ${linesOut.length} قلم`);
+    return simJson({
+      success: true, message: "صورت‌وضعیت صادر شد (شبیه‌ساز توسعه)",
+      data: {
+        id: invoiceId, invoice_code: code, items_count: linesOut.length,
+        base_amount: Math.round(sumBase * 100) / 100, coefficient_amount: Math.round(sumCoef * 100) / 100,
+        net_amount: Math.round(sumNet * 100) / 100, tax_amount: tax, final_amount: final,
+      },
+    }, 201);
+  }
+
+  // اقلام یک صورت‌وضعیت
+  const itemsMatch = /^\/invoices\/(\d+)\/items$/.exec(path);
+  if (method === "GET" && itemsMatch) {
+    const id = Number(itemsMatch[1]);
+    if (simInvoiceItemsStore.has(id)) {
+      return simJson({ success: true, data: { invoice: simInvoicesCreated.find(i => Number(i.id) === id) || null, items: simInvoiceItemsStore.get(id) } });
+    }
+    return null; // صورت‌وضعیت هاست — به هاست واریس شود
+  }
+
+  return null;
+}
+
 async function handleRequest(request: NextRequest) {
   const url = new URL(request.url);
   const path = url.pathname.replace(/^\/api\/proxy/, "");
@@ -511,11 +1047,11 @@ async function handleRequest(request: NextRequest) {
   if (DEV_MODE && isGet && path === "/backend-version") {
     const upstream = await upstreamBackendVersion();
     if (!upstream.length || !versionAtLeast(upstream, SIM_VERSION)) {
-      console.log(`[DEV SIM] backend-version هاست ${upstream.join(".") || "?"} قدیمی است — نسخهٔ بستهٔ 4.3.85 گزارش شد`);
+      console.log(`[DEV SIM] backend-version هاست ${upstream.join(".") || "?"} قدیمی است — نسخهٔ بستهٔ 4.3.86 گزارش شد`);
       return NextResponse.json({
         success: true,
         message: "نسخه بک‌اند",
-        data: { version: "v4.3.85", component: "Powerline PHP Backend (dev-sim)" },
+        data: { version: "v4.3.86", component: "Powerline PHP Backend (dev-sim)" },
       });
     }
   }
@@ -523,7 +1059,7 @@ async function handleRequest(request: NextRequest) {
   // v4.3.83 (فقط توسعه): فهرست نقش‌ها — بک‌اند قدیمی endpoint ندارد؛ شبیه‌ساز محلی پاسخ می‌دهد
   if (DEV_MODE && isGet && path === "/roles") {
     const upstream = await upstreamBackendVersion();
-    if (!upstream.length || !versionAtLeast(upstream, SIM_VERSION)) {
+    if (!upstream.length || !versionAtLeast(upstream, SIM_USERS_VERSION)) {
       return simulateRolesGet();
     }
   }
@@ -531,9 +1067,57 @@ async function handleRequest(request: NextRequest) {
   // v4.3.83 (فقط توسعه): نوشتن‌های /users و /roles — تا آپلود بک‌اند 4.3.83 روی هاست، محلی شبیه‌سازی می‌شوند
   if (DEV_MODE && !isGet && (path.startsWith("/users") || path.startsWith("/roles"))) {
     const upstream = await upstreamBackendVersion();
-    if (!upstream.length || !versionAtLeast(upstream, SIM_VERSION)) {
+    if (!upstream.length || !versionAtLeast(upstream, SIM_USERS_VERSION)) {
       if (path.startsWith("/roles")) return simulateRolesWrite(request.method, path, bodyText ?? "");
       return await simulateUsersWrite(request.method, path, bodyText ?? "", request.headers.get("authorization") || "");
+    }
+  }
+
+  // v4.3.86 (فقط توسعه): شبیه‌ساز فهرست بها + بازدید + صورت‌وضعیت — تا آپلود
+  // بک‌اند ۴.۳.۸۶ روی هاست و اجرای SQL جدید، این مسیرها محلی پاسخ داده می‌شوند.
+  // گیت: قابلیت price-list-import در backend-version هاست اعلام نشده باشد
+  // (هاست ممکن است شماره نسخهٔ مشابه را خودش گزارش داده باشد — قابلیت‌ها معیارند)
+  if (DEV_MODE && (
+    path.startsWith("/price-list-items") ||
+    path === "/invoices/candidates" || path === "/invoices/generate" ||
+    /^\/invoices\/\d+\/items$/.test(path) ||
+    path === "/inspections" || path === "/invoices"
+  )) {
+    const hasFeature = await hostHasFeature("price-list-import");
+    if (!hasFeature) {
+      const simAuth = request.headers.get("authorization") || "";
+      // بازدیدها: GET = پاسخ هاست + بازدیدهای محلی / POST = ساخت محلی
+      if (path === "/inspections") {
+        if (!isGet) {
+          const insSim = await simulateInspectionsRequest(request.method, path, bodyText ?? "", simAuth);
+          if (insSim) return insSim;
+        } else if (simInspectionsCreated.length) {
+          const host = await simFetchHost(`${path}${search}`, simAuth);
+          const hostRows: any[] = Array.isArray(host?.data) ? host.data : [];
+          const merged = [...simInspectionsCreated, ...hostRows];
+          const pag = host?.pagination
+            ? { ...host.pagination, total: (Number(host.pagination.total) || 0) + simInspectionsCreated.length }
+            : { page: 1, page_size: 500, total: merged.length, total_pages: 1, has_next: false, has_prev: false };
+          return simJson({ success: true, data: merged, pagination: pag });
+        }
+      }
+      // صورت‌وضعیت‌ها: GET لیست = پاسخ هاست + صورت‌وضعیت‌های محلی
+      if (isGet && path === "/invoices" && simInvoicesCreated.length) {
+        const host = await simFetchHost(`${path}${search}`, simAuth);
+        const hostRows: any[] = Array.isArray(host?.data) ? host.data : [];
+        const merged = [...simInvoicesCreated, ...hostRows];
+        const pag = host?.pagination
+          ? { ...host.pagination, total: (Number(host.pagination.total) || 0) + simInvoicesCreated.length }
+          : { page: 1, page_size: 500, total: merged.length, total_pages: 1, has_next: false, has_prev: false };
+        return simJson({ success: true, data: merged, pagination: pag });
+      }
+      // اقلام فهرست بها — کامل محلی (overlay روی اقلام هاست)
+      if (path.startsWith("/price-list-items")) {
+        return await simulatePriceListRequest(request.method, path, search, bodyText ?? "", simAuth);
+      }
+      // کاندیدها / صدور / اقلام صورت‌وضعیت
+      const invSim = await simulateInvoicesRequest(request.method, path, search, bodyText ?? "", simAuth);
+      if (invSim) return invSim;
     }
   }
 

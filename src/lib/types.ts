@@ -44,10 +44,6 @@ export interface Tower {
   tower_type: TowerType;
   tower_structure: string | null;
   tower_type_code: string | null;
-  terrain_type?: "plain" | "semi_mountainous" | "mountainous" | string | null;
-  plain_terrain?: number | null;
-  semi_mountainous?: number | null;
-  mountainous?: number | null;
   base_height_a: number | null;
   base_height_b: number | null;
   base_height_c: number | null;
@@ -170,11 +166,13 @@ export interface Inspection {
   gps_lng: number | null;
   status: InspectionStatus;
   priority: "routine" | "emergency" | "follow_up" | "commissioning";
-  inspection_method?: "patrol" | "climbing" | string | null;
-  crew_size?: number | null;
-  terrain_type?: "plain" | "semi_mountainous" | "mountainous" | string | null;
   weather: string | null;
   notes: string | null;
+  // v4.3.86: روش بازدید (climbing=صعودی / patrol=پیمایشی) + نوع زمین
+  inspection_method?: string | null;
+  /** کلید قدیمی برای سازگاری با بک‌اند ۴.۳.۸۶ قبل از rename */
+  inspection_type?: string | null;
+  terrain_type?: string | null;
   // v4.3.78: وضعیت فعال/غیرفعال + امور بهره‌برداری بازدید
   activity_status?: string | null;
   district_id?: number | null;

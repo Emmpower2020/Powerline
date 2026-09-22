@@ -20,6 +20,7 @@ import { ContractSelect } from "@/components/contract-select";
 import { DistrictSelect } from "@/components/district-select";
 import { currentUserDistrictId, resolveDistrictValue } from "@/hooks/use-district-options";
 import { FormSection } from "@/components/form-section";
+import { SearchableSelect } from "@/components/searchable-select";
 
 // قرارداد
 export function CreateContractDialog({ open, onClose, onCreated }: { open: boolean; onClose: () => void; onCreated: () => void }) {
@@ -222,32 +223,135 @@ export function CreateEquipmentDialog({ open, onClose, onCreated }: { open: bool
 export function CreateInspectionDialog({ open, onClose, onCreated }: { open: boolean; onClose: () => void; onCreated: () => void }) {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [form, setForm] = useState({ inspection_date: "", priority: "routine", weather: "", notes: "", contract_id: "", district_id: "", inspection_method: "", crew_size: "", terrain_type: "" });
+  // v4.3.86: نوع بازدید (صعودی/پیمایشی) + اتصال به خط/دکل + نوع زمین
+  const [lines, setLines] = useState<any[]>([]);
+  const [towers, setTowers] = useState<any[]>([]);
+  const [towersLoading, setTowersLoading] = useState(false);
+  const [form, setForm] = useState({ inspection_date: "", inspection_method: "climbing", priority: "routine", weather: "", notes: "", contract_id: "", district_id: "", line_id: "", tower_id: "", terrain_type: "" });
+
+  // بارگذاری خطوط
+  useEffect(() => {
+    if (open) {
+      apiClient.get<any>(API_ENDPOINTS.lines, { page: 1, page_size: 500 })
+        .then(r => setLines((Array.isArray(r) ? r : (r?.data || []))))
+        .catch(() => setLines([]));
+    }
+  }, [open]);
+
+  // بارگذاری دکل‌های خط انتخاب‌شده
+  useEffect(() => {
+    if (!open || !form.line_id) { setTowers([]); return; }
+    setTowersLoading(true);
+    apiClient.get<any>(API_ENDPOINTS.towers, { line_id: Number(form.line_id), page: 1, page_size: 1000 })
+      .then(r => setTowers((Array.isArray(r) ? r : (r?.data || []))))
+      .catch(() => setTowers([]))
+      .finally(() => setTowersLoading(false));
+  }, [open, form.line_id]);
+
+  // با انتخاب دکل: نمایش اطلاعات سازه/زمین دکل
+  const selectedTower = towers.find(t => String(t.id) === form.tower_id) || null;
+  const selectedLine = lines.find(l => String(l.id) === form.line_id) || null;
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.inspection_date) { setError("تاریخ بازدید الزامی است"); return; }
     setSubmitting(true); setError(null);
-    try { await apiClient.post(API_ENDPOINTS.inspections, { inspection_date: form.inspection_date, priority: form.priority, weather: form.weather || null, notes: form.notes || null, contract_id: form.contract_id ? Number(form.contract_id) : null, district_id: resolveDistrictValue(form.district_id), inspection_method: form.inspection_method || null, crew_size: form.crew_size ? Number(form.crew_size) : null, terrain_type: form.terrain_type || null }); setForm({ inspection_date: "", priority: "routine", weather: "", notes: "", contract_id: "", district_id: "", inspection_method: "", crew_size: "", terrain_type: "" }); onCreated(); } catch (err) { setError(err instanceof Error ? err.message : "خطا"); } finally { setSubmitting(false); }
+    try {
+      await apiClient.post(API_ENDPOINTS.inspections, {
+        inspection_date: form.inspection_date,
+        inspection_method: form.inspection_method || "climbing",
+        line_id: form.line_id ? Number(form.line_id) : null,
+        tower_id: form.tower_id ? Number(form.tower_id) : null,
+        terrain_type: form.terrain_type || null,
+        priority: form.priority,
+        weather: form.weather || null,
+        notes: form.notes || null,
+        contract_id: form.contract_id ? Number(form.contract_id) : null,
+        district_id: resolveDistrictValue(form.district_id),
+      });
+      setForm({ inspection_date: "", inspection_method: "climbing", priority: "routine", weather: "", notes: "", contract_id: "", district_id: currentUserDistrictId() !== null ? String(currentUserDistrictId()) : "", line_id: "", tower_id: "", terrain_type: "" });
+      onCreated();
+    } catch (err) { setError(err instanceof Error ? err.message : "خطا"); } finally { setSubmitting(false); }
   };
+
+  const terrainOptions = [
+    { value: "", label: "خودکار (از دکل)" },
+    { value: "plain", label: "دشت" },
+    { value: "hilly", label: "تپه‌ماهور" },
+    { value: "semi_mountainous", label: "نیمه‌کوهستانی" },
+    { value: "impassable", label: "صعب‌العبور" },
+  ];
 
   return (
     <Shell open={open} onClose={onClose} boxTitle="اطلاعات بازدید" title="ثبت بازدید جدید" submitting={submitting} error={error} onSubmit={submit}>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <Field label="تاریخ بازدید (اجباری)"><JalaliDatePicker value={form.inspection_date} onChange={v => setForm({ ...form, inspection_date: v })} /></Field>
-        <Field label="اولویت"><Select value={form.priority} onValueChange={v => setForm({ ...form, priority: v })}><SelectTrigger className="w-full"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="routine">معمول</SelectItem><SelectItem value="emergency">اضطراری</SelectItem></SelectContent></Select></Field>
+        {/* v4.3.86: روش بازدید (صعودی/پیمایشی) — مبنای تطبیق قلم فهرست بها هنگام صدور صورت‌وضعیت */}
+        <Field label="نوع بازدید">
+          <Select value={form.inspection_method} onValueChange={v => setForm({ ...form, inspection_method: v })}>
+            <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="climbing">بازدید صعودی</SelectItem>
+              <SelectItem value="patrol">بازدید پیمایشی</SelectItem>
+            </SelectContent>
+          </Select>
+        </Field>
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <Field label="قرارداد"><ContractSelect value={form.contract_id} onChange={v => setForm({ ...form, contract_id: v })} /></Field>
         {/* v4.3.78: امور بهره‌برداری بازدید */}
         <Field label="امور بهره‌برداری"><DistrictSelect autoLock value={form.district_id} onChange={v => setForm({ ...form, district_id: v })} /></Field>
       </div>
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        <Field label="نوع بازدید"><Select value={form.inspection_method || "__none__"} onValueChange={v => setForm({ ...form, inspection_method: v === "__none__" ? "" : v })}><SelectTrigger className="w-full"><SelectValue placeholder="انتخاب نوع بازدید" /></SelectTrigger><SelectContent><SelectItem value="__none__">نامشخص</SelectItem><SelectItem value="patrol">پیمایشی</SelectItem><SelectItem value="climbing">صعودی</SelectItem></SelectContent></Select></Field>
-        <Field label="تعداد نفرات بازدید"><Input value={form.crew_size} onChange={e => setForm({ ...form, crew_size: e.target.value })} type="number" min="1" step="1" dir="ltr" placeholder="مثلاً 2" /></Field>
-        <Field label="شرایط زمین در این بازدید"><Select value={form.terrain_type || "__none__"} onValueChange={v => setForm({ ...form, terrain_type: v === "__none__" ? "" : v })}><SelectTrigger className="w-full"><SelectValue placeholder="از دکل ارث‌بری می‌شود" /></SelectTrigger><SelectContent><SelectItem value="__none__">از دکل ارث‌بری می‌شود</SelectItem><SelectItem value="plain">دشت و تپه‌ماهور</SelectItem><SelectItem value="semi_mountainous">نیمه‌کوهستانی</SelectItem><SelectItem value="mountainous">صعب‌العبور</SelectItem></SelectContent></Select></Field>
+      {/* v4.3.86: اتصال بازدید به خط و دکل — برای صدور صورت‌وضعیت و قیمت‌گذاری خودکار */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <Field label="خط">
+          <SearchableSelect
+            value={form.line_id}
+            onChange={v => setForm({ ...form, line_id: v, tower_id: "", terrain_type: "" })}
+            options={lines.map(l => ({ value: String(l.id), label: `${l.line_code || ""} — ${(l.name || "").slice(0, 45)}` }))}
+            placeholder="جستجوی خط (کد یا نام)..."
+            allowClear
+          />
+        </Field>
+        <Field label="دکل">
+          <SearchableSelect
+            value={form.tower_id}
+            onChange={v => setForm({ ...form, tower_id: v })}
+            options={towers.map(t => ({
+              value: String(t.id),
+              label: t.tower_code || `دکل #${t.id}`,
+              description: [t.tower_structure, t.tower_type].filter(Boolean).join(" • "),
+            }))}
+            placeholder={form.line_id ? (towersLoading ? "در حال بارگذاری دکل‌ها..." : `جستجوی دکل (${towers.length.toLocaleString("fa-IR")} دکل)...`) : "ابتدا خط را انتخاب کنید"}
+            disabled={!form.line_id}
+            allowClear
+          />
+        </Field>
       </div>
-      <Field label="وضعیت هوا"><Input value={form.weather} onChange={e => setForm({ ...form, weather: e.target.value })} className="text-right" /></Field>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <Field label="نوع زمین بازدید">
+          <Select value={form.terrain_type} onValueChange={v => setForm({ ...form, terrain_type: v })}>
+            <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              {terrainOptions.map(o => <SelectItem key={o.value} value={o.value || "auto"}>{o.label}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </Field>
+        <div className="flex items-end">
+          {selectedLine || selectedTower ? (
+            <div className="text-xs text-slate-500 bg-slate-50 dark:bg-slate-800/50 rounded-lg p-2.5 w-full leading-6">
+              {selectedLine ? <>خط: <span className="font-medium text-slate-700 dark:text-slate-200">{selectedLine.line_code}</span>{selectedLine.voltage_kv ? ` — ${Number(selectedLine.voltage_kv).toLocaleString("fa-IR")} کیلوولت` : ""}{selectedLine.circuit_count ? ` — ${selectedLine.circuit_count === 1 ? "تک‌مداره" : selectedLine.circuit_count === 2 ? "دو مداره" : selectedLine.circuit_count === 4 ? "چهارمداره" : ""}` : ""}{selectedLine.bundle_count ? ` — ${selectedLine.bundle_count.toLocaleString("fa-IR")} باندل` : ""}<br /></> : null}
+              {selectedTower ? <>دکل: <span className="font-medium text-slate-700 dark:text-slate-200">{selectedTower.tower_code}</span>{selectedTower.tower_structure ? ` — ${selectedTower.tower_structure}` : ""}{selectedTower.terrain_type ? ` — زمین: ${{ plain: "دشت", hilly: "تپه‌ماهور", semi_mountainous: "نیمه‌کوهستانی", impassable: "صعب‌العبور" }[selectedTower.terrain_type] || ""}` : " — زمین: نامشخص"}</> : null}
+            </div>
+          ) : (
+            <p className="text-xs text-slate-400">با انتخاب خط و دکل، قیمت‌گذاری در صورت‌وضعیت خودکار از فهرست بها انجام می‌شود</p>
+          )}
+        </div>
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <Field label="اولویت"><Select value={form.priority} onValueChange={v => setForm({ ...form, priority: v })}><SelectTrigger className="w-full"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="routine">معمول</SelectItem><SelectItem value="emergency">اضطراری</SelectItem></SelectContent></Select></Field>
+        <Field label="وضعیت هوا"><Input value={form.weather} onChange={e => setForm({ ...form, weather: e.target.value })} className="text-right" /></Field>
+      </div>
       <Field label="یادداشت"><Textarea value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} rows={3} className="text-right" /></Field>
     </Shell>
   );

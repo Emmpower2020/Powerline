@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2 } from "lucide-react";
+import { Loader2, Receipt, Printer } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { ContractSelect } from "@/components/contract-select";
 import { DistrictSelect } from "@/components/district-select";
@@ -18,9 +18,9 @@ import { FormSection } from "@/components/form-section";
 import { DataTable, type DataTableColumn } from "@/components/data-table";
 import type { PaginatedResponse } from "@/lib/types";
 import { GenericBulkActions } from "@/components/generic-bulk-actions";
-import { BillingMeasurementsInvoiceDialog } from "@/components/billing-measurements-invoice-dialog";
 import { ImportExcelDialog } from "@/components/import-excel-dialog";
 import { BulkDeleteDialog } from "@/components/bulk-delete-dialog";
+import { InvoiceBuilderDialog, InvoiceItemsDialog } from "@/components/invoices/invoice-builder-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { fromJalali, fromPersianNumber, looksLikeLegacyJalaliStoredAsGregorian, toJalali } from "@/lib/jalali";
 
@@ -355,13 +355,16 @@ export function GenericModulePage({ moduleKey, endpoint, accessKey }: { moduleKe
   const [showCreate, setShowCreate] = useState(false);
   const [showImport, setShowImport] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
-  const [showInvoiceFromMeasurements, setShowInvoiceFromMeasurements] = useState(false);
   const [editor, setEditor] = useState<{open: boolean; mode: "edit"|"create"|"copy"; row: GenericItem|null}>({open:false,mode:"edit",row:null});
   // v4.3.53: حذف استاندارد با دیالوگ تأیید و نوار پیشرفت (به‌جای window.confirm)
   const [pendingDelete, setPendingDelete] = useState<GenericItem[] | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [deleteProgress, setDeleteProgress] = useState<{ done: number; total: number } | null>(null);
   const { toast } = useToast();
+  // v4.3.86: صدور صورت‌وضعیت از فهرست بها + مشاهده اقلام/چاپ
+  const [showInvoiceBuilder, setShowInvoiceBuilder] = useState(false);
+  const [invoiceItemsFor, setInvoiceItemsFor] = useState<GenericItem | null>(null);
+  const isInvoiceModule = moduleKey === "invoices";
 
   useEffect(() => {
     const load = async () => {
@@ -478,12 +481,23 @@ export function GenericModulePage({ moduleKey, endpoint, accessKey }: { moduleKe
         const result = await apiClient.get<PaginatedResponse<GenericItem>>(endpoint, { page: 1, page_size: 100000 });
         return Array.isArray(result) ? result : (result?.data || []);
       }}
-      toolbarExtra={(rows) => <div className="flex items-center gap-2">
+      toolbarExtra={(rows) => (<>
+        {/* v4.3.86: صورت‌وضعیت — صدور از فهرست بها + مشاهده اقلام/چاپ */}
+        {isInvoiceModule ? (
+          <div className="flex items-center gap-1.5 ml-2 pl-2 border-l border-slate-200 dark:border-slate-700">
+            <Button size="sm" className="h-8 bg-indigo-600 hover:bg-indigo-700" onClick={() => setShowInvoiceBuilder(true)}>
+              <Receipt className="w-3.5 h-3.5 ml-1" />
+              صدور صورت‌وضعیت
+            </Button>
+            <Button size="sm" variant="outline" className="h-8" disabled={rows.length !== 1} onClick={() => setInvoiceItemsFor(rows[0])}>
+              <Printer className="w-3.5 h-3.5 ml-1" />
+              اقلام و چاپ
+            </Button>
+          </div>
+        ) : null}
         <GenericBulkActions rows={rows} endpoint={endpoint} entityName={config.singular} onApplied={() => setRefreshKey(k => k + 1)} canToggleStatus statusField={config.statusField} canChangeContract={!!config.editKeys?.includes("contract_id")} canChangeDistrict={!!config.editKeys?.includes("district_id")} />
-        {moduleKey === "invoices" && <Button size="sm" variant="outline" onClick={() => setShowInvoiceFromMeasurements(true)}>صدور از متره‌ها</Button>}
-      </div>}
+      </>)}
     />
-    {moduleKey === "invoices" && <BillingMeasurementsInvoiceDialog open={showInvoiceFromMeasurements} onClose={() => setShowInvoiceFromMeasurements(false)} onCreated={() => setRefreshKey(k => k + 1)} />}
     <EditorDialog open={editor.open} row={editor.row} keys={selectedKeys} singular={config.singular} moduleKey={moduleKey} mode={editor.mode} endpoint={endpoint} onClose={() => setEditor(prev => ({...prev, open:false, row:null}))} onSaved={() => { setEditor(prev => ({...prev, open:false, row:null})); setRefreshKey(k => k + 1); }} />
 
     {/* ورود انبوه استاندارد از اکسل — همان تجربه مدارها/خطوط */}
@@ -513,5 +527,19 @@ export function GenericModulePage({ moduleKey, endpoint, accessKey }: { moduleKe
       onCancel={() => { if (!deleting) setPendingDelete(null); }}
       onConfirm={confirmDelete}
     />
+
+    {/* v4.3.86: صدور صورت‌وضعیت از فهرست بها + مشاهده اقلام/چاپ */}
+    {isInvoiceModule ? (<>
+      <InvoiceBuilderDialog
+        open={showInvoiceBuilder}
+        onClose={() => setShowInvoiceBuilder(false)}
+        onGenerated={() => { setShowInvoiceBuilder(false); setRefreshKey(k => k + 1); }}
+      />
+      <InvoiceItemsDialog
+        invoice={invoiceItemsFor ? { id: Number(invoiceItemsFor.id), invoice_code: String(invoiceItemsFor.invoice_code || ""), final_amount: (invoiceItemsFor as any).final_amount } : null}
+        open={invoiceItemsFor !== null}
+        onClose={() => setInvoiceItemsFor(null)}
+      />
+    </>) : null}
   </div>;
 }
