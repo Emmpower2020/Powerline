@@ -8,16 +8,16 @@
  *   ۳) تمام قابلیت‌های v5
  *
  * محل قرارگیری: در فولدر Powerline روی سرور
- * استفاده: https://jibimarket.com/Powerline/Files/import_defects_v6.php
+ * استفاده: https://bot.sabadgame.com/Powerline/Files/import_defects_v6.php
  */
 
 // ============================================================================
 //  تنظیمات دیتابیس
 // ============================================================================
 $DB_HOST = 'localhost';
-$DB_NAME = 'jibimar1_Powerline';
-$DB_USER = 'jibimar1_Powerline';
-$DB_PASS = 'JBg3XgdWjdzajJYMprus';
+$DB_NAME = 'sabadgam_Powerline';
+$DB_USER = 'sabadgam_Powerline';
+$DB_PASS = '@Emm151872';
 
 $EXCEL_FILE = __DIR__ . '/عیوب_استاندارد.xlsx';
 $AUTO_CREATE_CATEGORIES = true;

@@ -10,9 +10,9 @@
 //  تنظیمات دیتابیس
 // ============================================================================
 define('DB_HOST', 'localhost');
-define('DB_NAME', 'jibimar1_Powerline');
-define('DB_USER', 'jibimar1_Powerline');
-define('DB_PASS', 'JBg3XgdWjdzajJYMprus');
+define('DB_NAME', 'sabadgam_Powerline');
+define('DB_USER', 'sabadgam_Powerline');
+define('DB_PASS', '@Emm151872');
 define('DB_CHARSET', 'utf8mb4');
 
 // ============================================================================
